@@ -17,7 +17,7 @@ export class TrainingGameControlRenderer {
 
   get canvas() { return this.#canvas; }
 
-  draw({ state, countdownElapsed, score, clouds, obstacles,
+  draw({ state, countdownElapsed, score, highScore, clouds, obstacles,
          groundY, charX, charWidth, charHeight, jumpOffset, running, now }) {
     const ctx = this.#ctx;
     const w = this.#canvas.width;
@@ -31,12 +31,12 @@ export class TrainingGameControlRenderer {
       this.#drawObstacles(ctx, obstacles, groundY);
     }
     this.#drawCharacter(ctx, charX, groundY, charWidth, charHeight, jumpOffset, running, now);
+    this.#drawCounters(ctx, w, score, highScore);
 
     switch (state) {
       case STATE.IDLE:      return this.#drawIdle(ctx, w, h);
       case STATE.COUNTDOWN:  return this.#drawCountdown(ctx, w, h, countdownElapsed);
-      case STATE.PLAYING:    return this.#drawScoreOverlay(ctx, score);
-      case STATE.GAME_OVER:  return this.#drawGameOver(ctx, w, h, score);
+      case STATE.GAME_OVER:  return this.#drawGameOver(ctx, w, h, score, highScore);
     }
   }
 
@@ -155,7 +155,7 @@ export class TrainingGameControlRenderer {
     ctx.restore();
   }
 
-  #drawGameOver(ctx, w, h, score) {
+  #drawGameOver(ctx, w, h, score, highScore) {
     const cx = w / 2, cy = h / 2 - 60;
     ctx.save();
     ctx.shadowColor  = 'rgba(0,0,0,0.25)';
@@ -163,32 +163,40 @@ export class TrainingGameControlRenderer {
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
 
-    ctx.fillStyle = 'rgba(255,255,255,0.50)';
-    ctx.font      = '200 16px Nunito, sans-serif';
-    ctx.fillText('OBSTACLES CLEARED', cx, cy - 52);
-
     ctx.fillStyle = 'rgba(255,255,255,0.90)';
-    ctx.font      = '300 72px Nunito, sans-serif';
-    ctx.fillText(score, cx, cy);
+    ctx.font      = '300 42px Nunito, sans-serif';
+    ctx.fillText(`Score: ${score}`, cx, cy - 10);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.font      = '300 22px Nunito, sans-serif';
+    ctx.fillText(`Best score: ${highScore}`, cx, cy + 36);
 
     ctx.fillStyle = 'rgba(255,255,255,0.42)';
     ctx.font      = '200 14px Nunito, sans-serif';
-    ctx.fillText('Press Play again to retry', cx, cy + 52);
+    ctx.fillText('Press Play again to retry', cx, cy + 78);
     ctx.restore();
   }
 
-  #drawScoreOverlay(ctx, score) {
+  #drawCounters(ctx, w, score, highScore) {
     ctx.save();
     ctx.shadowColor  = 'rgba(0,0,0,0.35)';
     ctx.shadowBlur   = 10;
-    ctx.textAlign    = 'left';
+    ctx.textAlign    = 'right';
+
     ctx.textBaseline = 'top';
-    ctx.fillStyle    = 'rgba(255,255,255,0.88)';
-    ctx.font         = '300 48px Nunito, sans-serif';
-    ctx.fillText(score, 22, 14);
     ctx.fillStyle    = 'rgba(255,255,255,0.45)';
     ctx.font         = '200 13px Nunito, sans-serif';
-    ctx.fillText('score', 24, 64);
+    ctx.fillText('best', w - 24, 14);
+    ctx.fillStyle    = 'rgba(255,255,255,0.65)';
+    ctx.font         = '300 26px Nunito, sans-serif';
+    ctx.fillText(highScore, w - 24, 30);
+
+    ctx.fillStyle    = 'rgba(255,255,255,0.45)';
+    ctx.font         = '200 13px Nunito, sans-serif';
+    ctx.fillText('score', w - 24, 70);
+    ctx.fillStyle    = 'rgba(255,255,255,0.88)';
+    ctx.font         = '300 40px Nunito, sans-serif';
+    ctx.fillText(score, w - 24, 86);
     ctx.restore();
   }
 }
