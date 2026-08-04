@@ -24,6 +24,8 @@ Two windows open:
 | **Start** | Begins the 3-second countdown then the run. |
 | **Score** | Live count of obstacles successfully cleared. |
 
+The scene window also shows a live **score** / **best** pair top-right (best score is tracked for the current app session only — it resets on restart), and the end screen shows `Score: X` / `Best score: X`.
+
 ---
 
 ## How it works
@@ -56,8 +58,8 @@ In [app/modules/trainingGameControl/trainingGameControl_config.js](../modules/tr
 | `JUMP_DURATION_MS` | `500` | Total jump air time (ms) |
 | `OBSTACLE_WIDTH` | `22` | Obstacle width (px) |
 | `OBSTACLE_HEIGHT_MIN` / `MAX` | `40` / `70` | Obstacle height range (px) |
-| `MIN_OBSTACLE_INTERVAL_MS` | `500` | Minimum time between obstacle spawns |
-| `MAX_OBSTACLE_INTERVAL_MS` | `1500` | Maximum time between obstacle spawns |
+| `MIN_OBSTACLE_INTERVAL_MS` | `900` | Minimum time between obstacle spawns |
+| `MAX_OBSTACLE_INTERVAL_MS` | `2000` | Maximum time between obstacle spawns |
 | `EXHALE_ONSET_THRESHOLD` | `0.40` | Signal level to detect start of exhale |
 | `EXHALE_DEBOUNCE_MS` | `400` | Minimum ms between exhale detections |
 | `CLOUD_COUNT` | `6` | Number of parallax background clouds |
