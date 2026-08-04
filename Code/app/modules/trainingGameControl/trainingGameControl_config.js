@@ -14,8 +14,8 @@ export const CONFIG = {
   OBSTACLE_WIDTH: 22,
   OBSTACLE_HEIGHT_MIN: 40,
   OBSTACLE_HEIGHT_MAX: 70,
-  MIN_OBSTACLE_INTERVAL_MS: 500,
-  MAX_OBSTACLE_INTERVAL_MS: 1500,
+  MIN_OBSTACLE_INTERVAL_MS: 900,
+  MAX_OBSTACLE_INTERVAL_MS: 2000,
   FIRST_OBSTACLE_DELAY_MS: 1200,
 
   // ── Breath / exhale onset detection ────────────────────────────────────────
