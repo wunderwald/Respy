@@ -22,6 +22,7 @@ Direct-launch shortcuts (skip the start screen):
 npm run ibreath       # iBreath experiment
 npm run bioGame       # biofeedback breath game
 npm run trainingGame  # breath training game
+npm run trainingGameControl # breath-controlled dino-style runner
 npm run baseline      # resting-state baseline
 npm run visualizer    # real-time waveform
 ```
@@ -35,6 +36,7 @@ npm run visualizer    # real-time waveform
 | iBreath | Interoception experiment | [docs/ibreath.md](docs/ibreath.md) |
 | bioGame | Biofeedback game | [docs/bioGame.md](docs/bioGame.md) |
 | trainingGame | Slow breathing training game | [docs/trainingGame.md](docs/trainingGame.md) |
+| trainingGameControl | Breath-controlled dino-style runner | [docs/trainingGameControl.md](docs/trainingGameControl.md) |
 | baseline | Resting-state recording | [docs/baseline.md](docs/baseline.md) |
 | visualizer | Live signal waveform viewer | [docs/visualizer.md](docs/visualizer.md) |
 | signal | Signal processing utilities | [docs/signal.md](docs/signal.md) |

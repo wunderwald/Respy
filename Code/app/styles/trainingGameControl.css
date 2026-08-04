@@ -1,0 +1,40 @@
+/* trainingGameControl.css — Breath-controlled dino-style runner (modules/trainingGameControl/) */
+
+/* ── HUD bar (reuses #stats mount) ────────────────────────────────────────── */
+
+#stats {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  background: rgba(150, 150, 150, 0.45);
+  backdrop-filter: blur(8px);
+  border-radius: 99px;
+  padding: 8px 24px;
+  font-size: 0.78rem;
+  color: #aed4ed;
+  letter-spacing: 0.04em;
+}
+#stats span { white-space: nowrap; }
+#stats .label { opacity: 0.6; margin-right: 4px; }
+
+/* ── Full-window layout ───────────────────────────────────────────────────── */
+
+body  { padding: 0; gap: 0; }
+
+#scene {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* ── Game canvas ───────────────────────────────────────────────────────────── */
+
+#game-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
