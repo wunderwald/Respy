@@ -6,6 +6,7 @@ export class TrainingGameControl {
   // state
   #state = STATE.IDLE;
   #score = 0;
+  #highScore = 0; // session-only — resets on app restart
 
   // countdown
   #countdownStart = null;
@@ -192,6 +193,9 @@ export class TrainingGameControl {
         o.passed = true;
         this.#score++;
         this.#hudScore = this.#score;
+        if (this.#score > this.#highScore) {
+          this.#highScore = this.#score;
+        }
         this.#pushState();
       }
 
@@ -260,6 +264,7 @@ export class TrainingGameControl {
       state:            this.#state,
       countdownElapsed: this.#countdownStart != null ? now - this.#countdownStart : 0,
       score:            this.#score,
+      highScore:        this.#highScore,
       clouds:           this.#clouds,
       obstacles:        this.#obstacles,
       groundY:          this.#groundY(),
