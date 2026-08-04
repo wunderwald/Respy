@@ -7,8 +7,8 @@ export const CONFIG = {
   CHAR_X_RATIO: 0.12,
   CHAR_WIDTH: 26,
   CHAR_HEIGHT: 60,
-  JUMP_HEIGHT_PX: 110,
-  JUMP_DURATION_MS: 500,
+  JUMP_HEIGHT_PX: 150,
+  JUMP_DURATION_MS: 620,
 
   // ── Obstacles ───────────────────────────────────────────────────────────────
   OBSTACLE_WIDTH: 22,

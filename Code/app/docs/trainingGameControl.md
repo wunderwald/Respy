@@ -54,8 +54,8 @@ In [app/modules/trainingGameControl/trainingGameControl_config.js](../modules/tr
 | `GROUND_Y_RATIO` | `0.78` | Ground line as a fraction of canvas height |
 | `CHAR_X_RATIO` | `0.12` | Character's fixed x position as a fraction of canvas width |
 | `CHAR_WIDTH` / `CHAR_HEIGHT` | `26` / `60` | Character bounding box (px) |
-| `JUMP_HEIGHT_PX` | `110` | Jump apex height (px) |
-| `JUMP_DURATION_MS` | `500` | Total jump air time (ms) |
+| `JUMP_HEIGHT_PX` | `150` | Jump apex height (px) |
+| `JUMP_DURATION_MS` | `620` | Total jump air time (ms) |
 | `OBSTACLE_WIDTH` | `22` | Obstacle width (px) |
 | `OBSTACLE_HEIGHT_MIN` / `MAX` | `40` / `70` | Obstacle height range (px) |
 | `MIN_OBSTACLE_INTERVAL_MS` | `900` | Minimum time between obstacle spawns |
