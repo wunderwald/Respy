@@ -272,7 +272,7 @@ export class TrainingGameControl {
       charWidth:        CONFIG.CHAR_WIDTH,
       charHeight:       CONFIG.CHAR_HEIGHT,
       jumpOffset:       this.#jumpOffset,
-      running:          this.#state === STATE.PLAYING,
+      running:          this.#state !== STATE.GAME_OVER,
       now,
     };
   }
