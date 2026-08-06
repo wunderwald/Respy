@@ -164,23 +164,29 @@ export class TrainingGameRenderer {
   #drawSheepFlock(ctx, layout, score, now) {
     const { riverRightX, riverLeftX, w, groundBottom } = layout;
 
+    const scale = CONFIG.SHEEP_SCALE;
+    const rowStep = 30 * scale;
+
     // right bank — a small flock always available, doesn't deplete
     const rightCount = CONFIG.SHEEP_COUNT_RIGHT;
+    const rightCols = Math.min(rightCount, 3);
     for (let i = 0; i < rightCount; i++) {
-      const sx = lerp(riverRightX + 16, w - 16, i / (rightCount - 1 || 1));
-      const sy = groundBottom - 22 + Math.sin(now / 900 + i) * 2;
-      this.#drawSheep(ctx, sx, sy, 0.8);
+      const col = i % rightCols;
+      const row = Math.floor(i / rightCols);
+      const sx = lerp(riverRightX + 26, w - 26, col / (rightCols - 1 || 1));
+      const sy = groundBottom - 26 - row * rowStep + Math.sin(now / 900 + i) * 2;
+      this.#drawSheep(ctx, sx, sy, scale);
     }
 
     // left bank — grows with delivered score
     const leftCount = Math.min(score, CONFIG.SHEEP_MAX_SHOWN_LEFT);
-    const cols = 6;
+    const cols = 3;
     for (let i = 0; i < leftCount; i++) {
       const col = i % cols;
       const row = Math.floor(i / cols);
-      const sx = lerp(16, riverLeftX - 16, col / (cols - 1 || 1));
-      const sy = groundBottom - 22 - row * 22;
-      this.#drawSheep(ctx, sx, sy, 0.8);
+      const sx = lerp(26, riverLeftX - 26, col / (cols - 1 || 1));
+      const sy = groundBottom - 26 - row * rowStep;
+      this.#drawSheep(ctx, sx, sy, scale);
     }
   }
 
@@ -214,12 +220,13 @@ export class TrainingGameRenderer {
 
   #drawBoat(ctx, layout, { boatPos, hasSheep, sailAnim, now }) {
     const { riverLeftX, riverRightX, riverY } = layout;
-    const margin = 26;
+    const margin = 26 * CONFIG.BOAT_SCALE;
     const x = lerp(riverRightX - margin, riverLeftX + margin, boatPos);
     const y = riverY + Math.sin(now / 500) * 2;
 
     ctx.save();
     ctx.translate(x, y);
+    ctx.scale(CONFIG.BOAT_SCALE, CONFIG.BOAT_SCALE);
     ctx.strokeStyle = COLORS.ink;
     ctx.fillStyle = COLORS.bg;
     ctx.lineWidth = 2;
