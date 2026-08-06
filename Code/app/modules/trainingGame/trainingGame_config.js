@@ -23,6 +23,10 @@ export const CONFIG = {
   // ── Sheep ───────────────────────────────────────────────────────────────────
   SHEEP_COUNT_RIGHT:    4,   // always-available flock on the right bank
   SHEEP_MAX_SHOWN_LEFT: 24,  // cap on delivered-sheep icons drawn on the left bank
+  SHEEP_SCALE: 1.7,
+
+  // ── Boat / sailor size ──────────────────────────────────────────────────────
+  BOAT_SCALE: 1.8,
 
   // ── Background ──────────────────────────────────────────────────────────────
   CLOUD_COUNT: 5,
