@@ -22,6 +22,7 @@ Two windows open:
 |---|---|
 | **Subject** | Type the subject code before pressing Start. Locked once calibration begins. |
 | **Group** | *Target (slow 6 BPM)* — fish follows a 6 BPM breath curve, starfish appear on that curve. *Control (natural)* — curve uses the participant's natural BPM (set the BPM field). |
+| **Scene** | *Ocean* or *Jungle* — sets the visual theme (avatar, background, item shape, sounds). Chosen by the experimenter; no longer picked at random. |
 | **Natural BPM** | Only visible in the natural condition. Sets the target curve frequency. |
 | **Show target curve** | Overlays the sinusoidal target curve on screen (for debugging / operator monitoring). |
 | **Cal secs** | How many seconds to calibrate the breath signal (default 10 s). Calibration captures the participant's breathing range. |
