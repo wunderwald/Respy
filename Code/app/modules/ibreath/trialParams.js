@@ -1,5 +1,3 @@
-// Mirrors makeTrialData.m and the lr/sf/sa balanced-sequence logic.
-
 import { CONFIG } from './config.js';
 
 export function makeTrialParams(numTrials) {
@@ -40,8 +38,6 @@ export function makeTrialParams(numTrials) {
 
   const lrSeq       = balancedSeq(numTrials, 4);     // left / right
   const saSeq       = balancedSeq(numTrials, 2);     // sync / async alternating
-  const numAsync    = Math.floor(numTrials / 2);
-  const sfSeq       = balancedSeq(numAsync,  4);     // slow / fast (async only)
   const starfishSeq = balancedSeq(numTrials, 4, 1);  // 25% starfish, 75% pufferfish
   const flashSeq    = CONFIG.FLASHING_IMAGE
     ? balancedSeq(numTrials, 2)                      // 50% of trials get a flash
@@ -49,7 +45,6 @@ export function makeTrialParams(numTrials) {
   const questionSeq = makeQuestionSeq(numTrials);
 
   const trials = [];
-  let asyncIdx = 0;
 
   for (let i = 0; i < numTrials; i++) {
     const sync = saSeq[i];
@@ -67,7 +62,7 @@ export function makeTrialParams(numTrials) {
       stimY1:       1,
       ITI:          iti,               // ms
       questionType: questionSeq[i],    // 'sync' | 'flash' | 'lr' | 'img'
-      slowfast:     null,              // only set for async trials
+      delayMs:      null,              // async trials only — set at trial start from the adaptive staircase
       flashImage:   null,              // image name, or null if no flash this trial
       flashTime:    null,              // seconds into trial when flash fires
       flashX:       null,              // normalised [0,1] horizontal position
@@ -75,11 +70,6 @@ export function makeTrialParams(numTrials) {
       startTime:    null,
       endTime:      null,
     };
-
-    if (!sync) {
-      trial.slowfast = sfSeq[asyncIdx % sfSeq.length];
-      asyncIdx++;
-    }
 
     if (CONFIG.FLASHING_IMAGE && flashSeq[i]) {
       trial.flashImage = CONFIG.FLASH_IMAGE;
