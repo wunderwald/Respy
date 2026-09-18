@@ -2,15 +2,12 @@
  * signalUtils.js — Real-time signal processing utilities
  * =======================================================
  * Exports:
- *   class    GaussianSmoother     — real-time Gaussian low-pass filter
- *   class    AsyncSignalGenerator — sine + Perlin noise async stimulus
+ *   class    GaussianSmoother — real-time Gaussian low-pass filter
+ *   class    SignalDelayLine  — time-based delay buffer (async stimulus source)
  *   function mapRange(v, from, to)
- *   function perlin1d(len)
  *
  * All frequency/rate estimators live in breathRateEstimators.js.
  */
-
-import { AutocorrEstimator } from './breathRateEstimators.js';
 
 
 // ── mapRange ─────────────────────────────────────────────────────────────────
@@ -29,67 +26,6 @@ export function mapRange(value, from, to) {
   return to[0] + ((value - from[0]) / span) * (to[1] - to[0]);
 }
 
-
-
-// ── perlin1d ──────────────────────────────────────────────────────────────────
-// Port of perlin1d.m / perlin2d.m — produces a smooth noise array in [0, 1].
-// Not true Perlin noise but a smooth interpolated random signal matching the
-// statistical character of the MATLAB implementation.
-
-/**
- * Generates a 1-D smooth noise array of the given length, values in [0, 1].
- * @param {number} len
- * @returns {Float32Array}
- */
-export function perlin1d(len) {
-  // Build layered octave noise, same approach as the MATLAB perlin2d.m
-  const out = new Float32Array(len);
-  let w = len;
-  let octave = 1;
-
-  while (w > 3) {
-    // Random control points spaced by current octave width
-    const numPoints = Math.ceil(len / w) + 2;
-    const ctrl = new Float32Array(numPoints).map(() => Math.random());
-
-    // Cubic interpolation between control points
-    for (let i = 0; i < len; i++) {
-      const pos = (i / len) * (numPoints - 1);
-      const idx = Math.floor(pos);
-      const t = pos - idx;
-      const t2 = t * t;
-      const t3 = t2 * t;
-
-      const p0 = ctrl[Math.max(idx - 1, 0)];
-      const p1 = ctrl[idx];
-      const p2 = ctrl[Math.min(idx + 1, numPoints - 1)];
-      const p3 = ctrl[Math.min(idx + 2, numPoints - 1)];
-
-      // Catmull-Rom spline
-      const v = 0.5 * (
-        (2 * p1) +
-        (-p0 + p2) * t +
-        (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
-        (-p0 + 3 * p1 - 3 * p2 + p3) * t3
-      );
-      out[i] += octave * v;
-    }
-
-    w = w - Math.ceil(w / 2 - 1);
-    octave++;
-  }
-
-  // Normalise to [0, 1]
-  let min = Infinity, max = -Infinity;
-  for (let i = 0; i < len; i++) {
-    if (out[i] < min) min = out[i];
-    if (out[i] > max) max = out[i];
-  }
-  const range = max - min || 1;
-  for (let i = 0; i < len; i++) out[i] = (out[i] - min) / range;
-
-  return out;
-}
 
 
 // ── GaussianSmoother ─────────────────────────────────────────────────────────
@@ -181,130 +117,81 @@ export class GaussianSmoother {
 }
 
 
-// ── AsyncSignalGenerator ──────────────────────────────────────────────────────
+// ── SignalDelayLine ────────────────────────────────────────────────────────────
 
 /**
- * Generates the async (non-synchronous) stimulus signal:
- *   sine wave fitted to the participant's breath + blended Perlin noise.
+ * Time-based delay buffer: continuously records timestamped samples and lets
+ * the caller read back the value from an arbitrary number of milliseconds ago,
+ * linearly interpolated between the two nearest recorded points.
  *
- * Matches the MATLAB asyncSignal.m behaviour while adding noise blending.
+ * Used to drive the iBreath async stimulus — the participant's own real-time
+ * breath signal, played back after a delay — instead of a synthesized signal.
  *
  * Usage:
- *   const gen = new AsyncSignalGenerator({ estimator: new AutocorrEstimator() });
- *   gen.calibrate(signalArray, sampleRate);      // call after calibration phase
- *   gen.setSpeedFactor(1.1);                     // slow (>1) or fast (<1)
- *   const level = gen.sample(tSeconds);          // call each frame
+ *   const line = new SignalDelayLine({ maxAgeMs: 3500 });
+ *   line.push(performance.now(), value);   // call on every incoming sample
+ *   const delayed = line.sample(performance.now(), 2500);  // value from 2.5s ago
+ *   line.reset();
  */
-export class AsyncSignalGenerator {
-  // Noise configuration 
-  static NOISE_LENGTH = 150;
-  static NOISE_BLEND = 0.02;   // 2% noise, 98% sine (ADD_NOISE_ASYNC)
-
-  #estimator;
-  #freq = (2 * Math.PI) / 4;  // default: 4 s period
-  #amp = 0.5;
-  #speedFactor = 1.0;
-  #noise = null;   // Float32Array, ping-pong loop
-  #noiseIndex = 0;
-  #noisePeak = 1;
-  #calibrated = false;
-
-  // Range of the sync stimulus, used for MAP_ASYNC_RANGE_TO_SYNC_RANGE
-  #syncRange = null;   // [min, max] | null
+export class SignalDelayLine {
+  #buf = [];   // [{ t, v }, ...] ascending by t
+  #maxAgeMs;
 
   /**
    * @param {object} opts
-   * @param {FrequencyEstimator} [opts.estimator]  Defaults to AutocorrEstimator
+   * @param {number} [opts.maxAgeMs]  Samples older than this (relative to the
+   *                                  most recent push) are discarded. Should be
+   *                                  at least as large as the longest delay
+   *                                  ever passed to sample(). Default 5000.
    */
-  constructor({ estimator } = {}) {
-    this.#estimator = estimator ?? new AutocorrEstimator();
-    this.#buildNoise();
+  constructor({ maxAgeMs = 5000 } = {}) {
+    this.#maxAgeMs = maxAgeMs;
   }
 
   /**
-   * Run the estimator on a calibration signal and store results.
-   * @param {Float32Array|number[]} signal      Calibration samples
-   * @param {number}                sampleRate  Samples per second
-   * @param {[number,number]|null}  syncRange   Output range for sample(), in the same [0,1]
-   *                                            display space the caller renders/sonifies —
-   *                                            NOT the raw signal's native scale
-   *                                            (pass null to use the sine's natural [0, amp] range)
+   * Record a new sample.
+   * @param {number} t  Timestamp in ms (e.g. performance.now())
+   * @param {number} v  Sample value
    */
-  calibrate(signal, sampleRate, syncRange = null) {
-    const arr = signal instanceof Float32Array ? signal : new Float32Array(signal);
-    const { freq, amp } = this.#estimator.estimate(arr, sampleRate);
-
-    this.#freq = isFinite(freq) && freq > 0 ? freq : (2 * Math.PI) / 4;
-    this.#amp = isFinite(amp) && amp > 0 ? amp : 0.5;
-    this.#syncRange = syncRange;
-    this.#calibrated = true;
-    this.#buildNoise();
-
-    console.log(
-      `[AsyncSignalGenerator] calibrated — ` +
-      `period=${(2 * Math.PI / this.#freq).toFixed(2)}s  ` +
-      `amp=${this.#amp.toFixed(3)}`
-    );
+  push(t, v) {
+    this.#buf.push({ t, v });
+    const cutoff = t - this.#maxAgeMs;
+    let i = 0;
+    while (i < this.#buf.length && this.#buf[i].t < cutoff) i++;
+    if (i > 0) this.#buf.splice(0, i);
   }
 
   /**
-   * Speed factor applied to the async sine frequency.
-   * > 1 → slower than breath,  < 1 → faster than breath.
-   * Matches the MATLAB slowfast logic: factor = 1.1 (slow) or 0.9 (fast).
-   * @param {number} factor
-   */
-  setSpeedFactor(factor) {
-    this.#speedFactor = factor;
-  }
-
-  /**
-   * Returns the stimulus level for time t (seconds since trial start).
-   * Output is in [0, 1] (approximately — Perlin noise can push it slightly).
-   * @param {number} t  Seconds since trial start
+   * Value from `delayMs` milliseconds before `t`, linearly interpolated
+   * between the nearest recorded samples. Clamped to the oldest/newest
+   * buffered value if the requested time falls outside the buffered range.
+   * Returns 0 if nothing has been pushed yet.
+   * @param {number} t        Current time in ms (e.g. performance.now())
+   * @param {number} delayMs  How far back to look
    * @returns {number}
    */
-  sample(t) {
-    // asyncSignal.m: amp/2 * sin(freq * t / factor) + amp/2
-    const sine = (this.#amp / 2) *
-      Math.sin((this.#freq * t) / this.#speedFactor) +
-      (this.#amp / 2);
+  sample(t, delayMs) {
+    const n = this.#buf.length;
+    if (n === 0) return 0;
 
-    // Add Perlin noise (ping-pong loop)
-    const noiseSample = this.#noise[this.#noiseIndex % this.#noise.length];
-    this.#noiseIndex++;
-    const noiseNorm = noiseSample / this.#noisePeak;
+    const target = t - delayMs;
+    if (target <= this.#buf[0].t) return this.#buf[0].v;
+    const last = this.#buf[n - 1];
+    if (target >= last.t) return last.v;
 
-    const blended = (1 - AsyncSignalGenerator.NOISE_BLEND) * sine +
-      AsyncSignalGenerator.NOISE_BLEND * noiseNorm;
-
-    // Map to sync range if provided
-    if (this.#syncRange) {
-      return mapRange(blended, [0, this.#amp], this.#syncRange);
+    // Binary search for the pair of samples bracketing `target`.
+    let lo = 0, hi = n - 1;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (this.#buf[mid].t <= target) lo = mid; else hi = mid;
     }
-    return blended;
+    const a = this.#buf[lo], b = this.#buf[hi];
+    const frac = (target - a.t) / (b.t - a.t || 1);
+    return a.v + (b.v - a.v) * frac;
   }
 
-  /** Whether calibrate() has been called successfully. */
-  get isCalibrated() { return this.#calibrated; }
-
-  /** Current estimated period in seconds (useful for display / debugging). */
-  get periodSeconds() { return (2 * Math.PI) / this.#freq; }
-
-  // Build ping-pong Perlin noise array
-  #buildNoise() {
-    const len = AsyncSignalGenerator.NOISE_LENGTH;
-    const forward = perlin1d(len);
-    const backward = new Float32Array(len);
-    for (let i = 0; i < len; i++) backward[i] = forward[len - 1 - i];
-
-    this.#noise = new Float32Array(len * 2);
-    this.#noise.set(forward, 0);
-    this.#noise.set(backward, len);
-
-    this.#noisePeak = 0;
-    for (let i = 0; i < this.#noise.length; i++) {
-      if (this.#noise[i] > this.#noisePeak) this.#noisePeak = this.#noise[i];
-    }
-    this.#noiseIndex = 0;
+  /** Discard all buffered samples (e.g. at the start of a new session). */
+  reset() {
+    this.#buf = [];
   }
 }
