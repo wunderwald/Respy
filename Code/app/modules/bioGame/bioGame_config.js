@@ -49,7 +49,7 @@ export const CONFIG = {
   ITEM_SIZE_RATIO:       0.045, // size as fraction of canvas height
   // Hit tolerance = avatar's current (stress-scaled) height fraction × HITBOX_SCALE,
   // so the hitbox grows/shrinks along with the avatar's on-screen size.
-  HITBOX_SCALE:          1.5,
+  HITBOX_SCALE:          2.0,
 
   // ── Background ───────────────────────────────────────────────────────────
   BG_TEX_WIDTH:          2048,  // offscreen texture width (seamlessly tiling)
