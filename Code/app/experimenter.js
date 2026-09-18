@@ -96,13 +96,6 @@ if (frontend === 'ibreath') {
       <input id="ib-subject" type="text" value="${CONFIG.SUBJECT_CODE}"
              placeholder="subject code" autocomplete="off" spellcheck="false" />
     </span>
-    <span>
-      <span class="label">group</span>
-      <select id="ib-question-type" class="stream-select">
-        <option value="target">Target</option>
-        <option value="control">Control</option>
-      </select>
-    </span>
     <span id="ib-controls">
       <button id="ib-start-btn"       disabled>Start</button>
       <button id="ib-next-btn"        style="display:none">Next trial</button>
@@ -131,7 +124,6 @@ if (frontend === 'ibreath') {
   const remainingEl        = document.getElementById('ib-remaining');     // in #timer-bar
   const trialEl            = document.getElementById('ib-trial');
   const subjectInput       = document.getElementById('ib-subject');
-  const questionTypeSelect = document.getElementById('ib-question-type');
   const startBtn           = document.getElementById('ib-start-btn');
   const nextBtn            = document.getElementById('ib-next-btn');
   const abortBtn           = document.getElementById('ib-abort-btn');
@@ -188,7 +180,6 @@ if (frontend === 'ibreath') {
     }
     if (inputsLocked !== undefined) {
       subjectInput.disabled       = inputsLocked;
-      questionTypeSelect.disabled = inputsLocked;
       if (inputsLocked) {
         respStream.disable();
         gazeStream?.disable();
@@ -205,7 +196,6 @@ if (frontend === 'ibreath') {
     window.api.hud.sendAction({
       type:            'start',
       subjectCode:     subjectInput.value.trim() || 'TEST',
-      group:           questionTypeSelect.value,
       debugGaze:       document.getElementById('s-debug-gaze').checked,
       calibrationSecs: parseInt(document.getElementById('s-cal-secs').value) || CONFIG.CALIBRATION_SECS,
     });
