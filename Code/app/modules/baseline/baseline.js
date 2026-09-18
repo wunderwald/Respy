@@ -1,9 +1,10 @@
 /**
  * baseline.js — Resting-state baseline recording
  * ================================================
- * Shows a neutral display for a fixed duration (default 5 min).
- * Records the resp signal and writes it to CSV on completion.
- * Sends LSL markers at start and end.
+ * Plays a resting-state video full-screen for a fixed duration (default
+ * 7 min) while recording the resp signal in the background. Falls back to a
+ * plain countdown display if the video file isn't present.
+ * Writes the recording to CSV and sends LSL markers at start and end.
  *
  * State machine:  IDLE → PLAYING → DONE
  */
@@ -26,12 +27,18 @@ export default class Baseline {
 
   #canvas  = null;
   #ctx     = null;
+  #video   = null;
+  #videoAvailable = false;
+  #videoWarning   = null;   // persisted so it survives the experimenter window's 'ready' resync
   #markers = null;
 
   constructor({ sceneContainer }) {
-    sceneContainer.innerHTML = '<canvas id="bl-canvas"></canvas>';
+    sceneContainer.innerHTML =
+      '<canvas id="bl-canvas"></canvas>' +
+      '<video id="bl-video" preload="auto" playsinline></video>';
     this.#canvas = sceneContainer.querySelector('#bl-canvas');
     this.#ctx    = this.#canvas.getContext('2d');
+    this.#video  = sceneContainer.querySelector('#bl-video');
 
     this.#markers = CONFIG.SEND_MARKERS
       ? new MarkerStream(CONFIG.MARKER_STREAM_URL)
@@ -39,8 +46,33 @@ export default class Baseline {
 
     window.api.frontend.onAction((action) => this.#onAction(action));
 
+    this.#checkVideo();
     setInterval(() => this.#tick(), 100);
     requestAnimationFrame((t) => this.#rafLoop(t));
+  }
+
+  // ── Video availability ────────────────────────────────────────────────────
+  //
+  // Checked once at startup so the file can start buffering (preload="auto"
+  // + load()) well before Start is pressed, and so the experimenter sees the
+  // missing-video warning immediately rather than only once recording begins.
+
+  async #checkVideo() {
+    try {
+      const result = await window.api.fileExists(CONFIG.VIDEO_PATH);
+      this.#videoAvailable = result.ok && result.exists;
+    } catch {
+      this.#videoAvailable = false;
+    }
+
+    if (this.#videoAvailable) {
+      this.#video.src = CONFIG.VIDEO_PATH;
+      this.#video.load();
+    } else {
+      console.warn('[Baseline]', CONFIG.VIDEO_MISSING_WARNING);
+      this.#videoWarning = CONFIG.VIDEO_MISSING_WARNING;
+      this.#pushState();
+    }
   }
 
   // ── Frontend interface ─────────────────────────────────────────────────────
@@ -83,6 +115,18 @@ export default class Baseline {
     this.#sampleBuffer = [];
     this.#state        = STATE.PLAYING;
     this.#markers.send('baseline_start');
+
+    if (this.#videoAvailable) {
+      // Swap to the video and stop the canvas draw loop from doing any work
+      // (see #draw) so it isn't competing with video decode/composite.
+      this.#canvas.style.display = 'none';
+      this.#video.style.display  = 'block';
+      this.#video.currentTime = 0;
+      this.#video.play().catch((err) =>
+        console.error('[Baseline] video playback failed:', err)
+      );
+    }
+
     this.#pushState({
       stateText:           'recording',
       startEnabled:        false,
@@ -96,6 +140,13 @@ export default class Baseline {
   #finish(aborted = false) {
     this.#state = STATE.DONE;
     this.#markers.send(aborted ? 'baseline_abort' : 'baseline_end');
+
+    if (this.#videoAvailable) {
+      this.#video.pause();
+      this.#video.style.display  = 'none';
+      this.#canvas.style.display = 'block';
+    }
+
     this.#pushState({ stateText: aborted ? 'aborted' : 'done', abortVisible: false });
     this.#writeCSV();
   }
@@ -175,6 +226,11 @@ export default class Baseline {
   }
 
   #draw(now) {
+    // The video is the visual while it's playing — skip all canvas work
+    // (including the per-frame resize below) so it never competes with
+    // video decode/composite for the main thread.
+    if (this.#state === STATE.PLAYING && this.#videoAvailable) return;
+
     const canvas  = this.#canvas;
     canvas.width  = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
@@ -213,6 +269,7 @@ export default class Baseline {
       stateText:    this.#state,
       startEnabled: this.#state === STATE.IDLE && this.#streamReady,
       abortVisible: false,
+      warning:      this.#videoWarning,   // included every push so it survives the 'ready' resync
       ...overrides,
     });
   }
