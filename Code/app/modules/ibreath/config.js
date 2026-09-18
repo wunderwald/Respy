@@ -38,11 +38,11 @@ export const CONFIG = {
   DATA_DIR: "output_data/ibreath",
 
   // Questions after trials
-  SHOW_QUESTIONS: true,      // show a post-trial response question after each trial
+  SHOW_QUESTIONS: true,      // show a post-trial response question after each trial (fixed — not exposed in experimenter UI)
   RESPONSE_TIMEOUT_SECS: 5,        // seconds before a non-response is recorded as 'timeout'
 
   // Flash image
-  FLASHING_IMAGE: true,         // show a flash image in 50% of trials
+  FLASHING_IMAGE: true,         // show a flash image in 50% of trials (fixed — not exposed in experimenter UI)
   FLASH_IMAGE: 'pinkfish',   // image name — label for CSV and draw-routine selector
   FLASH_DURATION: 250,          // ms the flash is visible
   FLASH_TIME_MIN: 5,            // earliest flash onset (seconds into trial)
@@ -62,7 +62,7 @@ export const CONFIG = {
   MARKER_STREAM_URL: 'ws://localhost:9001',
 
   // Experiment control
-  AUTO_ADVANCE: true,      // skip the READY state — advance to next trial automatically
+  AUTO_ADVANCE: true,      // skip the READY state — advance to next trial automatically (fixed — not exposed in experimenter UI)
 };
 
 export const STATE = {

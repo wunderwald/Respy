@@ -121,9 +121,6 @@ if (frontend === 'ibreath') {
     <span class="label">settings</span>
     <label><input type="checkbox" id="s-use-eye-tracking"> use eye tracking</label>
     <label id="debug-gaze-label"><input type="checkbox" id="s-debug-gaze"      ${CONFIG.DEBUG_GAZE      ? 'checked' : ''}> show gaze position</label>
-    <label><input type="checkbox" id="s-auto-advance"    ${CONFIG.AUTO_ADVANCE    ? 'checked' : ''}> auto-advance trials</label>
-    <label><input type="checkbox" id="s-flash-images"    ${CONFIG.FLASHING_IMAGE  ? 'checked' : ''}> include flash images</label>
-    <label><input type="checkbox" id="s-show-questions"  ${CONFIG.SHOW_QUESTIONS  ? 'checked' : ''}> show questions</label>
     <span class="label">cal secs</span>
     <input id="s-cal-secs" type="number" class="settings-num" min="5" max="120" step="5"
            value="${CONFIG.CALIBRATION_SECS}" />
@@ -210,9 +207,6 @@ if (frontend === 'ibreath') {
       subjectCode:     subjectInput.value.trim() || 'TEST',
       group:           questionTypeSelect.value,
       debugGaze:       document.getElementById('s-debug-gaze').checked,
-      autoAdvance:     document.getElementById('s-auto-advance').checked,
-      flashingImage:   document.getElementById('s-flash-images').checked,
-      showQuestions:   document.getElementById('s-show-questions').checked,
       calibrationSecs: parseInt(document.getElementById('s-cal-secs').value) || CONFIG.CALIBRATION_SECS,
     });
   });
