@@ -1,6 +1,6 @@
 # Baseline
 
-Resting-state recording. The participant sees a neutral display with a countdown for 5 minutes while the resp signal is recorded and LSL markers are sent at the start and end.
+Resting-state recording. The participant watches a 7-minute resting-state video full-screen while the resp signal is recorded in the background and LSL markers are sent at the start and end. If the video file isn't present, falls back to a plain countdown display for the same duration.
 
 ---
 
@@ -29,10 +29,10 @@ Or select **Baseline** from the start screen (`npm start`).
 ## Session flow
 
 ```
-stream ready → [Start] → 5-minute countdown → baseline_end marker → Done
+stream ready → [Start] → 7-minute video (or countdown, if missing) → baseline_end marker → Done
 ```
 
-The scene window shows a countdown timer.
+The scene window plays the resting-state video full-screen, or shows a countdown timer if it isn't available.
 
 ---
 
@@ -75,11 +75,23 @@ MARKER_STREAM_URL: 'ws://localhost:9001',
 | Marker | Event |
 |---|---|
 | `baseline_start` | Recording begins |
-| `baseline_end` | 5 minutes elapsed — recording complete |
+| `baseline_end` | `DURATION_SECS` elapsed — recording complete |
 | `baseline_abort` | Experimenter pressed Abort |
 
 ---
 
-## Adding a video
+## Resting-state video
 
-Replace the countdown canvas in `baseline.js` with a `<video>` element. The markers, state machine, and CSV recording stay the same — only the scene rendering changes.
+Configured in [baseline_config.js](../modules/baseline/baseline_config.js):
+
+```js
+DURATION_SECS: 420,   // 7 minutes — also the fallback duration if the video is missing
+VIDEO_PATH: 'videos/01_Inscapes_NoScannerSound_h264.mov',
+VIDEO_MISSING_WARNING: '...',
+```
+
+- Checked for existence once at startup (before Start is enabled), so the file can start buffering (`preload="auto"` + `load()`) well ahead of time and starts playing smoothly the moment recording begins.
+- Recording, sample collection, and the `DURATION_SECS` end-of-session check all run exactly as in the countdown-only version — the video is purely the on-screen visual; it doesn't drive the state machine.
+- **If the video file is missing**, the experimenter HUD shows a persistent warning (`VIDEO_MISSING_WARNING`) and the session falls back to the plain countdown display, still for `DURATION_SECS`.
+- The video is not looped — if its actual length differs from `DURATION_SECS`, the recording still ends exactly at `DURATION_SECS` regardless of whether the video has finished.
+- Autoplay is enabled app-wide via the `autoplay-policy=no-user-gesture-required` Electron switch (in `main.js`), since playback is started by an IPC action from the experimenter window rather than a click inside the scene window itself.
