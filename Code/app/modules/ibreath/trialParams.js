@@ -2,7 +2,7 @@
 
 import { CONFIG } from './config.js';
 
-export function makeTrialParams(numTrials, group = 'target') {
+export function makeTrialParams(numTrials) {
   // Balanced pseudo-random boolean sequence.
   // Each block of `blockSize` contains exactly `trueCount` true values (default 50%).
   function balancedSeq(length, blockSize, trueCount = Math.floor(blockSize / 2)) {
@@ -18,12 +18,10 @@ export function makeTrialParams(numTrials, group = 'target') {
     return out.slice(0, length);
   }
 
-  // Question sequence: 50% main question for the group, ~16.7% each of the other three.
-  // Built from shuffled 6-trial blocks: [main×3, other1, other2, other3].
+  // Question sequence: 50% 'sync', ~16.7% each of 'flash', 'lr', 'img'.
+  // Built from shuffled 6-trial blocks: [sync×3, flash, lr, img].
   function makeQuestionSeq(n) {
-    const main   = group === 'control' ? 'flash' : 'sync';
-    const others = group === 'control' ? ['sync', 'lr', 'img'] : ['flash', 'lr', 'img'];
-    const template = [main, main, main, ...others];
+    const template = ['sync', 'sync', 'sync', 'flash', 'lr', 'img'];
     const out = [];
     while (out.length < n) {
       const block = [...template];
