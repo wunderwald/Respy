@@ -12,6 +12,7 @@ export class RemoteHud {
     stateText:           'waiting for stream…',
     stateColor:          '',
     trialText:           '—',
+    delayText:           '—',
     startEnabled:        false,
     nextVisible:         false,
     abortVisible:        false,
@@ -51,6 +52,7 @@ export class RemoteHud {
   set stateText(v)    { this.#snap.stateText    = v;   this.#push(); }
   set stateColor(v)   { this.#snap.stateColor   = v ?? ''; this.#push(); }
   set trialText(v)    { this.#snap.trialText     = v;   this.#push(); }
+  set delayText(v)    { this.#snap.delayText     = v;   this.#push(); }
   set startEnabled(v) { this.#snap.startEnabled  = v;   this.#push(); }
   set nextVisible(v)  { this.#snap.nextVisible   = v;   this.#push(); }
   set abortVisible(v) { this.#snap.abortVisible  = v;   this.#push(); }

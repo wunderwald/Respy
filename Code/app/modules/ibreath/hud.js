@@ -2,13 +2,13 @@
  * LocalHud — builds the experimenter control bar into a container element
  * and exposes a clean property API so callers never touch the DOM directly.
  *
- * Setters:  stateText, stateColor, trialText,
+ * Setters:  stateText, stateColor, trialText, delayText,
  *           startEnabled, nextVisible, abortVisible, pauseVisible, playVisible,
  *           calFailed, inputsLocked, gazeActive
  * Getters:  stateText, subjectCode
  */
 export class LocalHud {
-  #stateEl; #trialEl; #subjectInput;
+  #stateEl; #trialEl; #delayEl; #subjectInput;
   #startBtn; #nextBtn; #abortBtn; #pauseBtn; #playBtn; #calRetryBtn; #calDefaultBtn;
 
   constructor(container, subjectCode, { onStart, onNext, onAbort, onPause, onPlay,
@@ -18,6 +18,10 @@ export class LocalHud {
       <span>
         <span class="label">trial</span>
         <span id="ib-trial">—</span>
+      </span>
+      <span>
+        <span class="label">delay</span>
+        <span id="ib-delay">—</span>
       </span>
       <span>
         <span class="label">subject</span>
@@ -37,6 +41,7 @@ export class LocalHud {
 
     this.#stateEl            = container.querySelector('#ib-state-text');
     this.#trialEl            = container.querySelector('#ib-trial');
+    this.#delayEl            = container.querySelector('#ib-delay');
     this.#subjectInput       = container.querySelector('#ib-subject');
     this.#startBtn           = container.querySelector('#ib-start-btn');
     this.#nextBtn            = container.querySelector('#ib-next-btn');
@@ -59,6 +64,7 @@ export class LocalHud {
   set stateText(v)     { this.#stateEl.textContent = v; }
   set stateColor(v)    { this.#stateEl.style.color = v ?? ''; }
   set trialText(v)     { this.#trialEl.textContent = v; }
+  set delayText(v)     { this.#delayEl.textContent = v; }
   set startEnabled(v)  { this.#startBtn.disabled = !v; }
   set nextVisible(v)   { this.#nextBtn.style.display  = v ? '' : 'none'; }
   set abortVisible(v)  { this.#abortBtn.style.display = v ? '' : 'none'; }
