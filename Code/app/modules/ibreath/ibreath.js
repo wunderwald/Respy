@@ -18,8 +18,7 @@
  *   csv.js         — file output
  */
 
-import { GaussianSmoother, AsyncSignalGenerator, mapRange } from '../signal/signalUtils.js';
-import { AutocorrEstimator } from '../signal/breathRateEstimators.js';
+import { GaussianSmoother, SignalDelayLine, mapRange } from '../signal/signalUtils.js';
 import { RespCalibration } from '../calibration/calibration.js';
 import { IBreathSound } from './ibreath_sound.js';
 import { CONFIG, STATE } from './config.js';
@@ -47,22 +46,20 @@ export default class IBreath {
   #trialData = [];
 
   // ── calibration ────────────────────────────────────────────────────────
-  #calSamples = [];      // raw samples, fed to AsyncSignalGenerator for freq estimation
   #calibration = null;   // RespCalibration — derives the sync stimulus range
   #calFailed = false;
 
   // ── signal pipeline ────────────────────────────────────────────────────
   #smoother = new GaussianSmoother(CONFIG.SMOOTH_WINDOW);
-  #asyncGen = new AsyncSignalGenerator({ estimator: new AutocorrEstimator() });
+  #delayLine = new SignalDelayLine({ maxAgeMs: CONFIG.MAX_DELAY_MS + 500 });  // async's real-time delay buffer
+  #currentDelayMs = CONFIG.MAX_DELAY_MS;   // adaptive staircase — see #onResponse
   #syncStimulusRange = [0.3, 0.4];   // raw native-scale window — used to rescale the live signal into [0,1]
-  #syncDisplayRange = [0, 1];        // [0,1]-space window the sync display actually occupied — async's output target
 
   // ── per-trial state ────────────────────────────────────────────────────
   #trialStartTime = null;
   #stimulusLevel = 0;
   #lastRawSample = 0;
   #lastScaledSample = 0;
-  #syncSignal = [];
   #syncStimulusSignal = [];
   #frameRows = [];
 
@@ -150,9 +147,11 @@ export default class IBreath {
     this.#lastRawSample = rawValue;
     this.#lastScaledSample = rawValue;
     this.#smoother.push(rawValue);
+    // Always-on, regardless of state, so a trial's delay buffer already has
+    // up to MAX_DELAY_MS of history available the moment it starts.
+    this.#delayLine.push(performance.now(), this.#smoother.value);
 
     if (this.#state === STATE.CALIBRATING) {
-      this.#calSamples.push(rawValue);
       this.#calibration.push(this.#smoother.value);
     } else if (this.#state === STATE.TRIAL) {
       this.#onTrialSample(rawValue);
@@ -198,11 +197,13 @@ export default class IBreath {
     this.#trials = makeTrialParams(CONFIG.MAX_NUM_TRIALS);
     this.#trialIndex = 0;
     this.#trialData = [];
-    this.#calSamples = [];
+    this.#currentDelayMs = CONFIG.MAX_DELAY_MS;
+    this.#updateDelayHud();
     this.#calibration = new RespCalibration({ durationSecs: CONFIG.CALIBRATION_SECS });
     this.#calibration.start();
     this.#calFailed = false;
     this.#smoother.reset();
+    this.#delayLine.reset();
 
     this.#state = STATE.CALIBRATING;
     this.#hud.experimentStartedAt = Date.now();
@@ -236,9 +237,6 @@ export default class IBreath {
   #completeCalibration(range) {
     this.#syncStimulusRange = range;
 
-    const sampleRate = this.#calSamples.length / CONFIG.CALIBRATION_SECS;
-    this.#asyncGen.calibrate(this.#calSamples, sampleRate, this.#syncDisplayRange);
-
     this.#hud.trialText = `0 / ${this.#trials.length}`;
     this.#calFailed = false;
     this.#hud.calFailed = false;
@@ -256,7 +254,6 @@ export default class IBreath {
 
   #retryCalibration() {
     if (this.#state !== STATE.CALIBRATING || !this.#calFailed) return;
-    this.#calSamples = [];
     this.#calibration.start();
     this.#calFailed = false;
     this.#hud.calFailed = false;
@@ -278,23 +275,8 @@ export default class IBreath {
     }
 
     const trial = this.#trials[this.#trialIndex];
+    trial.delayMs = trial.synchronous ? null : this.#currentDelayMs;
 
-    if (!trial.synchronous) {
-      const factor = trial.slowfast
-        ? CONFIG.SPEED_FACTOR_SLOW
-        : CONFIG.SPEED_FACTOR_FAST;
-      this.#asyncGen.setSpeedFactor(factor);
-
-      if (CONFIG.MAP_ASYNC_RANGE_TO_SYNC_RANGE) {
-        this.#asyncGen.calibrate(
-          new Float32Array(this.#calSamples),
-          this.#calSamples.length / CONFIG.CALIBRATION_SECS,
-          this.#syncDisplayRange
-        );
-      }
-    }
-
-    this.#syncSignal = [];
     this.#syncStimulusSignal = [];
     this.#frameRows = [];
     this.#stimulusLevel = 0;
@@ -306,11 +288,6 @@ export default class IBreath {
     // Pre-fill smoother with 64 samples (matching MATLAB pre-buffer)
     for (let i = 0; i < CONFIG.SMOOTH_WINDOW; i++) {
       this.#smoother.push(this.#lastScaledSample);
-    }
-    if (trial.synchronous) {
-      for (let i = 0; i < CONFIG.SMOOTH_WINDOW; i++) {
-        this.#syncSignal.push(this.#lastScaledSample);
-      }
     }
 
     this.#hud.nextVisible  = false;
@@ -349,7 +326,6 @@ export default class IBreath {
   #onTrialSample(rawValue) {
     const trial = this.#trials[this.#trialIndex];
     if (trial.synchronous) {
-      this.#syncSignal.push(rawValue);
       const smoothedRaw = this.#smoother.value;
       this.#syncStimulusSignal.push(smoothedRaw);
       this.#stimulusLevel = Math.max(0, Math.min(1,
@@ -363,23 +339,11 @@ export default class IBreath {
     trial.endTime = new Date().toISOString();
     trial.aborted = aborted;
 
-    if (trial.synchronous && this.#syncSignal.length > CONFIG.SMOOTH_WINDOW) {
-      // Strip the 64-sample pre-buffer (matches syncSignal(65:end) in MATLAB)
-      const cleanSignal = new Float32Array(
-        this.#syncSignal.slice(CONFIG.SMOOTH_WINDOW)
-      );
-      const sampleRate = cleanSignal.length /
-        ((performance.now() - this.#trialStartTime) / 1000);
-
+    // Rescale future frames to the amplitude actually observed in this sync
+    // trial (auto-gain, independent of async's delayed-signal readback).
+    if (trial.synchronous && this.#syncStimulusSignal.length > 0) {
       const rawLvls = this.#syncStimulusSignal;
       const rawMin = Math.min(...rawLvls), rawMax = Math.max(...rawLvls);
-      this.#syncDisplayRange = [
-        Math.max(0, Math.min(1, mapRange(rawMin, this.#syncStimulusRange, [0, 1]))),
-        Math.max(0, Math.min(1, mapRange(rawMax, this.#syncStimulusRange, [0, 1]))),
-      ];
-
-      this.#asyncGen.calibrate(cleanSignal, sampleRate, this.#syncDisplayRange);
-
       this.#syncStimulusRange = [rawMin, rawMax];
     }
 
@@ -421,10 +385,31 @@ export default class IBreath {
     }
     trial.response = response;
 
+    // Adaptive delay staircase: only the sync-detection question on an async
+    // trial tells us anything about the current delay's detectability.
+    if (!trial.synchronous && trial.questionType === 'sync') {
+      if (response === 'no') {
+        // Correctly identified as out-of-sync — make the next one harder.
+        this.#currentDelayMs = Math.max(CONFIG.MIN_DELAY_MS, this.#currentDelayMs - CONFIG.DELAY_STEP_MS);
+      } else if (response === 'yes') {
+        // Mistaken for in-sync — make the next one easier.
+        this.#currentDelayMs = Math.min(CONFIG.MAX_DELAY_MS, this.#currentDelayMs + CONFIG.DELAY_STEP_MS);
+      }
+      // 'timeout' leaves the current delay unchanged.
+      this.#updateDelayHud();
+    }
+
     this.#markers.send(`response_${response}_t${trial.trialIndex}`);
     this.#csv.appendTrialData(trial);
     this.#trialData.push({ ...trial });
     this.#startITIorEnd(trial);
+  }
+
+  // Keeps the experimenter HUD's "delay" readout in sync with the adaptive
+  // staircase, so the experimenter always sees the delay the next async
+  // trial will use.
+  #updateDelayHud() {
+    this.#hud.delayText = `${this.#currentDelayMs} ms`;
   }
 
   #startITIorEnd(trial) {
@@ -655,7 +640,8 @@ export default class IBreath {
       const tSecs = (now - this.#trialStartTime) / 1000;
 
       if (!trial.synchronous) {
-        this.#stimulusLevel = this.#asyncGen.sample(tSecs);
+        const delayedRaw = this.#delayLine.sample(now, trial.delayMs);
+        this.#stimulusLevel = mapRange(delayedRaw, this.#syncStimulusRange, [0, 1]);
       }
       const stimLevel = Math.max(0, Math.min(1, this.#stimulusLevel));
       this.#sound.setNoiseLevel(stimLevel);
