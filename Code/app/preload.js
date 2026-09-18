@@ -89,6 +89,14 @@ contextBridge.exposeInMainWorld("api", {
   pickDir:  () => ipcRenderer.invoke("pick-directory"),
   readFile: (filePath) => ipcRenderer.invoke("read-file", filePath),
 
+  /**
+   * Checks whether a file exists, without reading its content.
+   * Safe to use on large files (e.g. videos).
+   * @param {string} filePath
+   * @returns {Promise<{ ok: boolean, exists?: boolean, error?: string }>}
+   */
+  fileExists: (filePath) => ipcRenderer.invoke("file-exists", filePath),
+
   // Scene window self-management
   window: {
     minimize: () => ipcRenderer.send('window:minimize'),
