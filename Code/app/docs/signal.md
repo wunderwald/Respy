@@ -4,7 +4,7 @@ Two modules:
 
 | Module | Purpose |
 |---|---|
-| [signalUtils.js](../modules/signal/signalUtils.js) | Real-time utilities: smoothing, sine synthesis, noise |
+| [signalUtils.js](../modules/signal/signalUtils.js) | Real-time utilities: smoothing, delay line, range mapping |
 | [breathRateEstimators.js](../modules/signal/breathRateEstimators.js) | Offline breath rate estimation from recordings |
 
 ---
@@ -26,55 +26,33 @@ smoother.reset();
 
 ---
 
-### AsyncSignalGenerator
+### SignalDelayLine
 
-Generates the async stimulus signal: sine fitted to the participant's breath + 2 % Perlin noise blend.
+Time-based delay buffer: continuously records timestamped samples and reads back the value from an arbitrary number of milliseconds ago, linearly interpolated. Drives the iBreath async stimulus — the participant's own real-time breath signal, played back after a delay.
 
 ```js
-import { AsyncSignalGenerator } from './modules/signal/signalUtils.js';
-import { AutocorrEstimator }    from './modules/signal/breathRateEstimators.js';
+import { SignalDelayLine } from './modules/signal/signalUtils.js';
 
-const gen = new AsyncSignalGenerator({ estimator: new AutocorrEstimator() });
-gen.calibrate(signalArray, sampleRate, syncRange);  // syncRange = [min, max] in [0,1] display
-                                                     // space (NOT raw signal units), or null
-gen.setSpeedFactor(1.1);   // > 1 = slower,  < 1 = faster
-const level = gen.sample(tSeconds);  // ~[0, 1]
+const line = new SignalDelayLine({ maxAgeMs: 3500 });  // discard samples older than this
+line.push(performance.now(), value);                  // call on every incoming sample
+const delayed = line.sample(performance.now(), 2500);  // value from 2.5s ago, clamped to
+                                                        // the buffered range if out of bounds
+line.reset();
 ```
 
 ---
 
-### mapRange / perlin1d
+### mapRange
 
 ```js
-import { mapRange, perlin1d } from './modules/signal/signalUtils.js';
+import { mapRange } from './modules/signal/signalUtils.js';
 
 mapRange(value, [inMin, inMax], [outMin, outMax]);  // linear range mapping
-perlin1d(150);  // Float32Array of smooth noise in [0, 1]
 ```
 
 ---
 
 ## breathRateEstimators.js
-
-Contains all estimators. Two families:
-
-### FrequencyEstimator / AutocorrEstimator / PeakDetectionEstimator
-
-Sine-synthesis estimators used by `AsyncSignalGenerator`. Return `{ freq (rad/s), amp }`.
-
-- **`AutocorrEstimator`** — autocorrelation peak; falls back to `PeakDetectionEstimator`, then a 4 s hard default.
-- **`PeakDetectionEstimator`** — MATLAB-style inter-peak averaging; returns `null` on failure.
-- **`FrequencyEstimator`** — abstract base; subclass to plug a custom algorithm into `AsyncSignalGenerator`.
-
-```js
-import { AutocorrEstimator, PeakDetectionEstimator, FrequencyEstimator }
-  from './modules/signal/breathRateEstimators.js';
-
-const { freq, amp } = new AutocorrEstimator({ minBreathPeriod: 2, maxBreathPeriod: 12 })
-  .estimate(signalArray, sampleRate);
-```
-
----
 
 ### Offline rate estimators
 
