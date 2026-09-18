@@ -25,14 +25,12 @@ export class RemoteHud {
     gazeCalibrating:     false,
   };
   #subjectCode = 'TEST';
-  #group = 'target';
 
   constructor({ onStart, onNext, onAbort, onResponse, onPause, onPlay, onRecalibrateGaze,
                 onRetryCalibration, onUseDefaultCalibration, onSetUseEyeTracking }) {
-    window.api.hud.onAction(({ type, subjectCode, group, value,
+    window.api.hud.onAction(({ type, subjectCode, value,
                                debugGaze, calibrationSecs }) => {
       if (subjectCode !== undefined) this.#subjectCode = subjectCode;
-      if (group       !== undefined) this.#group       = group;
       switch (type) {
         case 'start':           onStart({ debugGaze, calibrationSecs }); break;
         case 'next':            onNext(); break;
@@ -65,7 +63,6 @@ export class RemoteHud {
   set experimentStartedAt(v) { this.#snap.experimentStartedAt = v; this.#push(); }
   set stateTimer(v)          { this.#snap.stateTimer = v;          this.#push(); }
   get subjectCode()          { return this.#subjectCode; }
-  get group()                { return this.#group; }
 
   #push() {
     window.api.hud.sendState({ ...this.#snap });
