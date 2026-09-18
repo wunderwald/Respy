@@ -496,12 +496,14 @@ if (frontend === 'ibreath') {
       <button id="bl-start-btn" disabled>Start</button>
       <button id="bl-abort-btn" style="display:none">Abort</button>
     </span>
+    <span id="bl-warning" style="display:none;color:#e0a838;"></span>
   `;
 
   const blStatusEl  = document.getElementById('bl-status');
   const blSubjectEl = document.getElementById('bl-subject');
   const blStartBtn  = document.getElementById('bl-start-btn');
   const blAbortBtn  = document.getElementById('bl-abort-btn');
+  const blWarningEl = document.getElementById('bl-warning');
 
   const blTimerStateEl   = document.getElementById('ib-state-text');
   const blElapsedEl      = document.getElementById('ib-elapsed');
@@ -520,7 +522,7 @@ if (frontend === 'ibreath') {
   }, 250);
 
   window.api.frontend.onState(({ stateText, startEnabled, abortVisible, inputsLocked,
-                                  recordingStartedAt, duration }) => {
+                                  recordingStartedAt, duration, warning }) => {
     if (recordingStartedAt !== undefined) blRecordingStartedAt = recordingStartedAt;
     if (duration           !== undefined) blDurationSecs       = duration;
     if (stateText !== undefined) {
@@ -534,6 +536,10 @@ if (frontend === 'ibreath') {
     }
     if (startEnabled !== undefined) blStartBtn.disabled      = !startEnabled;
     if (abortVisible !== undefined) blAbortBtn.style.display = abortVisible ? '' : 'none';
+    if (warning !== undefined) {
+      blWarningEl.textContent   = warning ?? '';
+      blWarningEl.style.display = warning ? '' : 'none';
+    }
     if (inputsLocked) {
       blSubjectEl.disabled = true;
       respStream.disable();
