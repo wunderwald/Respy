@@ -1,6 +1,6 @@
 # iBreath — Interoception Sync/Async Experiment
 
-Port of the MATLAB version of iBreath (`ibreath_main_v2.m`) to Electron. On each trial the participant views an animation that either tracks their breath in real time (synchronous) or plays back a slightly speed-shifted version (asynchronous). There are multiple variations of the experiment (interoception task, exteroception task, gaze-tracked task...).
+Port of the MATLAB version of iBreath (`ibreath_main_v2.m`) to Electron. On each trial the participant views an animation that either tracks their breath in real time (synchronous) or plays back their own real-time breath signal after a delay (asynchronous). There are multiple variations of the experiment (interoception task, exteroception task, gaze-tracked task...).
 
 ---
 
@@ -67,13 +67,27 @@ The `[READY]` step is skipped when `AUTO_ADVANCE` is on. The `[DISPLAY]` step is
 
 ## Trial design
 
-- **80 trials** per session, balanced in blocks of 4: 2 sync, 1 async-slow, 1 async-fast.
+- **80 trials** per session, balanced in blocks of 2: 1 sync, 1 async.
 - **Synchronous trials** — cloud animation tracks the Gaussian-smoothed breath signal, rescaled into `[0, 1]` using the calibration range (see [calibration](calibration.md)).
-- **Asynchronous trials** — cloud follows a sine wave fitted to the participant's calibration breath, shifted in time (slow: ×1.1, fast: ×0.9 speed factor). Its output is separately rescaled to match the `[0, 1]`-space intensity actually observed during sync trials (`MAP_ASYNC_RANGE_TO_SYNC_RANGE`), so async and sync trials feel comparably intense.
+- **Asynchronous trials** — cloud tracks the participant's own real-time breath signal, delayed by the current adaptive delay (see [Async delay staircase](#async-delay-staircase) below), then rescaled the same way as sync trials.
 - **Flash stimulus** (`FLASHING_IMAGE`) — a lightning image appears on 50 % of trials at a random time between `FLASH_TIME_MIN` and `FLASH_TIME_MAX` seconds into the trial.
 - **Post-trial question** (`MIXED_QUESTIONS`) — after each non-aborted trial, a question is shown for up to `RESPONSE_TIMEOUT_SECS` seconds. Non-responses are recorded as `timeout`.
   - **Off (default)** — every trial asks the sync-detection question: "Was the fish in sync with your breathing?"
   - **On** — questions are mixed: ~50% sync-detection, ~16.7% each of flash-detection ("Did you see the pink fish flashing?"), left/right, and pufferfish/starfish, built from shuffled 6-trial blocks.
+
+### Async delay staircase
+
+Async trials play back the participant's own real-time breath signal, delayed by a running `currentDelayMs` value:
+
+- **Range**: `MIN_DELAY_MS` (2000 ms) to `MAX_DELAY_MS` (3000 ms), in steps of `DELAY_STEP_MS` (200 ms).
+- **Start**: `currentDelayMs` is reset to `MAX_DELAY_MS` at the start of every session (i.e. at Start / calibration).
+- **Adaptation**: it only changes on the sync-detection question (`questionType === 'sync'`) asked after an **async** trial:
+  - Answered **"no"** (correctly identified as out of sync) → `currentDelayMs` decreases by `DELAY_STEP_MS` (harder next time).
+  - Answered **"yes"** (mistaken for in sync) → `currentDelayMs` increases by `DELAY_STEP_MS` (easier next time).
+  - **Timeout**, or any other question type (`flash`/`lr`/`img` when `MIXED_QUESTIONS` is on), leaves it unchanged.
+  - The value is always clamped to `[MIN_DELAY_MS, MAX_DELAY_MS]`.
+- The delay used for a given trial is fixed at the start of that trial and recorded in `trialData.csv` as `delayMs`.
+- The current value is shown live in the experimenter HUD's **delay** readout, updated whenever the staircase steps.
 
 ---
 
@@ -93,7 +107,9 @@ Flags in [app/modules/ibreath/config.js](./modules/ibreath/config.js):
 | `MAX_NUM_TRIALS` | `80` | Total trial count |
 | `MAX_TRIAL_TIME` | `30` | Trial auto-ends after this many seconds |
 | `CALIBRATION_SECS` | `10` | Duration of the calibration recording |
-| `MAP_ASYNC_RANGE_TO_SYNC_RANGE` | `true` | Rescale async trials' synthetic signal to the `[0, 1]`-space intensity actually observed during sync trials, so both feel comparably intense |
+| `MIN_DELAY_MS` | `2000` | Lower bound of the async delay staircase |
+| `MAX_DELAY_MS` | `3000` | Upper bound of the async delay staircase; also its starting value each session |
+| `DELAY_STEP_MS` | `200` | Step size the async delay staircase moves by per sync-question response (see [Async delay staircase](#async-delay-staircase)) |
 
 ---
 
@@ -115,7 +131,7 @@ One row per trial, appended after each trial ends (or after the response screen)
 | `lr` | Cloud starting side (`left` / `right`) |
 | `stimX0`, `stimY0` | Cloud start position (normalised 0–1) |
 | `stimX1`, `stimY1` | Cloud end position (normalised 0–1) |
-| `slowfast` | `slow`, `fast`, or empty (sync trials) |
+| `delayMs` | Async delay applied to this trial (ms), or empty (sync trials) — see [Async delay staircase](#async-delay-staircase) |
 | `ITI` | Inter-trial interval in ms |
 | `startTime` | ISO-8601 trial start time |
 | `endTime` | ISO-8601 trial end time |
