@@ -112,6 +112,17 @@ export default class BioGame {
     return lerp(CONFIG.SCROLL_SPEED_MIN, CONFIG.SCROLL_SPEED_MAX, this.#speedNorm);
   }
 
+  // Avatar's current height, as a fraction of canvas height (matches the
+  // renderer's baseH calculation) — the hitbox scales with this so it tracks
+  // the avatar's on-screen size as it grows/shrinks via the stress mechanic.
+  get #avatarHeightNorm() {
+    return lerp(CONFIG.AVATAR_STRESS_SIZE_MIN, CONFIG.AVATAR_STRESS_SIZE_MAX, this.#avatarStressNorm);
+  }
+
+  get #hitRadius() {
+    return this.#avatarHeightNorm * CONFIG.HITBOX_SCALE;
+  }
+
   constructor({ sceneContainer }) {
     this.#scene   = resolveScene(CONFIG.SCENE);
     this.#renderer = new BioGameRenderer(sceneContainer, this.#scene);
@@ -406,7 +417,7 @@ export default class BioGame {
 
         if (item.xRatio <= CONFIG.AVATAR_X_RATIO) {
           item.checked = true;
-          if (Math.abs(item.normY - this.#avatarNormY) < CONFIG.ITEM_HIT_RADIUS) {
+          if (Math.abs(item.normY - this.#avatarNormY) < this.#hitRadius) {
             this.#collectItem(item, blockTime);
           } else {
             this.#missItem(item, blockTime);

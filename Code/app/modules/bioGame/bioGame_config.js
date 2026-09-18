@@ -44,10 +44,12 @@ export const CONFIG = {
   MISS_GAME_OVER:        20,    // total misses before game over
 
   // ── Items ─────────────────────────────────────────────────────────────────
-  ITEM_SPAWN_MIN_MS:     1500,
-  ITEM_SPAWN_MAX_MS:     3500,
+  ITEM_SPAWN_MIN_MS:     400,
+  ITEM_SPAWN_MAX_MS:     900,
   ITEM_SIZE_RATIO:       0.045, // size as fraction of canvas height
-  ITEM_HIT_RADIUS:       0.12,  // normalised Y tolerance for collection
+  // Hit tolerance = avatar's current (stress-scaled) height fraction × HITBOX_SCALE,
+  // so the hitbox grows/shrinks along with the avatar's on-screen size.
+  HITBOX_SCALE:          1.5,
 
   // ── Background ───────────────────────────────────────────────────────────
   BG_TEX_WIDTH:          2048,  // offscreen texture width (seamlessly tiling)
