@@ -92,6 +92,10 @@ if (frontend === 'ibreath') {
       <span id="ib-trial">—</span>
     </span>
     <span>
+      <span class="label">delay</span>
+      <span id="ib-delay">—</span>
+    </span>
+    <span>
       <span class="label">subject</span>
       <input id="ib-subject" type="text" value="${CONFIG.SUBJECT_CODE}"
              placeholder="subject code" autocomplete="off" spellcheck="false" />
@@ -124,6 +128,7 @@ if (frontend === 'ibreath') {
   const elapsedEl          = document.getElementById('ib-elapsed');       // in #timer-bar
   const remainingEl        = document.getElementById('ib-remaining');     // in #timer-bar
   const trialEl            = document.getElementById('ib-trial');
+  const delayEl            = document.getElementById('ib-delay');
   const subjectInput       = document.getElementById('ib-subject');
   const startBtn           = document.getElementById('ib-start-btn');
   const nextBtn            = document.getElementById('ib-next-btn');
@@ -156,7 +161,7 @@ if (frontend === 'ibreath') {
   let gazeActive      = false;
   let gazeCalibrating = false;
 
-  window.api.hud.onState(({ stateText, stateColor, trialText,
+  window.api.hud.onState(({ stateText, stateColor, trialText, delayText,
                              startEnabled, nextVisible, abortVisible, pauseVisible, playVisible, inputsLocked,
                              experimentStartedAt: esa, stateTimer: st, gazeActive: ga, gazeCalibrating: gc, calFailed }) => {
     if (esa !== undefined) experimentStartedAt = esa;
@@ -164,6 +169,7 @@ if (frontend === 'ibreath') {
     if (stateText    !== undefined) stateEl.textContent        = stateText;
     if (stateColor   !== undefined) stateEl.style.color        = stateColor;
     if (trialText    !== undefined) trialEl.textContent        = trialText;
+    if (delayText    !== undefined) delayEl.textContent        = delayText;
     if (startEnabled !== undefined) startBtn.disabled          = !startEnabled;
     if (nextVisible  !== undefined) nextBtn.style.display      = nextVisible  ? '' : 'none';
     if (abortVisible !== undefined) abortBtn.style.display     = abortVisible ? '' : 'none';
