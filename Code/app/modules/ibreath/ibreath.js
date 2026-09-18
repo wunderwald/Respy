@@ -42,7 +42,6 @@ export default class IBreath {
 
   // ── experiment data ────────────────────────────────────────────────────
   #subjectCode = CONFIG.SUBJECT_CODE;
-  #group = 'target';
   #trials = [];
   #trialIndex = 0;
   #trialData = [];
@@ -195,8 +194,7 @@ export default class IBreath {
     if (calibrationSecs !== undefined) CONFIG.CALIBRATION_SECS = calibrationSecs;
 
     this.#subjectCode = this.#hud.subjectCode;
-    this.#group       = this.#hud.group;
-    this.#trials = makeTrialParams(CONFIG.MAX_NUM_TRIALS, this.#group);
+    this.#trials = makeTrialParams(CONFIG.MAX_NUM_TRIALS);
     this.#trialIndex = 0;
     this.#trialData = [];
     this.#calSamples = [];
@@ -213,7 +211,7 @@ export default class IBreath {
     this.#hud.pauseVisible = false;
     this.#hud.stateText    = 'calibrating…';
 
-    this.#csv = new IBreathCSV(this.#subjectCode, this.#group, this.#gazeEnabled, (msg) => this.#csvWarn(msg));
+    this.#csv = new IBreathCSV(this.#subjectCode, this.#gazeEnabled, (msg) => this.#csvWarn(msg));
     this.#csv.init();
     this.#markers.send('calibration_start');
   }
