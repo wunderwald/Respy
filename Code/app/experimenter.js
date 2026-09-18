@@ -110,6 +110,7 @@ if (frontend === 'ibreath') {
       <button id="ib-cal-retry-btn"   style="display:none">Retry calibration</button>
       <button id="ib-cal-default-btn" style="display:none">Use default calibration</button>
     </span>
+    <span id="ib-space-hint" class="space-hint" style="display:none">Press SPACE to continue</span>
   `;
 
   // ── iBreath settings bar ────────────────────────────────────────────────────
@@ -132,6 +133,7 @@ if (frontend === 'ibreath') {
   const subjectInput       = document.getElementById('ib-subject');
   const startBtn           = document.getElementById('ib-start-btn');
   const nextBtn            = document.getElementById('ib-next-btn');
+  const spaceHintEl        = document.getElementById('ib-space-hint');
   const abortBtn           = document.getElementById('ib-abort-btn');
   const pauseBtn           = document.getElementById('ib-pause-btn');
   const playBtn            = document.getElementById('ib-play-btn');
@@ -171,7 +173,10 @@ if (frontend === 'ibreath') {
     if (trialText    !== undefined) trialEl.textContent        = trialText;
     if (delayText    !== undefined) delayEl.textContent        = delayText;
     if (startEnabled !== undefined) startBtn.disabled          = !startEnabled;
-    if (nextVisible  !== undefined) nextBtn.style.display      = nextVisible  ? '' : 'none';
+    if (nextVisible  !== undefined) {
+      nextBtn.style.display     = nextVisible ? '' : 'none';
+      spaceHintEl.style.display = nextVisible ? '' : 'none';
+    }
     if (abortVisible !== undefined) abortBtn.style.display     = abortVisible ? '' : 'none';
     if (pauseVisible !== undefined) pauseBtn.style.display     = pauseVisible ? '' : 'none';
     if (playVisible  !== undefined) playBtn.style.display      = playVisible  ? '' : 'none';
@@ -358,6 +363,7 @@ if (frontend === 'ibreath') {
       <button id="bg-cal-retry-btn"   style="display:none">Retry calibration</button>
       <button id="bg-cal-default-btn" style="display:none">Use default calibration</button>
     </span>
+    <span id="bg-space-hint" class="space-hint" style="display:none">Press SPACE to continue</span>
   `;
 
   // ── bioGame settings bar ──────────────────────────────────────────────────────
@@ -381,6 +387,7 @@ if (frontend === 'ibreath') {
   const bgScoreEl    = document.getElementById('bg-score');
   const bgStartBtn      = document.getElementById('bg-start-btn');
   const bgNextBtn       = document.getElementById('bg-next-btn');
+  const bgSpaceHintEl   = document.getElementById('bg-space-hint');
   const bgAbortBtn      = document.getElementById('bg-abort-btn');
   const bgCalRetryBtn   = document.getElementById('bg-cal-retry-btn');
   const bgCalDefaultBtn = document.getElementById('bg-cal-default-btn');
@@ -442,7 +449,10 @@ if (frontend === 'ibreath') {
     if (score        != null)       bgScoreEl.textContent       = score;
     if (startEnabled !== undefined) bgStartBtn.disabled         = !startEnabled;
     if (startText    !== undefined) bgStartBtn.textContent      = startText;
-    if (nextVisible  !== undefined) bgNextBtn.style.display     = nextVisible  ? '' : 'none';
+    if (nextVisible  !== undefined) {
+      bgNextBtn.style.display     = nextVisible ? '' : 'none';
+      bgSpaceHintEl.style.display = nextVisible ? '' : 'none';
+    }
     if (abortVisible !== undefined) bgAbortBtn.style.display    = abortVisible ? '' : 'none';
     if (calFailed    !== undefined) {
       bgCalRetryBtn.style.display   = calFailed ? '' : 'none';

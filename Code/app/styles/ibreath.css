@@ -103,6 +103,26 @@
   cursor: default;
 }
 
+/* Space-to-continue hint — shown next to the Next-style button whenever the
+   participant/experimenter can press Space to advance the state machine. */
+.space-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(174, 212, 237, 0.5);
+  color: #aed4ed;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  animation: space-hint-pulse 1.6s ease-in-out infinite;
+}
+@keyframes space-hint-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+
 /* Abort buttons — distinct colour so they're easy to find in a hurry */
 #ib-abort-btn,
 #bg-abort-btn {
