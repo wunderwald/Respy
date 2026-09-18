@@ -41,7 +41,6 @@ export const CONFIG = {
   SCROLL_SPEED_MAX:      0.22,  // max item scroll speed
   SCROLL_SPEED_INIT:     0.5,   // starting speed norm (0–1)
   BG_SCROLL_FACTOR:      0.38,  // bg scroll speed = item speed × factor
-  MISS_GAME_OVER:        20,    // total misses before game over
 
   // ── Items ─────────────────────────────────────────────────────────────────
   ITEM_SPAWN_MIN_MS:     400,

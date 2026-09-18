@@ -89,11 +89,11 @@ export class BioGameRenderer {
         break;
 
       case STATE.INTERMISSION:
-        this.#drawIntermission(ctx, w, h, renderData.scoreBlock1 ?? 0, renderData.gameOver ?? false);
+        this.#drawIntermission(ctx, w, h, renderData.scoreBlock1 ?? 0);
         break;
 
       case STATE.DONE:
-        this.#drawDone(ctx, w, h, renderData.scoreBlock1 ?? 0, renderData.scoreBlock2 ?? 0, renderData.gameOver ?? false);
+        this.#drawDone(ctx, w, h, renderData.scoreBlock1 ?? 0, renderData.scoreBlock2 ?? 0);
         break;
     }
   }
@@ -551,7 +551,7 @@ export class BioGameRenderer {
     const {
       avatarNormY, avatarStressNorm = 0.5, avatarTilt = 0, avatarBumpT,
       items, particles, score, blockTime, bpm, showCurve, group, now,
-      scrollSpeed, missCount = 0,
+      scrollSpeed,
     } = data;
 
     const topPad = h * 0.10;
@@ -580,19 +580,6 @@ export class BioGameRenderer {
       this.#drawScoreDisplay(ctx, 18, 16, score, dt);
       this.#drawTimerBar(ctx, w, h, blockTime, now);
     }
-
-    if (missCount > 0) {
-      const maxMiss = CONFIG.MISS_GAME_OVER;
-      const danger  = missCount / maxMiss;
-      const alpha   = 0.30 + 0.55 * danger;
-      const r = Math.round(lerp(200, 255, danger));
-      const g = Math.round(lerp(200, 80,  danger));
-      ctx.fillStyle    = `rgba(${r},${g},80,${alpha})`;
-      ctx.font         = '300 13px Nunito, sans-serif';
-      ctx.textAlign    = 'right';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText(`${missCount} / ${maxMiss} misses`, w - 18, h - 14);
-    }
   }
 
   #drawParticles(ctx, w, h, topPad, playH, particles) {
@@ -612,15 +599,13 @@ export class BioGameRenderer {
     ctx.restore();
   }
 
-  #drawIntermission(ctx, w, h, score, gameOver = false) {
+  #drawIntermission(ctx, w, h, score) {
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.fillRect(0, 0, w, h);
 
     const cy = h / 2;
 
-    const headline      = gameOver ? 'Game 1 over  ·  Too many misses!' : 'Game 1 complete  ·  Good job!';
-    const headlineColor = gameOver ? 'rgba(255,140,100,0.90)' : 'rgba(255,255,255,0.85)';
-    this.#drawCenter(ctx, w, cy - 80, headline, headlineColor, 30, '300');
+    this.#drawCenter(ctx, w, cy - 80, 'Game 1 complete  ·  Good job!', 'rgba(255,255,255,0.85)', 30, '300');
 
     const scoreStr = `★  ${score}  ★`;
     ctx.fillStyle    = '#ffd060';
@@ -637,16 +622,14 @@ export class BioGameRenderer {
     this.#drawCenter(ctx, w, cy + 110, 'Press Space', 'rgba(255,255,255,0.28)', 15);
   }
 
-  #drawDone(ctx, w, h, score1, score2, gameOver = false) {
+  #drawDone(ctx, w, h, score1, score2) {
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.fillRect(0, 0, w, h);
 
     const cy    = h / 2;
     const total = score1 + score2;
 
-    const headline      = gameOver ? 'Game Over' : 'Experiment complete!';
-    const headlineColor = gameOver ? 'rgba(255,120,90,0.92)' : 'rgba(255,255,255,0.85)';
-    this.#drawCenter(ctx, w, cy - 90, headline, headlineColor, 28, '300');
+    this.#drawCenter(ctx, w, cy - 90, 'Experiment complete!', 'rgba(255,255,255,0.85)', 28, '300');
 
     ctx.fillStyle    = '#ffd060';
     ctx.font         = '200 72px Nunito, sans-serif';

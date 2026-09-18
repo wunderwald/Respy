@@ -78,8 +78,6 @@ export default class BioGame {
   // ── Stress mechanic ───────────────────────────────────────────────────────
   #avatarStressNorm = CONFIG.AVATAR_STRESS_INIT;
   #speedNorm        = CONFIG.SCROLL_SPEED_INIT;
-  #missCount        = 0;
-  #gameOver         = false;
 
   // ── Items ─────────────────────────────────────────────────────────────────
   #items         = [];
@@ -282,8 +280,6 @@ export default class BioGame {
       randBetween(CONFIG.ITEM_SPAWN_MIN_MS, CONFIG.ITEM_SPAWN_MAX_MS);
     this.#avatarStressNorm = CONFIG.AVATAR_STRESS_INIT;
     this.#speedNorm        = CONFIG.SCROLL_SPEED_INIT;
-    this.#missCount        = 0;
-    this.#gameOver         = false;
 
     this.#csv.initBlockCSV(this.#blockIndex);
     this.#nextTrialTime = (60 / this.#activeBpm) * 0.75;
@@ -464,13 +460,8 @@ export default class BioGame {
     item.missT  = 0;
     this.#avatarStressNorm = clamp(this.#avatarStressNorm - CONFIG.STRESS_SHRINK_STEP, 0, 1);
     this.#speedNorm        = clamp(this.#speedNorm        - CONFIG.SPEED_SHRINK_STEP,  0, 1);
-    this.#missCount++;
     this.#markers.send(`item_miss_b${this.#blockIndex}`);
     this.#csv.appendEvent(this.#blockIndex, 'item_miss', '', blockTime.toFixed(2));
-    if (this.#missCount >= CONFIG.MISS_GAME_OVER) {
-      this.#gameOver = true;
-      this.#endBlock(false);
-    }
   }
 
   // ── Particles ─────────────────────────────────────────────────────────────
@@ -560,8 +551,6 @@ export default class BioGame {
       group:             this.#group,
       showCurve:         this.#showCurve,
       scrollSpeed:       this.#scrollSpeed,
-      missCount:         this.#missCount,
-      gameOver:          this.#gameOver,
       calProgress:       this.#calibration?.progress ?? 0,
       calRemaining:      Math.ceil(this.#calibration?.remainingSecs ?? this.#calibrationSecs),
       countdownValue,
