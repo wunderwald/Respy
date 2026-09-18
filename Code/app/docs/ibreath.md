@@ -26,13 +26,12 @@ Two windows open:
 | **Retry calibration** | Appears only if calibration fails (no signal received). Restarts the calibration recording. |
 | **Use default calibration** | Appears only if calibration fails. Skips ahead using `CONFIG.DEFAULT_CAL_RANGE` instead of a measured range. |
 | **Data dir** | Folder for CSV output. Default: `iBreathData/` inside the app folder. |
-| **Auto-advance** | Skip the READY state between trials — experiment runs continuously. |
-| **Show questions** | After each trial show a sync-detection question; record response in CSV. |
-| **Flashing image** | Enable lightning flash stimulus on 50 % of trials. |
 | **Animation display** | Show a 5-second pre-trial animation before each trial begins. |
 | **Start** | Begins calibration. Requires a connected resp stream. |
 | **Next trial** | Visible when `AUTO_ADVANCE` is off — advances to the next trial. |
 | **Abort** | Ends the current trial early (marks it `aborted = true` in CSV). |
+
+Auto-advance, sync-detection questions, and the flashing-image stimulus are always on (`AUTO_ADVANCE` / `SHOW_QUESTIONS` / `FLASHING_IMAGE` in [config.js](./modules/ibreath/config.js)) and no longer exposed as experimenter controls.
 
 **Keyboard shortcuts** (scene or experimenter window focused):
 - `Space` — advance from READY state
@@ -53,7 +52,7 @@ stream ready → [Start] → Calibration (10 s)
                                ↓
                       Trial (up to 30 s)
                                ↓
-                   [RESPONSE — ← or →]           (if SHOW_QUESTIONS only)
+                   [RESPONSE — ← or →]           (skipped if trial aborted)
                                ↓
                       ITI (2–3 s jitter)
                                ↓
@@ -62,7 +61,7 @@ stream ready → [Start] → Calibration (10 s)
 
 The state machine is: `IDLE → CALIBRATING → [READY] → [DISPLAY] → TRIAL → [RESPONSE] → ITI → … → DONE`
 
-The `[READY]` step is skipped when `AUTO_ADVANCE` is on. The `[DISPLAY]` step is skipped when `ANIMATION_DISPLAY` is off. The `[RESPONSE]` step is skipped when `SHOW_QUESTIONS` is off or the trial was aborted.
+The `[READY]` step is skipped when `AUTO_ADVANCE` is on. The `[DISPLAY]` step is skipped when `ANIMATION_DISPLAY` is off. The `[RESPONSE]` step is skipped when the trial was aborted.
 
 ---
 
@@ -72,7 +71,7 @@ The `[READY]` step is skipped when `AUTO_ADVANCE` is on. The `[DISPLAY]` step is
 - **Synchronous trials** — cloud animation tracks the Gaussian-smoothed breath signal, rescaled into `[0, 1]` using the calibration range (see [calibration](calibration.md)).
 - **Asynchronous trials** — cloud follows a sine wave fitted to the participant's calibration breath, shifted in time (slow: ×1.1, fast: ×0.9 speed factor). Its output is separately rescaled to match the `[0, 1]`-space intensity actually observed during sync trials (`MAP_ASYNC_RANGE_TO_SYNC_RANGE`), so async and sync trials feel comparably intense.
 - **Flash stimulus** (`FLASHING_IMAGE`) — a lightning image appears on 50 % of trials at a random time between `FLASH_TIME_MIN` and `FLASH_TIME_MAX` seconds into the trial.
-- **Sync detection** (`SHOW_QUESTIONS`) — after each non-aborted trial, a question is shown for up to `RESPONSE_TIMEOUT_SECS` seconds. Non-responses are recorded as `timeout`.
+- **Sync detection** — after each non-aborted trial, a question is shown for up to `RESPONSE_TIMEOUT_SECS` seconds. Non-responses are recorded as `timeout`.
 
 ---
 
@@ -101,7 +100,7 @@ Saved to `iBreathData/<SUBJECT_CODE>/` (or your chosen data dir).
 
 ### Trial data — `trialData.csv`
 
-One row per trial, appended after each trial ends (or after the response screen if `SHOW_QUESTIONS` is on).
+One row per trial, appended after each trial ends (or after the response screen).
 
 | Column | Description |
 |---|---|
@@ -118,7 +117,7 @@ One row per trial, appended after each trial ends (or after the response screen 
 | `startTime` | ISO-8601 trial start time |
 | `endTime` | ISO-8601 trial end time |
 | `aborted` | `true` if experimenter pressed Abort |
-| `response` | `true` (yes), `false` (no), or `timeout` — only when `SHOW_QUESTIONS` is on |
+| `response` | `true` (yes), `false` (no), or `timeout` |
 | `flashImage` | Image name or empty — only when `FLASHING_IMAGE` is on |
 | `flashScheduledTime` | Seconds into trial when flash was scheduled |
 | `flashX`, `flashY` | Flash position (normalised 0–1) |
