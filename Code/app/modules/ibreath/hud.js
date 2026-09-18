@@ -5,10 +5,10 @@
  * Setters:  stateText, stateColor, trialText,
  *           startEnabled, nextVisible, abortVisible, pauseVisible, playVisible,
  *           calFailed, inputsLocked, gazeActive
- * Getters:  stateText, subjectCode, questionType
+ * Getters:  stateText, subjectCode
  */
 export class LocalHud {
-  #stateEl; #trialEl; #subjectInput; #questionTypeSelect;
+  #stateEl; #trialEl; #subjectInput;
   #startBtn; #nextBtn; #abortBtn; #pauseBtn; #playBtn; #calRetryBtn; #calDefaultBtn;
 
   constructor(container, subjectCode, { onStart, onNext, onAbort, onPause, onPlay,
@@ -24,13 +24,6 @@ export class LocalHud {
         <input id="ib-subject" type="text" value="${subjectCode}"
                placeholder="subject code" autocomplete="off" spellcheck="false" />
       </span>
-      <span>
-        <span class="label">group</span>
-        <select id="ib-question-type" class="stream-select">
-          <option value="target">Target</option>
-          <option value="control">Control</option>
-        </select>
-      </span>
       <span id="ib-controls">
         <button id="ib-start-btn"       disabled>Start</button>
         <button id="ib-next-btn"        style="display:none">Next trial</button>
@@ -45,7 +38,6 @@ export class LocalHud {
     this.#stateEl            = container.querySelector('#ib-state-text');
     this.#trialEl            = container.querySelector('#ib-trial');
     this.#subjectInput       = container.querySelector('#ib-subject');
-    this.#questionTypeSelect = container.querySelector('#ib-question-type');
     this.#startBtn           = container.querySelector('#ib-start-btn');
     this.#nextBtn            = container.querySelector('#ib-next-btn');
     this.#abortBtn           = container.querySelector('#ib-abort-btn');
@@ -77,13 +69,11 @@ export class LocalHud {
     this.#calDefaultBtn.style.display = v ? '' : 'none';
   }
   set inputsLocked(v)  {
-    this.#subjectInput.disabled       = v;
-    this.#questionTypeSelect.disabled = v;
+    this.#subjectInput.disabled = v;
   }
   set experimentStartedAt(_v) {}
   set stateTimer(_v) {}
   set gazeActive(_v) {}   // no gaze button in local HUD
   set gazeCalibrating(_v) {}   // no gaze button in local HUD
   get subjectCode()    { return this.#subjectInput.value.trim() || 'TEST'; }
-  get group()          { return this.#questionTypeSelect.value; }
 }
