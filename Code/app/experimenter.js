@@ -114,6 +114,7 @@ if (frontend === 'ibreath') {
     <span class="label">settings</span>
     <label><input type="checkbox" id="s-use-eye-tracking"> use eye tracking</label>
     <label id="debug-gaze-label"><input type="checkbox" id="s-debug-gaze"      ${CONFIG.DEBUG_GAZE      ? 'checked' : ''}> show gaze position</label>
+    <label><input type="checkbox" id="s-mixed-questions" ${CONFIG.MIXED_QUESTIONS ? 'checked' : ''}> use mixed questions</label>
     <span class="label">cal secs</span>
     <input id="s-cal-secs" type="number" class="settings-num" min="5" max="120" step="5"
            value="${CONFIG.CALIBRATION_SECS}" />
@@ -197,6 +198,7 @@ if (frontend === 'ibreath') {
       type:            'start',
       subjectCode:     subjectInput.value.trim() || 'TEST',
       debugGaze:       document.getElementById('s-debug-gaze').checked,
+      mixedQuestions:  document.getElementById('s-mixed-questions').checked,
       calibrationSecs: parseInt(document.getElementById('s-cal-secs').value) || CONFIG.CALIBRATION_SECS,
     });
   });

@@ -18,9 +18,13 @@ export function makeTrialParams(numTrials) {
     return out.slice(0, length);
   }
 
-  // Question sequence: 50% 'sync', ~16.7% each of 'flash', 'lr', 'img'.
-  // Built from shuffled 6-trial blocks: [sync×3, flash, lr, img].
+  // Question sequence.
+  // MIXED_QUESTIONS off (default): every trial asks 'sync'.
+  // MIXED_QUESTIONS on: 50% 'sync', ~16.7% each of 'flash', 'lr', 'img',
+  // built from shuffled 6-trial blocks: [sync×3, flash, lr, img].
   function makeQuestionSeq(n) {
+    if (!CONFIG.MIXED_QUESTIONS) return new Array(n).fill('sync');
+
     const template = ['sync', 'sync', 'sync', 'flash', 'lr', 'img'];
     const out = [];
     while (out.length < n) {

@@ -40,6 +40,8 @@ export const CONFIG = {
   // Questions after trials
   SHOW_QUESTIONS: true,      // show a post-trial response question after each trial (fixed — not exposed in experimenter UI)
   RESPONSE_TIMEOUT_SECS: 5,        // seconds before a non-response is recorded as 'timeout'
+  MIXED_QUESTIONS: false,    // false: every trial asks 'sync'. true: mix in 'flash'/'lr'/'img' questions.
+                             // Overridable via the experimenter's "use mixed questions" checkbox.
 
   // Flash image
   FLASHING_IMAGE: true,         // show a flash image in 50% of trials (fixed — not exposed in experimenter UI)

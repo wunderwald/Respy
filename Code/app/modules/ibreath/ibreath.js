@@ -189,8 +189,9 @@ export default class IBreath {
 
   // ── State machine ──────────────────────────────────────────────────────
 
-  #beginCalibration({ debugGaze, calibrationSecs } = {}) {
+  #beginCalibration({ debugGaze, mixedQuestions, calibrationSecs } = {}) {
     if (debugGaze       !== undefined) CONFIG.DEBUG_GAZE        = debugGaze;
+    if (mixedQuestions  !== undefined) CONFIG.MIXED_QUESTIONS   = mixedQuestions;
     if (calibrationSecs !== undefined) CONFIG.CALIBRATION_SECS = calibrationSecs;
 
     this.#subjectCode = this.#hud.subjectCode;

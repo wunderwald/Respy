@@ -29,10 +29,10 @@ export class RemoteHud {
   constructor({ onStart, onNext, onAbort, onResponse, onPause, onPlay, onRecalibrateGaze,
                 onRetryCalibration, onUseDefaultCalibration, onSetUseEyeTracking }) {
     window.api.hud.onAction(({ type, subjectCode, value,
-                               debugGaze, calibrationSecs }) => {
+                               debugGaze, mixedQuestions, calibrationSecs }) => {
       if (subjectCode !== undefined) this.#subjectCode = subjectCode;
       switch (type) {
-        case 'start':           onStart({ debugGaze, calibrationSecs }); break;
+        case 'start':           onStart({ debugGaze, mixedQuestions, calibrationSecs }); break;
         case 'next':            onNext(); break;
         case 'abort':           onAbort(); break;
         case 'response':        onResponse?.(value); break;
