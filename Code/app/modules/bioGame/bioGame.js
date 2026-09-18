@@ -49,6 +49,7 @@ export default class BioGame {
   // ── Experiment settings (overridden by experimenter on start) ─────────────
   #subjectCode      = CONFIG.SUBJECT_CODE;
   #group            = CONFIG.GROUP;
+  #sceneId          = CONFIG.SCENE;
   #naturalBpm       = CONFIG.NATURAL_BPM;
   #showCurve        = CONFIG.SHOW_CURVE;
   #calibrationSecs  = CONFIG.CALIBRATION_SECS;
@@ -124,11 +125,13 @@ export default class BioGame {
   }
 
   constructor({ sceneContainer }) {
-    this.#scene   = resolveScene(CONFIG.SCENE);
+    // Placeholder scene shown before the experimenter picks one at Start;
+    // #beginCalibration() re-resolves it from #sceneId and applies it for real.
+    this.#scene   = resolveScene(this.#sceneId);
     this.#renderer = new BioGameRenderer(sceneContainer, this.#scene);
 
     this.#sound = new BioGameSound();
-    this.#sound.init(this.#scene.sounds).catch(e => console.warn('[BioGame] sound init failed:', e));
+    this.#sound.init().catch(e => console.warn('[BioGame] sound init failed:', e));
 
     this.#markers = CONFIG.SEND_MARKERS
       ? new MarkerStream(CONFIG.MARKER_STREAM_URL)
@@ -163,11 +166,12 @@ export default class BioGame {
 
   // ── Action handler ────────────────────────────────────────────────────────
 
-  #onAction({ type, subjectCode, group, naturalBpm, showCurve, calibrationSecs }) {
+  #onAction({ type, subjectCode, group, scene, naturalBpm, showCurve, calibrationSecs }) {
     switch (type) {
       case 'start':
         if (subjectCode     !== undefined) this.#subjectCode     = subjectCode;
         if (group           !== undefined) this.#group           = group;
+        if (scene           !== undefined) this.#sceneId         = scene;
         if (naturalBpm      !== undefined) this.#naturalBpm      = naturalBpm;
         if (showCurve       !== undefined) this.#showCurve       = showCurve;
         if (calibrationSecs !== undefined) this.#calibrationSecs = calibrationSecs;
@@ -200,6 +204,11 @@ export default class BioGame {
   // ── State machine ─────────────────────────────────────────────────────────
 
   #beginCalibration() {
+    this.#scene = resolveScene(this.#sceneId);
+    this.#renderer.setScene(this.#scene);
+    this.#sound.loadScene(this.#scene.sounds)
+      .catch(e => console.warn('[BioGame] scene sound load failed:', e));
+
     this.#calibration = new RespCalibration({ durationSecs: this.#calibrationSecs });
     this.#calibration.start();
     this.#calFailed = false;

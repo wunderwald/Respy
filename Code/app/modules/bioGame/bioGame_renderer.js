@@ -44,6 +44,14 @@ export class BioGameRenderer {
 
   // ── Public ────────────────────────────────────────────────────────────────
 
+  // Switches the active scene (avatar sprite + background texture), e.g.
+  // when the experimenter picks a scene at Start. Safe to call repeatedly.
+  setScene(scene) {
+    this.#scene = scene;
+    this.#loadAvatarImg();
+    this.#buildBgTex();
+  }
+
   draw(renderData) {
     const canvas = this.#canvas;
     canvas.width  = canvas.offsetWidth;

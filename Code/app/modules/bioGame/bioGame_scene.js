@@ -58,13 +58,9 @@ export const SCENES = {
 };
 
 /**
- * Resolve a scene macro to a scene definition.
- * @param {string} macro  'ocean' | 'jungle' | 'random'
+ * Resolve a scene id to a scene definition.
+ * @param {string} id  'ocean' | 'jungle'
  */
-export function resolveScene(macro) {
-  if (macro === 'random') {
-    const keys = Object.keys(SCENES);
-    return SCENES[keys[Math.floor(Math.random() * keys.length)]];
-  }
-  return SCENES[macro] ?? SCENES.ocean;
+export function resolveScene(id) {
+  return SCENES[id] ?? SCENES.ocean;
 }

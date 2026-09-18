@@ -2,7 +2,7 @@ export const CONFIG = {
   // ── Experiment ───────────────────────────────────────────────────────────
   SUBJECT_CODE:          'TEST',
   GROUP:                 'slow',   // 'slow' | 'natural'
-  SCENE:                 'random',  // 'ocean' | 'jungle' | 'random'
+  SCENE:                 'ocean',  // 'ocean' | 'jungle' — selected by the experimenter's "scene" control
   NATURAL_BPM:           10,
   SHOW_CURVE:            false,
   DATA_DIR:              'output_data/bio_game', // do not change
