@@ -19,15 +19,13 @@ import { CONFIG } from './config.js';
 
 export class IBreathCSV {
   #subjectCode;
-  #group;
   #gazeEnabled;
   #onWarn;
   #frameHeader;
   #trialHeader;
 
-  constructor(subjectCode, group, gazeEnabled, onWarn) {
+  constructor(subjectCode, gazeEnabled, onWarn) {
     this.#subjectCode = subjectCode;
-    this.#group       = group;
     this.#gazeEnabled = gazeEnabled;
     this.#onWarn      = onWarn;
 
@@ -37,7 +35,7 @@ export class IBreathCSV {
       (gazeEnabled ? ',gazeX,gazeY' : '') + '\n';
 
     this.#trialHeader =
-      'trialIndex,subject,group,questionType,synchronous,img,lr,stimX0,stimY0,stimX1,stimY1,slowfast,' +
+      'trialIndex,subject,questionType,synchronous,img,lr,stimX0,stimY0,stimX1,stimY1,slowfast,' +
       'ITI,startTime,endTime,aborted' +
       (CONFIG.SHOW_QUESTIONS ? ',response' : '') +
       (CONFIG.FLASHING_IMAGE ? ',flashImage,flashScheduledTime,flashX,flashY,flashShown' : '') + '\n';
@@ -100,7 +98,6 @@ export class IBreathCSV {
     const row =
       `${trial.trialIndex},` +
       `${this.#subjectCode},` +
-      `${this.#group},` +
       `${trial.questionType ?? ''},` +
       `${trial.synchronous},` +
       `${trial.img},` +
