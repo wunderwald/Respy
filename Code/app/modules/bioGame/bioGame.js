@@ -445,7 +445,6 @@ export default class BioGame {
     this.#avatarStressNorm = clamp(this.#avatarStressNorm - CONFIG.STRESS_SHRINK_STEP, 0, 1);
     this.#speedNorm        = clamp(this.#speedNorm        - CONFIG.SPEED_SHRINK_STEP,  0, 1);
     this.#missCount++;
-    this.#sound.playMiss();
     this.#markers.send(`item_miss_b${this.#blockIndex}`);
     this.#csv.appendEvent(this.#blockIndex, 'item_miss', '', blockTime.toFixed(2));
     if (this.#missCount >= CONFIG.MISS_GAME_OVER) {

@@ -17,7 +17,7 @@ import { SOUND_CONFIG as CFG } from './bioGame_sound_config.js';
 
 export class BioGameSound {
   #engine = new SoundEngine();
-  #buf    = {};   // { ambience, noise, miss, collect[] } → AudioBuffer | null
+  #buf    = {};   // { ambience, noise, collect[] } → AudioBuffer | null
 
   #ambience       = null;   // LoopPlayer
   #noise          = null;   // LoopPlayer
@@ -27,13 +27,12 @@ export class BioGameSound {
 
   async init(sounds) {
     await this.#engine.init();
-    const [ambience, noise, miss, ...collectBufs] = await Promise.all([
+    const [ambience, noise, ...collectBufs] = await Promise.all([
       this.#engine.loadBuffer(sounds.ambience),
       this.#engine.loadBuffer(sounds.noise),
-      this.#engine.loadBuffer(sounds.miss),
       ...sounds.collect.map(url => this.#engine.loadBuffer(url)),
     ]);
-    this.#buf = { ambience, noise, miss, collect: collectBufs };
+    this.#buf = { ambience, noise, collect: collectBufs };
   }
 
   // ── Block layer ───────────────────────────────────────────────────────────
@@ -73,10 +72,6 @@ export class BioGameSound {
     if (!bufs?.length) return;
     const buf = bufs[Math.floor(Math.random() * bufs.length)];
     this.#playOnce(buf, CFG.COLLECT_VOLUME);
-  }
-
-  playMiss() {
-    this.#playOnce(this.#buf.miss, CFG.MISS_VOLUME);
   }
 
   #playOnce(buffer, gain) {
