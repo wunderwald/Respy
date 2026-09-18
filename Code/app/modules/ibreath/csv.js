@@ -35,7 +35,7 @@ export class IBreathCSV {
       (gazeEnabled ? ',gazeX,gazeY' : '') + '\n';
 
     this.#trialHeader =
-      'trialIndex,subject,questionType,synchronous,img,lr,stimX0,stimY0,stimX1,stimY1,slowfast,' +
+      'trialIndex,subject,questionType,synchronous,img,lr,stimX0,stimY0,stimX1,stimY1,delayMs,' +
       'ITI,startTime,endTime,aborted' +
       (CONFIG.SHOW_QUESTIONS ? ',response' : '') +
       (CONFIG.FLASHING_IMAGE ? ',flashImage,flashScheduledTime,flashX,flashY,flashShown' : '') + '\n';
@@ -103,7 +103,7 @@ export class IBreathCSV {
       `${trial.img},` +
       `${trial.lr},` +
       `${trial.stimX0},${trial.stimY0},${trial.stimX1},${trial.stimY1},` +
-      `${trial.slowfast ?? ''},` +
+      `${trial.delayMs ?? ''},` +
       `${trial.ITI},` +
       `${trial.startTime ?? ''},` +
       `${trial.endTime ?? ''},` +
