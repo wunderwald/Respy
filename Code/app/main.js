@@ -133,6 +133,23 @@ ipcMain.handle("read-file", (_event, filePath) => {
 });
 
 /**
+ * file-exists
+ * Checks whether a file exists at the given path, without reading its
+ * content — safe to use on large files (e.g. videos).
+ * Returns { ok: true, exists: boolean } or { ok: false, error: string }.
+ */
+ipcMain.handle("file-exists", (_event, filePath) => {
+  try {
+    const resolved = path.isAbsolute(filePath)
+      ? filePath
+      : path.join(__dirname, filePath);
+    return { ok: true, exists: fs.existsSync(resolved) };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+/**
  * pick-directory
  * Opens a native folder-picker dialog.
  * Returns the selected path string, or null if cancelled.
@@ -312,6 +329,11 @@ function setupPermissions() {
 // window, which delays state transitions and marker sends.
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
+
+// Allow scripted video.play() without a prior user gesture in that window —
+// needed because the baseline video is started by an IPC action from the
+// experimenter window, not a click inside the scene window itself.
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 app.whenReady().then(() => {
   setupPermissions();
