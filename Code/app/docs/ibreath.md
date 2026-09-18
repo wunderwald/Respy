@@ -25,6 +25,7 @@ Two windows open:
 | **Retry calibration** | Appears only if calibration fails (no signal received). Restarts the calibration recording. |
 | **Use default calibration** | Appears only if calibration fails. Skips ahead using `CONFIG.DEFAULT_CAL_RANGE` instead of a measured range. |
 | **Data dir** | Folder for CSV output. Default: `iBreathData/` inside the app folder. |
+| **Use mixed questions** | Off by default — every trial asks the sync-detection question. When on, questions are mixed (see [Trial design](#trial-design)). |
 | **Animation display** | Show a 5-second pre-trial animation before each trial begins. |
 | **Start** | Begins calibration. Requires a connected resp stream. |
 | **Next trial** | Visible when `AUTO_ADVANCE` is off — advances to the next trial. |
@@ -70,7 +71,9 @@ The `[READY]` step is skipped when `AUTO_ADVANCE` is on. The `[DISPLAY]` step is
 - **Synchronous trials** — cloud animation tracks the Gaussian-smoothed breath signal, rescaled into `[0, 1]` using the calibration range (see [calibration](calibration.md)).
 - **Asynchronous trials** — cloud follows a sine wave fitted to the participant's calibration breath, shifted in time (slow: ×1.1, fast: ×0.9 speed factor). Its output is separately rescaled to match the `[0, 1]`-space intensity actually observed during sync trials (`MAP_ASYNC_RANGE_TO_SYNC_RANGE`), so async and sync trials feel comparably intense.
 - **Flash stimulus** (`FLASHING_IMAGE`) — a lightning image appears on 50 % of trials at a random time between `FLASH_TIME_MIN` and `FLASH_TIME_MAX` seconds into the trial.
-- **Sync detection** — after each non-aborted trial, a question is shown for up to `RESPONSE_TIMEOUT_SECS` seconds. Non-responses are recorded as `timeout`.
+- **Post-trial question** (`MIXED_QUESTIONS`) — after each non-aborted trial, a question is shown for up to `RESPONSE_TIMEOUT_SECS` seconds. Non-responses are recorded as `timeout`.
+  - **Off (default)** — every trial asks the sync-detection question: "Was the fish in sync with your breathing?"
+  - **On** — questions are mixed: ~50% sync-detection, ~16.7% each of flash-detection ("Did you see the pink fish flashing?"), left/right, and pufferfish/starfish, built from shuffled 6-trial blocks.
 
 ---
 
@@ -81,7 +84,8 @@ Flags in [app/modules/ibreath/config.js](./modules/ibreath/config.js):
 | Flag | Default | Effect |
 |---|---|---|
 | `AUTO_ADVANCE` | `true` | Skip READY state between trials |
-| `SHOW_QUESTIONS` | `true` | Show sync-detection response screen after each trial |
+| `SHOW_QUESTIONS` | `true` | Show a post-trial response screen after each trial |
+| `MIXED_QUESTIONS` | `false` | `false`: every trial asks the sync-detection question. `true`: mix in flash/left-right/image questions. Exposed as the "use mixed questions" experimenter checkbox. |
 | `FLASHING_IMAGE` | `true` | Enable lightning flash on 50 % of trials |
 | `ANIMATION_DISPLAY` | `true` | Show 5-second pre-trial animation |
 | `SEND_MARKERS` | `true` | Send LSL markers via WebSocket |
@@ -105,7 +109,7 @@ One row per trial, appended after each trial ends (or after the response screen)
 |---|---|
 | `trialIndex` | 0-based trial number |
 | `subject` | Subject code |
-| `questionType` | `sync`, `flash`, `lr`, or `img` — which post-trial question was asked (see [Sync detection](#trial-design)) |
+| `questionType` | `sync`, `flash`, `lr`, or `img` — which post-trial question was asked. Always `sync` unless `MIXED_QUESTIONS` is on (see [Trial design](#trial-design)) |
 | `synchronous` | `true` / `false` |
 | `img` | Cloud image variant used |
 | `lr` | Cloud starting side (`left` / `right`) |
