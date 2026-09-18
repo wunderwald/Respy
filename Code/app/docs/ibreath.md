@@ -21,7 +21,6 @@ Two windows open:
 | Control | What it does |
 |---|---|
 | **Subject** | Subject code written to the CSV filename. Locked once calibration begins. |
-| **Group** | `intero` or `extero` — written to `trialData.csv` as the `group` column. |
 | **Cal secs** | Calibration recording duration (default 10 s). |
 | **Retry calibration** | Appears only if calibration fails (no signal received). Restarts the calibration recording. |
 | **Use default calibration** | Appears only if calibration fails. Skips ahead using `CONFIG.DEFAULT_CAL_RANGE` instead of a measured range. |
@@ -106,7 +105,7 @@ One row per trial, appended after each trial ends (or after the response screen)
 |---|---|
 | `trialIndex` | 0-based trial number |
 | `subject` | Subject code |
-| `group` | `intero` or `extero` |
+| `questionType` | `sync`, `flash`, `lr`, or `img` — which post-trial question was asked (see [Sync detection](#trial-design)) |
 | `synchronous` | `true` / `false` |
 | `img` | Cloud image variant used |
 | `lr` | Cloud starting side (`left` / `right`) |
@@ -117,7 +116,7 @@ One row per trial, appended after each trial ends (or after the response screen)
 | `startTime` | ISO-8601 trial start time |
 | `endTime` | ISO-8601 trial end time |
 | `aborted` | `true` if experimenter pressed Abort |
-| `response` | `true` (yes), `false` (no), or `timeout` |
+| `response` | `yes`/`no` (`sync`/`flash` questions), `left`/`right` (`lr`), `pufferfish`/`starfish` (`img`), or `timeout` |
 | `flashImage` | Image name or empty — only when `FLASHING_IMAGE` is on |
 | `flashScheduledTime` | Seconds into trial when flash was scheduled |
 | `flashX`, `flashY` | Flash position (normalised 0–1) |
