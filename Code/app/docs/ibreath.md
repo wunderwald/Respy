@@ -1,6 +1,8 @@
-# iBreath — Interoception Sync/Async Experiment
+# iBreath (and iBeat) — Interoception Sync/Async Experiment
 
 Port of the MATLAB version of iBreath (`ibreath_main_v2.m`) to Electron. On each trial the participant views an animation that either tracks their breath in real time (synchronous) or plays back their own real-time breath signal after a delay (asynchronous). There are multiple variations of the experiment (interoception task, exteroception task, gaze-tracked task...).
+
+**This one frontend runs both the iBreath and iBeat experiments** — same code, same `npm run ibreath`, same "iBreath / iBeat" entry in the launcher. The only difference is the **Signal type** setting (see [Input signal types](#input-signal-types)): *Physiological* is iBreath (breath signal), *Peaks only* is iBeat (ECG peak signal) — typically chosen via one of the bundled `iBreath_*` / `iBeat_*` [presets](#presets).
 
 ---
 
