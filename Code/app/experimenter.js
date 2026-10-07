@@ -124,6 +124,11 @@ if (frontend === 'ibreath') {
     <span class="label">settings</span>
     <label><input type="checkbox" id="s-use-eye-tracking"> use eye tracking</label>
     <label><input type="checkbox" id="s-mixed-questions" ${CONFIG.MIXED_QUESTIONS ? 'checked' : ''}> use mixed questions</label>
+    <span class="label">signal type</span>
+    <select id="s-signal-type" class="stream-select">
+      <option value="physiological" ${CONFIG.INPUT_SIGNAL_TYPE === 'physiological' ? 'selected' : ''}>Physiological</option>
+      <option value="peaksOnly"     ${CONFIG.INPUT_SIGNAL_TYPE === 'peaksOnly'     ? 'selected' : ''}>Peaks only</option>
+    </select>
     <span class="label">cal secs</span>
     <input id="s-cal-secs" type="number" class="settings-num" min="5" max="120" step="5"
            value="${CONFIG.CALIBRATION_SECS}" />
@@ -218,6 +223,7 @@ if (frontend === 'ibreath') {
       subjectCode:     subjectInput.value.trim() || 'TEST',
       debugGaze:       document.getElementById('s-debug-gaze').checked,
       mixedQuestions:  document.getElementById('s-mixed-questions').checked,
+      inputSignalType: document.getElementById('s-signal-type').value,
       calibrationSecs: parseInt(document.getElementById('s-cal-secs').value) || CONFIG.CALIBRATION_SECS,
     });
   });
