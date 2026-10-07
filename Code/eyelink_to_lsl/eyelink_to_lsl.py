@@ -35,6 +35,14 @@ from pylsl import StreamInfo, StreamOutlet, local_clock
 log = logging.getLogger(__name__)
 
 MISSING_VAL: float = -1.0
+
+# Eye / missing-data codes from the EyeLink C API (eye_data.h).  Recent pylink
+# releases no longer export these as module attributes, so fall back to the
+# documented values.
+LEFT_EYE: int = getattr(pylink, "LEFT_EYE", 0)
+RIGHT_EYE: int = getattr(pylink, "RIGHT_EYE", 1)
+BINOCULAR: int = getattr(pylink, "BINOCULAR", 2)
+MISSING_DATA: int = getattr(pylink, "MISSING_DATA", -32768)
 NOMINAL_RATE: float = 500.0
 
 
@@ -239,7 +247,7 @@ class EyeLinkLSLBridge:
         self._outlet: StreamOutlet | None = None
         self._thread: threading.Thread | None = None
         self._running = False
-        self._eye = pylink.RIGHT_EYE  # updated after connect()
+        self._eye = RIGHT_EYE  # updated after connect()
         self._on_state = on_state
 
         # Set by request_calibrate(); consumed inside the pump loop.
@@ -272,7 +280,7 @@ class EyeLinkLSLBridge:
         eye = self._tracker.eyeAvailable()
         self._eye = eye
         self._tracker.sendCommand(
-            f"binocular_enabled = {'YES' if eye == pylink.BINOCULAR else 'NO'}"
+            f"binocular_enabled = {'YES' if eye == BINOCULAR else 'NO'}"
         )
 
         # Register custom display with pylink before any calibration call.
@@ -418,11 +426,11 @@ class EyeLinkLSLBridge:
         Binocular: averages both eyes, falls back to whichever is valid.
         Monocular: uses the tracked eye directly.
         """
-        if self._eye == pylink.BINOCULAR:
+        if self._eye == BINOCULAR:
             lx, ly = sample.getLeftEye().getGaze()
             rx, ry = sample.getRightEye().getGaze()
-            l_ok = lx != pylink.MISSING_DATA
-            r_ok = rx != pylink.MISSING_DATA
+            l_ok = lx != MISSING_DATA
+            r_ok = rx != MISSING_DATA
 
             if l_ok and r_ok:
                 px, py = (lx + rx) / 2.0, (ly + ry) / 2.0
@@ -435,11 +443,11 @@ class EyeLinkLSLBridge:
         else:
             eye_data = (
                 sample.getLeftEye()
-                if self._eye == pylink.LEFT_EYE
+                if self._eye == LEFT_EYE
                 else sample.getRightEye()
             )
             px, py = eye_data.getGaze()
-            if px == pylink.MISSING_DATA:
+            if px == MISSING_DATA:
                 return MISSING_VAL, MISSING_VAL
 
         return px / self.screen_w, py / self.screen_h
