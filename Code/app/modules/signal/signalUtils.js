@@ -2,8 +2,9 @@
  * signalUtils.js — Real-time signal processing utilities
  * =======================================================
  * Exports:
- *   class    GaussianSmoother — real-time Gaussian low-pass filter
- *   class    SignalDelayLine  — time-based delay buffer (async stimulus source)
+ *   class    GaussianSmoother     — real-time Gaussian low-pass filter
+ *   class    SignalDelayLine      — time-based delay buffer (async stimulus source)
+ *   class    PeakEnvelopeFollower — swell/fade pulse generator for peaks-only signals
  *   function mapRange(v, from, to)
  *
  * All frequency/rate estimators live in breathRateEstimators.js.
@@ -193,5 +194,135 @@ export class SignalDelayLine {
   /** Discard all buffered samples (e.g. at the start of a new session). */
   reset() {
     this.#buf = [];
+  }
+}
+
+
+// ── PeakEnvelopeFollower ───────────────────────────────────────────────────────
+
+/**
+ * Converts a sparse "peaks-only" signal — a constant baseline with brief,
+ * distinct spikes (e.g. an ECG fast-response/peak-detect channel) — into a
+ * continuous [0, 1] envelope suitable for the same downstream pipeline used
+ * for a continuous physiological signal: a short rise ("swell") to 1 on
+ * every detected peak, followed by a slightly longer decay ("fade") back to
+ * 0, so each heartbeat reads as one short, plucky pulse.
+ *
+ * Peak detection is a simple adaptive rising-edge threshold: it tracks the
+ * lowest and highest raw values seen so far (self-calibrating to whatever
+ * the actual peak height turns out to be) and fires on every upward
+ * crossing of the point `crossFraction` of the way between them. There is
+ * no refractory period and no retrigger guard — every qualifying crossing
+ * restarts the swell from whatever level the envelope is currently at, so a
+ * spurious double-trigger just looks like a slightly early next beat rather
+ * than a discontinuity. Assumes a genuinely clean signal (constant baseline,
+ * distinct peaks) — if that doesn't hold, the detector needs rework, not
+ * just retuning.
+ *
+ * Usage:
+ *   const env = new PeakEnvelopeFollower({ swellMs: 80, fadeMs: 260 });
+ *   env.push(performance.now(), rawValue);   // call on every incoming sample
+ *   const level = env.value;                 // current envelope level, [0, 1]
+ *   env.reset();
+ */
+export class PeakEnvelopeFollower {
+  #swellMs;
+  #fadeMs;
+  #crossFraction;
+
+  #min = Infinity;
+  #max = -Infinity;
+  #aboveThreshold = false;   // edge-detection state
+
+  #value = 0;
+  #phase = 'idle';           // 'idle' | 'swell' | 'fade'
+  #phaseStartTime = 0;
+  #phaseStartValue = 0;
+
+  /**
+   * @param {object} opts
+   * @param {number} [opts.swellMs]       Rise time to full level on a peak (default 80ms)
+   * @param {number} [opts.fadeMs]        Decay time back to 0 after the swell (default 260ms)
+   * @param {number} [opts.crossFraction] Fraction of the way from the tracked min to the
+   *                                      tracked max that counts as "in a peak" (default 0.5)
+   */
+  constructor({ swellMs = 80, fadeMs = 260, crossFraction = 0.5 } = {}) {
+    this.#swellMs = swellMs;
+    this.#fadeMs = fadeMs;
+    this.#crossFraction = crossFraction;
+  }
+
+  /**
+   * Feed one raw sample.
+   * @param {number} t    Timestamp in ms (e.g. performance.now())
+   * @param {number} raw  Raw sample value
+   */
+  push(t, raw) {
+    if (raw < this.#min) this.#min = raw;
+    if (raw > this.#max) this.#max = raw;
+
+    // Need a non-degenerate observed range before a crossing means anything.
+    const haveRange = this.#max > this.#min;
+    const threshold = haveRange
+      ? this.#min + this.#crossFraction * (this.#max - this.#min)
+      : Infinity;
+
+    const above = haveRange && raw >= threshold;
+    if (above && !this.#aboveThreshold) {
+      this.#trigger(t);
+    }
+    this.#aboveThreshold = above;
+
+    this.#advance(t);
+  }
+
+  /** Current envelope level, [0, 1]. */
+  get value() {
+    return this.#value;
+  }
+
+  /** Discard all tracking/envelope state (e.g. at the start of a new session). */
+  reset() {
+    this.#min = Infinity;
+    this.#max = -Infinity;
+    this.#aboveThreshold = false;
+    this.#value = 0;
+    this.#phase = 'idle';
+    this.#phaseStartTime = 0;
+    this.#phaseStartValue = 0;
+  }
+
+  // Start (or restart) the swell from wherever the envelope currently is.
+  #trigger(t) {
+    this.#phase = 'swell';
+    this.#phaseStartTime = t;
+    this.#phaseStartValue = this.#value;
+  }
+
+  // Advance the envelope to time t given its current phase.
+  #advance(t) {
+    if (this.#phase === 'idle') return;
+
+    const elapsed = t - this.#phaseStartTime;
+
+    if (this.#phase === 'swell') {
+      if (elapsed >= this.#swellMs) {
+        this.#value = 1;
+        this.#phase = 'fade';
+        this.#phaseStartTime = t;
+        this.#phaseStartValue = 1;
+      } else {
+        const frac = this.#swellMs > 0 ? elapsed / this.#swellMs : 1;
+        this.#value = this.#phaseStartValue + (1 - this.#phaseStartValue) * frac;
+      }
+    } else if (this.#phase === 'fade') {
+      if (elapsed >= this.#fadeMs) {
+        this.#value = 0;
+        this.#phase = 'idle';
+      } else {
+        const frac = this.#fadeMs > 0 ? elapsed / this.#fadeMs : 1;
+        this.#value = this.#phaseStartValue * (1 - frac);
+      }
+    }
   }
 }
