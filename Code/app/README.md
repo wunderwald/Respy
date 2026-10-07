@@ -33,7 +33,7 @@ npm run visualizer    # real-time waveform
 
 | Module | Description | Docs |
 |---|---|---|
-| iBreath | Interoception experiment | [docs/ibreath.md](docs/ibreath.md) |
+| iBreath / iBeat | Interoception experiment | [docs/ibreath.md](docs/ibreath.md) |
 | bioGame | Biofeedback game | [docs/bioGame.md](docs/bioGame.md) |
 | trainingGame | Slow breathing training game | [docs/trainingGame.md](docs/trainingGame.md) |
 | trainingGameControl | Breath-controlled dino-style runner | [docs/trainingGameControl.md](docs/trainingGameControl.md) |
