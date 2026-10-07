@@ -151,7 +151,7 @@ class PsychopyCalibrationDisplay(pylink.EyeLinkCustomDisplay):
         return mapped
 
     def setup(self, tracker: pylink.EyeLink) -> None:
-        tracker.openGraphicsEx(self)
+        pylink.openGraphicsEx(self)
 
     def teardown(self) -> None:
         pylink.closeGraphics()

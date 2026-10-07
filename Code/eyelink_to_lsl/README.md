@@ -134,7 +134,7 @@ If you are not using PsychoPy, implement the `CalibrationDisplay` protocol and p
 ```python
 class MyDisplay(pylink.EyeLinkCustomDisplay):
     def setup(self, tracker):
-        tracker.openGraphicsEx(self)
+        pylink.openGraphicsEx(self)
     def teardown(self):
         pylink.closeGraphics()
     # implement draw_cal_target, clear_cal_display, get_input_key, ...
