@@ -7,7 +7,17 @@ export const CONFIG = {
   BREATH_SCALE_BASE_LOG: 1.2,
 
   // Smoothing
-  SMOOTH_WINDOW: 64,        // samples (matches smoothBreathRT.m windowSize)
+  SMOOTH_WINDOW: 64,        // samples (matches smoothBreathRT.m windowSize) — physiological signal only
+
+  // Input signal type — set by the experimenter's "signal type" control, locked once a session starts.
+  // 'physiological': continuous breath-like signal, smoothed via SMOOTH_WINDOW (default).
+  // 'peaksOnly':     sparse ECG-peak signal (e.g. AD Instruments fast-response output) — every
+  //                  detected peak triggers a swell/fade pulse instead (see PEAK_* below). From
+  //                  there on (calibration, sync/async trials, CSV) both types are identical.
+  INPUT_SIGNAL_TYPE: 'physiological',
+  PEAK_SWELL_MS: 80,          // rise time to full level on a detected peak
+  PEAK_FADE_MS: 260,          // decay time back to 0 after the swell
+  PEAK_CROSS_FRACTION: 0.5,   // fraction of the way from the tracked min to max that counts as "in a peak"
 
   // Calibration
   CALIBRATION_SECS: 30,     // seconds to record before first trial
