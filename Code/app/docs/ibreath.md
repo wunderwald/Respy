@@ -27,6 +27,7 @@ Two windows open:
 | **Data dir** | Folder for CSV output. Default: `iBreathData/` inside the app folder. |
 | **Use mixed questions** | Off by default — every trial asks the sync-detection question. When on, questions are mixed (see [Trial design](#trial-design)). |
 | **Animation display** | Show a 5-second pre-trial animation before each trial begins. |
+| **Use eye tracking** | Off by default. When on, reveals a shared group with the rest of the eye-tracking controls and status — see [Eye tracking](#eye-tracking-eyelink) below. |
 | **Start** | Begins calibration. Requires a connected resp stream. |
 | **Next trial** | Visible when `AUTO_ADVANCE` is off — advances to the next trial. |
 | **Abort** | Ends the current trial early (marks it `aborted = true` in CSV). |
@@ -194,3 +195,18 @@ cd resp && python simulate_lsl.py --bpm 14   # synthetic sine wave
 ```
 
 An optional second gaze stream is read from `GAZE_STREAM_URL` (`ws://localhost:8766` by default). Connect a stream that pushes `[gazeX, gazeY]` pixel coordinates. If no gaze stream is connected, gaze columns are omitted from the CSV.
+
+---
+
+## Eye tracking (EyeLink)
+
+Checking **Use eye tracking** reveals a shared group in the experimenter controls with everything eye-tracking-related: the **show gaze position** checkbox, the **Recalibrate gaze** button, and a live **eye tracker** status readout (the EyeLink bridge's own lifecycle state — `connected`, `calibrating`, `calibrated`, `recording`, `stopped`, or `disconnected`). The group stays hidden while eye tracking is off.
+
+iBreath talks to the EyeLink tracker via the [`eyelink_to_lsl`](../../eyelink_to_lsl/README.md) bridge, over two separate connections:
+
+- `EYELINK_CONTROL_URL` (`ws://localhost:9002` by default) — the control channel (`modules/stream/eyelinkControl.js`) used to trigger calibration and receive the status broadcasts shown in the group above.
+- `GAZE_STREAM_URL` (see [Signal input](#signal-input) above) — the actual gaze samples, forwarded the same way the resp signal is.
+
+**Networking**: the EyeLink Host and the PC running this app communicate over a dedicated link (default Host IP `100.1.1.1`). The PC's tracking NIC must be given a **static IP on the same `100.1.1.x` subnet** (e.g. `100.1.1.2 / 255.255.255.0`) — without it, the bridge cannot connect to the tracker at all. See the bridge's own README for the full hardware setup.
+
+**Fullscreen windows don't fight each other.** The bridge's calibration window shares Screen 2 with this app's own fullscreen scene window. The bridge keeps its window minimized except while it's actually drawing calibration targets (see "Key design notes" in the bridge's README); on this app's side, `#beginEyeCalibration()`/`#finishEyeCalibration()` minimize and restore the scene window around every recalibration for the same reason.
