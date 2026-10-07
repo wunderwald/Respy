@@ -106,11 +106,16 @@ if (frontend === 'ibreath') {
       <button id="ib-abort-btn"       style="display:none">Abort trial</button>
       <button id="ib-pause-btn"       style="display:none">Pause</button>
       <button id="ib-play-btn"        style="display:none">Play</button>
-      <button id="ib-gaze-btn"        style="display:none">Recalibrate gaze</button>
       <button id="ib-cal-retry-btn"   style="display:none">Retry calibration</button>
       <button id="ib-cal-default-btn" style="display:none">Use default calibration</button>
     </span>
     <span id="ib-space-hint" class="space-hint" style="display:none">Press SPACE to continue</span>
+    <span id="ib-eyetrack-group" class="eyetrack-group" style="display:none">
+      <label id="debug-gaze-label"><input type="checkbox" id="s-debug-gaze" ${CONFIG.DEBUG_GAZE ? 'checked' : ''}> show gaze position</label>
+      <button id="ib-gaze-btn" style="display:none">Recalibrate gaze</button>
+      <span class="label">eye tracker</span>
+      <span id="ib-eyelink-state">—</span>
+    </span>
   `;
 
   // ── iBreath settings bar ────────────────────────────────────────────────────
@@ -118,7 +123,6 @@ if (frontend === 'ibreath') {
   settingsBar.innerHTML = `
     <span class="label">settings</span>
     <label><input type="checkbox" id="s-use-eye-tracking"> use eye tracking</label>
-    <label id="debug-gaze-label"><input type="checkbox" id="s-debug-gaze"      ${CONFIG.DEBUG_GAZE      ? 'checked' : ''}> show gaze position</label>
     <label><input type="checkbox" id="s-mixed-questions" ${CONFIG.MIXED_QUESTIONS ? 'checked' : ''}> use mixed questions</label>
     <span class="label">cal secs</span>
     <input id="s-cal-secs" type="number" class="settings-num" min="5" max="120" step="5"
@@ -141,8 +145,10 @@ if (frontend === 'ibreath') {
   const calRetryBtn        = document.getElementById('ib-cal-retry-btn');
   const calDefaultBtn      = document.getElementById('ib-cal-default-btn');
   const useEyeTrackingBox  = document.getElementById('s-use-eye-tracking');
-  const debugGazeLabel     = document.getElementById('debug-gaze-label');
+  const eyetrackGroupEl    = document.getElementById('ib-eyetrack-group');
+  const eyelinkStateEl     = document.getElementById('ib-eyelink-state');
   const gazeBarEl          = document.getElementById('gaze-bar');
+  eyetrackGroupEl.appendChild(gazeBarEl);   // fold the existing gaze-stream status pill into the shared group
 
   // ── Clocks ──────────────────────────────────────────────────────────────────
 
@@ -165,7 +171,8 @@ if (frontend === 'ibreath') {
 
   window.api.hud.onState(({ stateText, stateColor, trialText, delayText,
                              startEnabled, nextVisible, abortVisible, pauseVisible, playVisible, inputsLocked,
-                             experimentStartedAt: esa, stateTimer: st, gazeActive: ga, gazeCalibrating: gc, calFailed }) => {
+                             experimentStartedAt: esa, stateTimer: st, gazeActive: ga, gazeCalibrating: gc, calFailed,
+                             eyelinkState }) => {
     if (esa !== undefined) experimentStartedAt = esa;
     if (st  !== undefined) stateTimer          = st;
     if (stateText    !== undefined) stateEl.textContent        = stateText;
@@ -186,6 +193,7 @@ if (frontend === 'ibreath') {
       gazeBtn.style.display = gazeActive ? '' : 'none';
       gazeBtn.disabled      = !gazeActive || gazeCalibrating;
     }
+    if (eyelinkState !== undefined) eyelinkStateEl.textContent = eyelinkState;
     if (calFailed    !== undefined) {
       calRetryBtn.style.display   = calFailed ? '' : 'none';
       calDefaultBtn.style.display = calFailed ? '' : 'none';
@@ -221,11 +229,10 @@ if (frontend === 'ibreath') {
   calRetryBtn.addEventListener('click',   () => window.api.hud.sendAction({ type: 'retryCalibration' }));
   calDefaultBtn.addEventListener('click', () => window.api.hud.sendAction({ type: 'useDefaultCalibration' }));
 
-  // ── Eye tracking on/off — unchecked by default; hides all gaze-related UI ────
+  // ── Eye tracking on/off — unchecked by default; hides the whole eye-tracking group ────
 
   function applyEyeTrackingVisibility(enabled) {
-    gazeBarEl.style.display      = enabled ? '' : 'none';
-    debugGazeLabel.style.display = enabled ? '' : 'none';
+    eyetrackGroupEl.style.display = enabled ? '' : 'none';
     if (!enabled) gazeBtn.style.display = 'none';
   }
   applyEyeTrackingVisibility(useEyeTrackingBox.checked);

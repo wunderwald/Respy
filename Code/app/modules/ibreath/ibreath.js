@@ -533,6 +533,7 @@ export default class IBreath {
   }
 
   #onEyelinkStatus(status) {
+    this.#hud.eyelinkState = status.state;
     if (status.state === 'calibrated' || status.state === 'recording') {
       this.#eyelinkReady = true;
     }

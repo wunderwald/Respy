@@ -123,6 +123,14 @@
   50%      { opacity: 1; }
 }
 
+/* Eye-tracking group — all eye-tracking controls + status, shown together
+   only while "use eye tracking" is checked. */
+.eyetrack-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 /* Abort buttons — distinct colour so they're easy to find in a hurry */
 #ib-abort-btn,
 #bg-abort-btn {
