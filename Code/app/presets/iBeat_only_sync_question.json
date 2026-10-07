@@ -1,0 +1,13 @@
+{
+  "name": "iBeat_only_sync_question",
+  "description": "Every trial asks only the sync-detection question. Peaks-only (ECG) input signal, with the default peak-envelope timings carried explicitly so this preset doesn't depend on whatever config.js happens to default to. Eye tracking left to the experimenter controls.",
+  "inputSignalType": "peaksOnly",
+  "questions": [
+    { "id": "sync", "probability": 1, "text": "Was the fish in sync with your breathing?", "answers": ["yes", "no"] }
+  ],
+  "configOverrides": {
+    "PEAK_SWELL_MS": 80,
+    "PEAK_FADE_MS": 260,
+    "PEAK_CROSS_FRACTION": 0.5
+  }
+}

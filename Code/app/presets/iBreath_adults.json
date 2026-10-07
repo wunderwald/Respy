@@ -1,0 +1,10 @@
+{
+  "name": "iBreath_adults",
+  "description": "Same question setup as iBreath_only_sync_question, with a placeholder question added at 20% probability (replace its text/answers before real use). Physiological (breath) input signal. Eye tracking activated.",
+  "inputSignalType": "physiological",
+  "useEyeTracking": true,
+  "questions": [
+    { "id": "sync",        "probability": 0.8, "text": "Was the fish in sync with your breathing?",   "answers": ["yes", "no"] },
+    { "id": "placeholder", "probability": 0.2, "text": "Placeholder question — replace before use",   "answers": ["yes", "no"] }
+  ]
+}
