@@ -18,7 +18,7 @@
  *   csv.js         — file output
  */
 
-import { GaussianSmoother, SignalDelayLine, mapRange } from '../signal/signalUtils.js';
+import { GaussianSmoother, SignalDelayLine, PeakEnvelopeFollower, mapRange } from '../signal/signalUtils.js';
 import { RespCalibration } from '../calibration/calibration.js';
 import { IBreathSound } from './ibreath_sound.js';
 import { CONFIG, STATE } from './config.js';
@@ -41,6 +41,7 @@ export default class IBreath {
 
   // ── experiment data ────────────────────────────────────────────────────
   #subjectCode = CONFIG.SUBJECT_CODE;
+  #inputSignalType = CONFIG.INPUT_SIGNAL_TYPE;   // 'physiological' | 'peaksOnly'
   #trials = [];
   #trialIndex = 0;
   #trialData = [];
@@ -50,7 +51,14 @@ export default class IBreath {
   #calFailed = false;
 
   // ── signal pipeline ────────────────────────────────────────────────────
+  // Exactly one of these two feeds #smoothedValue, chosen by #inputSignalType;
+  // everything downstream of that getter is identical for both signal types.
   #smoother = new GaussianSmoother(CONFIG.SMOOTH_WINDOW);
+  #peakEnvelope = new PeakEnvelopeFollower({
+    swellMs: CONFIG.PEAK_SWELL_MS,
+    fadeMs: CONFIG.PEAK_FADE_MS,
+    crossFraction: CONFIG.PEAK_CROSS_FRACTION,
+  });
   #delayLine = new SignalDelayLine({ maxAgeMs: CONFIG.MAX_DELAY_MS + 500 });  // async's real-time delay buffer
   #currentDelayMs = CONFIG.MAX_DELAY_MS;   // adaptive staircase — see #onResponse
   #syncStimulusRange = [0.3, 0.4];   // raw native-scale window — used to rescale the live signal into [0,1]
@@ -128,6 +136,16 @@ export default class IBreath {
     requestAnimationFrame(() => this.#drawLoop());
   }
 
+  // The current real-time signal value, however it was produced — Gaussian-
+  // smoothed for a physiological signal, or the swell/fade envelope for a
+  // peaks-only one. Everything downstream (calibration, sync display, the
+  // async delay line) reads this instead of either engine directly.
+  get #smoothedValue() {
+    return this.#inputSignalType === 'peaksOnly'
+      ? this.#peakEnvelope.value
+      : this.#smoother.value;
+  }
+
   // ── Public interface ───────────────────────────────────────────────────
 
   pushGazeSample(channels) {
@@ -146,13 +164,18 @@ export default class IBreath {
   pushSample(rawValue) {
     this.#lastRawSample = rawValue;
     this.#lastScaledSample = rawValue;
-    this.#smoother.push(rawValue);
+    const now = performance.now();
+    if (this.#inputSignalType === 'peaksOnly') {
+      this.#peakEnvelope.push(now, rawValue);
+    } else {
+      this.#smoother.push(rawValue);
+    }
     // Always-on, regardless of state, so a trial's delay buffer already has
     // up to MAX_DELAY_MS of history available the moment it starts.
-    this.#delayLine.push(performance.now(), this.#smoother.value);
+    this.#delayLine.push(now, this.#smoothedValue);
 
     if (this.#state === STATE.CALIBRATING) {
-      this.#calibration.push(this.#smoother.value);
+      this.#calibration.push(this.#smoothedValue);
     } else if (this.#state === STATE.TRIAL) {
       this.#onTrialSample(rawValue);
     }
@@ -188,9 +211,10 @@ export default class IBreath {
 
   // ── State machine ──────────────────────────────────────────────────────
 
-  #beginCalibration({ debugGaze, mixedQuestions, calibrationSecs } = {}) {
+  #beginCalibration({ debugGaze, mixedQuestions, inputSignalType, calibrationSecs } = {}) {
     if (debugGaze       !== undefined) CONFIG.DEBUG_GAZE        = debugGaze;
     if (mixedQuestions  !== undefined) CONFIG.MIXED_QUESTIONS   = mixedQuestions;
+    if (inputSignalType !== undefined) this.#inputSignalType    = inputSignalType;
     if (calibrationSecs !== undefined) CONFIG.CALIBRATION_SECS = calibrationSecs;
 
     this.#subjectCode = this.#hud.subjectCode;
@@ -203,6 +227,7 @@ export default class IBreath {
     this.#calibration.start();
     this.#calFailed = false;
     this.#smoother.reset();
+    this.#peakEnvelope.reset();
     this.#delayLine.reset();
 
     this.#state = STATE.CALIBRATING;
@@ -283,12 +308,18 @@ export default class IBreath {
     this.#flashShown = false;
     this.#flashStartTime = null;
     this.#flashEndSent = false;
-    this.#smoother.reset();
 
-    // Pre-fill smoother with 64 samples (matching MATLAB pre-buffer)
-    for (let i = 0; i < CONFIG.SMOOTH_WINDOW; i++) {
-      this.#smoother.push(this.#lastScaledSample);
+    if (this.#inputSignalType !== 'peaksOnly') {
+      this.#smoother.reset();
+      // Pre-fill smoother with 64 samples (matching MATLAB pre-buffer)
+      for (let i = 0; i < CONFIG.SMOOTH_WINDOW; i++) {
+        this.#smoother.push(this.#lastScaledSample);
+      }
     }
+    // peaksOnly: the envelope carries on continuously across trial
+    // boundaries (like the delay line) — there's no windowed average to
+    // re-seed, and resetting here would risk clipping a heartbeat pulse
+    // right at a trial transition.
 
     this.#hud.nextVisible  = false;
     this.#hud.abortVisible = false;
@@ -326,7 +357,7 @@ export default class IBreath {
   #onTrialSample(rawValue) {
     const trial = this.#trials[this.#trialIndex];
     if (trial.synchronous) {
-      const smoothedRaw = this.#smoother.value;
+      const smoothedRaw = this.#smoothedValue;
       this.#syncStimulusSignal.push(smoothedRaw);
       this.#stimulusLevel = Math.max(0, Math.min(1,
         mapRange(smoothedRaw, this.#syncStimulusRange, [0, 1])
