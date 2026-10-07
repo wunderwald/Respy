@@ -104,6 +104,7 @@ class PsychopyCalibrationDisplay(pylink.EyeLinkCustomDisplay):
     # -- Required pylink.EyeLinkCustomDisplay callbacks --------------------
 
     def setup_cal_display(self):
+        self._set_window_visible(True)
         self._win.setColor(self.BG_COLOR)
         self._win.flip()
 
@@ -114,6 +115,7 @@ class PsychopyCalibrationDisplay(pylink.EyeLinkCustomDisplay):
     def exit_cal_display(self):
         self._win.setColor(self.BG_COLOR)
         self._win.flip()
+        self._set_window_visible(False)
 
     def draw_cal_target(self, x, y):
         """Draw calibration target at tracker pixel coords (x, y)."""
@@ -152,11 +154,41 @@ class PsychopyCalibrationDisplay(pylink.EyeLinkCustomDisplay):
 
     def setup(self, tracker: pylink.EyeLink) -> None:
         pylink.openGraphicsEx(self)
+        # Not calibrating yet — keep the window out of the way until the
+        # first setup_cal_display() call actually needs it on screen.
+        self._set_window_visible(False)
 
     def teardown(self) -> None:
         pylink.closeGraphics()
 
     # -- Helpers -----------------------------------------------------------
+
+    def _set_window_visible(self, visible: bool) -> None:
+        """
+        Show/raise or minimize the fullscreen calibration window.
+
+        This window lives on the same display as the experiment app's own
+        fullscreen window (Screen 2). It only needs to be on screen while
+        pylink is actively drawing calibration targets; the rest of the
+        time (including throughout normal recording) it must stay in the
+        background so it never covers or steals focus from the app.
+
+        Uses the pyglet window handle PsychoPy's default backend exposes.
+        Best-effort: swallows errors so a backend without this handle (or a
+        platform quirk) degrades to "window stays visible" rather than
+        crashing calibration.
+        """
+        try:
+            handle = getattr(self._win, "winHandle", None)
+            if handle is None:
+                return
+            if visible:
+                handle.set_visible(True)
+                handle.activate()
+            else:
+                handle.minimize()
+        except Exception:
+            log.exception("Could not change calibration window visibility (visible=%s).", visible)
 
     def _tracker_to_psychopy(self, x, y):
         """
