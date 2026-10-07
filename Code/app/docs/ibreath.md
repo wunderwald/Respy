@@ -26,6 +26,7 @@ Two windows open:
 | **Use default calibration** | Appears only if calibration fails. Skips ahead using `CONFIG.DEFAULT_CAL_RANGE` instead of a measured range. |
 | **Data dir** | Folder for CSV output. Default: `iBreathData/` inside the app folder. |
 | **Use mixed questions** | Off by default — every trial asks the sync-detection question. When on, questions are mixed (see [Trial design](#trial-design)). |
+| **Signal type** | *Physiological* (default) or *Peaks only* — see [Input signal types](#input-signal-types) below. Locked once calibration begins. |
 | **Animation display** | Show a 5-second pre-trial animation before each trial begins. |
 | **Use eye tracking** | Off by default. When on, reveals a shared group with the rest of the eye-tracking controls and status — see [Eye tracking](#eye-tracking-eyelink) below. |
 | **Start** | Begins calibration. Requires a connected resp stream. |
@@ -195,6 +196,17 @@ cd resp && python simulate_lsl.py --bpm 14   # synthetic sine wave
 ```
 
 An optional second gaze stream is read from `GAZE_STREAM_URL` (`ws://localhost:8766` by default). Connect a stream that pushes `[gazeX, gazeY]` pixel coordinates. If no gaze stream is connected, gaze columns are omitted from the CSV.
+
+### Input signal types
+
+The experimenter's **Signal type** control selects how the raw stream is turned into the real-time value that calibration, the sync display, and the async delay line all read — everything *after* that point (calibration, trial logic, CSV columns, markers) is identical for both types.
+
+- **Physiological** (default) — a continuous breath-like signal, Gaussian-smoothed over `SMOOTH_WINDOW` samples, same as always.
+- **Peaks only** — for a sparse signal that's a constant baseline with brief, distinct spikes (e.g. AD Instruments' fast-response/peak-detect ECG output from LabChart, streamed to LSL). Every detected peak triggers a short swell-then-fade pulse instead of running the raw signal through the Gaussian smoother, so it reads as one plucky "heartbeat" per peak:
+  - **Peak detection** is an adaptive rising-edge threshold: it tracks the lowest and highest raw values seen so far and fires on every upward crossing of the point `PEAK_CROSS_FRACTION` of the way between them — no fixed voltage/unit threshold needed, and no refractory period. Assumes a genuinely clean signal (constant baseline, distinct peaks); if that doesn't hold in practice, the detector needs rework, not just retuning.
+  - **The pulse shape**: `PEAK_SWELL_MS` (default 80 ms) to rise to full level, then `PEAK_FADE_MS` (default 260 ms) to decay back to 0. A peak that arrives before the previous pulse has fully faded simply restarts the swell from the envelope's current level — no special-casing, since the signal is assumed clean enough that this shouldn't normally happen.
+  - Unlike the Gaussian smoother, the envelope is **not** reset between trials (there's no window to re-seed, and resetting could clip a pulse mid-trial-transition) — it runs continuously across the whole session, only reset at Start.
+  - All three constants live in [config.js](./modules/ibreath/config.js) and can be retuned without touching the detection/envelope logic itself.
 
 ---
 
