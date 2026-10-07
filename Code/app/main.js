@@ -163,6 +163,21 @@ ipcMain.handle("pick-directory", async (event) => {
   return result.canceled ? null : result.filePaths[0];
 });
 
+/**
+ * pick-file
+ * Opens a native file-picker dialog, filtered to the given extensions.
+ * Returns the selected path string, or null if cancelled.
+ */
+ipcMain.handle("pick-file", async (event, { title, extensions } = {}) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const result = await dialog.showOpenDialog(win, {
+    title: title ?? "Select a file",
+    properties: ["openFile"],
+    filters: extensions ? [{ name: extensions.join("/"), extensions }] : undefined,
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
 // ── Experimenter control window ───────────────────────────────────────────────
 
 function createControlWindow(frontend) {

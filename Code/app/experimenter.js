@@ -123,7 +123,6 @@ if (frontend === 'ibreath') {
   settingsBar.innerHTML = `
     <span class="label">settings</span>
     <label><input type="checkbox" id="s-use-eye-tracking"> use eye tracking</label>
-    <label><input type="checkbox" id="s-mixed-questions" ${CONFIG.MIXED_QUESTIONS ? 'checked' : ''}> use mixed questions</label>
     <span class="label">signal type</span>
     <select id="s-signal-type" class="stream-select">
       <option value="physiological" ${CONFIG.INPUT_SIGNAL_TYPE === 'physiological' ? 'selected' : ''}>Physiological</option>
@@ -132,6 +131,19 @@ if (frontend === 'ibreath') {
     <span class="label">cal secs</span>
     <input id="s-cal-secs" type="number" class="settings-num" min="5" max="120" step="5"
            value="${CONFIG.CALIBRATION_SECS}" />
+    <span class="label">preset</span>
+    <select id="s-preset" class="stream-select">
+      <option value="">None (sync only)</option>
+      <option value="iBreath_mixed_questions">iBreath — mixed questions</option>
+      <option value="iBreath_only_sync_question">iBreath — sync only</option>
+      <option value="iBreath_adults">iBreath — adults</option>
+      <option value="iBeat_mixed_questions">iBeat — mixed questions</option>
+      <option value="iBeat_only_sync_question">iBeat — sync only</option>
+      <option value="iBeat_adults">iBeat — adults</option>
+      <option value="__browse__">Browse…</option>
+    </select>
+    <span id="s-preset-status" style="font-size:11px;opacity:0.6"></span>
+    <span id="ib-preset-warning" class="preset-warning" style="display:none"></span>
   `;
 
   const stateEl            = document.getElementById('ib-state-text');   // in #timer-bar
@@ -154,6 +166,11 @@ if (frontend === 'ibreath') {
   const eyelinkStateEl     = document.getElementById('ib-eyelink-state');
   const gazeBarEl          = document.getElementById('gaze-bar');
   eyetrackGroupEl.appendChild(gazeBarEl);   // fold the existing gaze-stream status pill into the shared group
+
+  const signalTypeSelect  = document.getElementById('s-signal-type');
+  const presetSelect      = document.getElementById('s-preset');
+  const presetStatusEl    = document.getElementById('s-preset-status');
+  const presetWarningEl   = document.getElementById('ib-preset-warning');
 
   // ── Clocks ──────────────────────────────────────────────────────────────────
 
@@ -222,9 +239,10 @@ if (frontend === 'ibreath') {
       type:            'start',
       subjectCode:     subjectInput.value.trim() || 'TEST',
       debugGaze:       document.getElementById('s-debug-gaze').checked,
-      mixedQuestions:  document.getElementById('s-mixed-questions').checked,
-      inputSignalType: document.getElementById('s-signal-type').value,
+      inputSignalType: signalTypeSelect.value,
       calibrationSecs: parseInt(document.getElementById('s-cal-secs').value) || CONFIG.CALIBRATION_SECS,
+      questions:       activePreset?.questions ?? null,
+      configOverrides: activePreset?.configOverrides ?? null,
     });
   });
   nextBtn.addEventListener('click',  () => window.api.hud.sendAction({ type: 'next' }));
@@ -243,11 +261,95 @@ if (frontend === 'ibreath') {
   }
   applyEyeTrackingVisibility(useEyeTrackingBox.checked);
 
-  useEyeTrackingBox.addEventListener('change', () => {
-    const enabled = useEyeTrackingBox.checked;
+  function setEyeTracking(enabled) {
+    useEyeTrackingBox.checked = enabled;
     applyEyeTrackingVisibility(enabled);
     window.api.hud.sendAction({ type: 'setUseEyeTracking', value: enabled });
+  }
+  useEyeTrackingBox.addEventListener('change', () => setEyeTracking(useEyeTrackingBox.checked));
+
+  // ── Presets ──────────────────────────────────────────────────────────────────
+  //
+  // A preset is a JSON file (bundled under app/presets/, or any file via
+  // "Browse…") that can define: inputSignalType / useEyeTracking (pre-filled
+  // and locked in the UI the moment the preset loads — not deferred to
+  // Start), a custom `questions` list (replacing the default sync-only
+  // question), and arbitrary `configOverrides` (applied to CONFIG at Start,
+  // same as every other setting). See docs/ibreath.md for the file format.
+
+  let activePreset = null;
+
+  function updateSyncWarning(questions) {
+    const list = questions?.length ? questions : CONFIG.QUESTIONS;
+    const hasSync = list.some(q => q.id === 'sync');
+    presetWarningEl.style.display = hasSync ? 'none' : '';
+    presetWarningEl.textContent = hasSync ? '' :
+      '⚠ no "sync" question in this preset — the adaptive async delay will never change';
+  }
+
+  function applyPreset(preset) {
+    activePreset = preset;
+
+    if (preset?.inputSignalType !== undefined) {
+      signalTypeSelect.value    = preset.inputSignalType;
+      signalTypeSelect.disabled = true;
+    } else {
+      signalTypeSelect.disabled = false;
+    }
+
+    if (preset?.useEyeTracking != null) {
+      setEyeTracking(preset.useEyeTracking);
+      useEyeTrackingBox.disabled = true;
+    } else {
+      useEyeTrackingBox.disabled = false;
+    }
+
+    updateSyncWarning(preset?.questions);
+  }
+
+  async function fetchBundledPreset(name) {
+    const res = await fetch(`presets/${name}.json`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  presetSelect.addEventListener('change', async () => {
+    const value = presetSelect.value;
+    presetStatusEl.textContent = '';
+
+    if (value === '') {
+      applyPreset(null);
+      return;
+    }
+
+    if (value === '__browse__') {
+      try {
+        const path = await window.api.pickFile({ title: 'Load iBreath preset', extensions: ['json'] });
+        if (!path) { presetSelect.value = ''; applyPreset(null); return; }
+        const result = await window.api.readFile(path);
+        if (!result.ok) throw new Error(result.error);
+        applyPreset(JSON.parse(result.content));
+        presetStatusEl.textContent = `loaded: ${path.split(/[\\/]/).pop()}`;
+      } catch (err) {
+        console.error('[Preset] failed to load:', err);
+        presetStatusEl.textContent = `⚠ failed to load: ${err.message}`;
+        presetSelect.value = '';
+        applyPreset(null);
+      }
+      return;
+    }
+
+    try {
+      applyPreset(await fetchBundledPreset(value));
+    } catch (err) {
+      console.error('[Preset] failed to load:', err);
+      presetStatusEl.textContent = `⚠ failed to load: ${err.message}`;
+      presetSelect.value = '';
+      applyPreset(null);
+    }
   });
+
+  applyPreset(null);   // initial state: no preset, default sync-only question
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────────
 

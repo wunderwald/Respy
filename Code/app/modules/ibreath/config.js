@@ -50,8 +50,16 @@ export const CONFIG = {
   // Questions after trials
   SHOW_QUESTIONS: true,      // show a post-trial response question after each trial (fixed — not exposed in experimenter UI)
   RESPONSE_TIMEOUT_SECS: 5,        // seconds before a non-response is recorded as 'timeout'
-  MIXED_QUESTIONS: false,    // false: every trial asks 'sync'. true: mix in 'flash'/'lr'/'img' questions.
-                             // Overridable via the experimenter's "use mixed questions" checkbox.
+
+  // Active question set. Each entry: { id, text, answers: [leftLabel, rightLabel], probability }.
+  // probability values across the set must sum to ~1. `id` is the stable identifier used by
+  // CSV/markers/the adaptive-delay logic (which specifically requires an 'sync' entry with
+  // answers ['yes', 'no'] to function); `text`/`answers` are freely overridable display strings
+  // (e.g. for translations). Replaced wholesale by a preset's `questions` list when one is
+  // loaded; this single-entry default (100% 'sync') is what's used when no preset is loaded.
+  QUESTIONS: [
+    { id: 'sync', text: 'Was the fish in sync with your breathing?', answers: ['yes', 'no'], probability: 1 },
+  ],
 
   // Flash image
   FLASHING_IMAGE: true,         // show a flash image in 50% of trials (fixed — not exposed in experimenter UI)
@@ -76,6 +84,13 @@ export const CONFIG = {
   // Experiment control
   AUTO_ADVANCE: true,      // skip the READY state — advance to next trial automatically (fixed — not exposed in experimenter UI)
 };
+
+// Snapshot of the hardcoded defaults above, taken once at module load — used to reset CONFIG
+// before applying a preset's configOverrides, so a value an earlier session's preset changed
+// doesn't silently linger into a later session that loads no preset (or a different one) that
+// doesn't mention that key. QUESTIONS is excluded: it's always set explicitly every session
+// (to either a preset's `questions` or this default), never merged.
+export const CONFIG_DEFAULTS = { ...CONFIG, QUESTIONS: CONFIG.QUESTIONS };
 
 export const STATE = {
   IDLE: 'idle',

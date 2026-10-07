@@ -21,7 +21,7 @@
 import { GaussianSmoother, SignalDelayLine, PeakEnvelopeFollower, mapRange } from '../signal/signalUtils.js';
 import { RespCalibration } from '../calibration/calibration.js';
 import { IBreathSound } from './ibreath_sound.js';
-import { CONFIG, STATE } from './config.js';
+import { CONFIG, CONFIG_DEFAULTS, STATE } from './config.js';
 import { makeTrialParams } from './trialParams.js';
 import { LocalHud } from './hud.js';
 import { IBreathRenderer } from './ibreath_renderer.js';
@@ -211,9 +211,15 @@ export default class IBreath {
 
   // ── State machine ──────────────────────────────────────────────────────
 
-  #beginCalibration({ debugGaze, mixedQuestions, inputSignalType, calibrationSecs } = {}) {
+  #beginCalibration({ debugGaze, inputSignalType, calibrationSecs, questions, configOverrides } = {}) {
+    // Reset to the hardcoded defaults first so a previous session's preset
+    // (configOverrides) never silently lingers into a session that loads no
+    // preset, or a different one that doesn't mention the same keys.
+    Object.assign(CONFIG, CONFIG_DEFAULTS);
+    if (configOverrides) Object.assign(CONFIG, configOverrides);
+    CONFIG.QUESTIONS = questions?.length ? questions : CONFIG_DEFAULTS.QUESTIONS;
+
     if (debugGaze       !== undefined) CONFIG.DEBUG_GAZE        = debugGaze;
-    if (mixedQuestions  !== undefined) CONFIG.MIXED_QUESTIONS   = mixedQuestions;
     if (inputSignalType !== undefined) this.#inputSignalType    = inputSignalType;
     if (calibrationSecs !== undefined) CONFIG.CALIBRATION_SECS = calibrationSecs;
 
@@ -407,12 +413,10 @@ export default class IBreath {
     let response;
     if (side === 'timeout') {
       response = 'timeout';
-    } else if (trial.questionType === 'lr') {
-      response = side === 'left' ? 'left' : 'right';
-    } else if (trial.questionType === 'img') {
-      response = side === 'left' ? 'pufferfish' : 'starfish';
     } else {
-      response = side === 'left' ? 'yes' : 'no';
+      const def = CONFIG.QUESTIONS.find(q => q.id === trial.questionType);
+      const [leftLabel, rightLabel] = def?.answers ?? ['yes', 'no'];
+      response = side === 'left' ? leftLabel : rightLabel;
     }
     trial.response = response;
 

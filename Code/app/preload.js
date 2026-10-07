@@ -87,6 +87,7 @@ contextBridge.exposeInMainWorld("api", {
   },
 
   pickDir:  () => ipcRenderer.invoke("pick-directory"),
+  pickFile: (opts) => ipcRenderer.invoke("pick-file", opts),
   readFile: (filePath) => ipcRenderer.invoke("read-file", filePath),
 
   /**

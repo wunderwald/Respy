@@ -157,13 +157,8 @@ export class IBreathRenderer {
     const cx = w / 2, cy = h / 2;
     const r  = 40;
 
-    const QUESTIONS = {
-      sync:  'Was the fish in sync with your breathing?',
-      flash: 'Did you see the pink fish flashing?',
-      lr:    'Was the fish left or right?',
-      img:   'Did you see the pufferfish or the starfish?',
-    };
-    this.#centerText(ctx, cx, cy - 80, QUESTIONS[questionType] ?? QUESTIONS.sync,
+    const questionDef = CONFIG.QUESTIONS.find(q => q.id === questionType) ?? CONFIG.QUESTIONS[0];
+    this.#centerText(ctx, cx, cy - 80, questionDef.text,
                      'rgba(255,255,255,0.85)', 22);
 
     // For 'flash': small pinkfish image between question and arc
@@ -204,10 +199,9 @@ export class IBreathRenderer {
         ctx.drawImage(sf, cx + gap - s, imgY - s, s * 2, s * 2);
       this.#centerText(ctx, cx - gap, imgY + s + 10, '←', 'rgba(255,255,255,0.4)', 18);
       this.#centerText(ctx, cx + gap, imgY + s + 10, '→', 'rgba(255,255,255,0.4)', 18);
-    } else if (questionType === 'lr') {
-      this.#centerText(ctx, cx, cy + 80, '← left          right →', 'rgba(255,255,255,0.4)', 16);
     } else {
-      this.#centerText(ctx, cx, cy + 80, '← yes          no →', 'rgba(255,255,255,0.4)', 16);
+      const [leftLabel, rightLabel] = questionDef.answers ?? ['yes', 'no'];
+      this.#centerText(ctx, cx, cy + 80, `← ${leftLabel}          ${rightLabel} →`, 'rgba(255,255,255,0.4)', 16);
     }
   }
 
