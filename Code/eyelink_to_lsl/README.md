@@ -170,3 +170,5 @@ if dt == pylink.SAMPLE_TYPE:
 ```
 
 **Binocular averaging.** When both eyes are tracked, `x_norm`/`y_norm` are the average of left and right gaze. If one eye is missing the valid eye is used. If you need per-eye channels, add four channels (`lx`, `ly`, `rx`, `ry`) and skip the averaging in `_extract_gaze`.
+
+**The calibration window stays backgrounded outside calibration.** `window` (Screen 2) is the same fullscreen display the experiment app (e.g. [`../app/`](../app/)) uses for its own window, so `PsychopyCalibrationDisplay` minimizes it as soon as `setup()` registers the display, and again as soon as `exit_cal_display()` fires at the end of a calibration/validation pass. It's only raised back to the foreground while `setup_cal_display()` has it (i.e. while pylink is actively drawing targets for the operator). This relies on the pyglet window handle PsychoPy's default backend exposes (`win.winHandle.minimize()` / `.set_visible(True)` / `.activate()`); on a backend without that handle it degrades silently to "window stays visible" rather than erroring.
