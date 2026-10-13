@@ -2,8 +2,8 @@
 // by every game before play. Binary calibration (not a continuous-depth
 // recording like the lab's RespCalibration): the games here only care about
 // loud-while-blowing vs. quiet-while-not, so we directly measure both ends
-// by prompting for each, twice, with short breaks — then warn if "quiet"
-// isn't actually quiet enough to tell the two apart.
+// by prompting for each, twice, with short breaks — then warn (in either
+// direction) if there isn't a clear enough gap between them to tell apart.
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { CALIBRATION_CONFIG as C } from './calibrationConfig.js';
 import './calibration.css';
@@ -26,6 +26,31 @@ const DURATION_MS = { countdown: C.COUNTDOWN_MS, hold: C.HOLD_MS, break: C.BREAK
 
 function mean(arr) { return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0; }
 function max(arr) { return arr.length ? Math.max(...arr) : 0; }
+function stddev(arr) {
+  if (arr.length < 2) return 0;
+  const m = mean(arr);
+  return Math.sqrt(mean(arr.map((v) => (v - m) ** 2)));
+}
+
+// Checks both calibration failure directions and returns the reasons that
+// triggered (empty array = all good). Self-relative to this session's own
+// measurements throughout — no fixed absolute levels — since mic
+// gain/distance varies per device.
+function checkSeparation(blowSamples, quietSamples) {
+  const reasons = [];
+  const blowMean = mean(blowSamples);
+  const quietMean = mean(quietSamples);
+  const quietCeiling = max(quietSamples);
+  const quietSpread = stddev(quietSamples);
+
+  if (quietCeiling >= blowMean * C.MAX_QUIET_RATIO) {
+    reasons.push('quietTooLoud');
+  }
+  if (blowMean < quietMean + C.MIN_BLOW_ABOVE_QUIET_STD * quietSpread) {
+    reasons.push('blowTooQuiet');
+  }
+  return reasons;
+}
 
 function countdownLabel(segElapsed) {
   if (segElapsed < 1000) return '3';
@@ -53,14 +78,15 @@ export function MicCalibration({ mic, onDone }) {
 
   const finish = useCallback(() => {
     const { blow, quiet } = samplesRef.current;
-    const loud = mean(blow.map(mean));
-    const quietLevel = mean(quiet.map(max));
+    const blowSamples = blow.flat();
+    const quietSamples = quiet.flat();
+    const reasons = checkSeparation(blowSamples, quietSamples);
 
-    if (quietLevel >= loud * C.MAX_QUIET_RATIO) {
-      setWarning({ quiet: quietLevel, loud });
+    if (reasons.length) {
+      setWarning(reasons);
       return;
     }
-    onDone({ min: quietLevel, max: loud });
+    onDone({ min: max(quietSamples), max: mean(blowSamples) });
   }, [onDone]);
 
   useEffect(() => {
@@ -113,7 +139,7 @@ export function MicCalibration({ mic, onDone }) {
   const retry = () => { setWarning(null); setAttempt((a) => a + 1); };
   const continueAnyway = () => {
     const { blow, quiet } = samplesRef.current;
-    onDone({ min: mean(quiet.map(max)), max: mean(blow.map(mean)) });
+    onDone({ min: max(quiet.flat()), max: mean(blow.flat()) });
   };
 
   if (micError) {
@@ -129,13 +155,18 @@ export function MicCalibration({ mic, onDone }) {
   }
 
   if (warning) {
+    const messages = [];
+    if (warning.includes('blowTooQuiet')) {
+      messages.push("Your blow seemed pretty quiet — try blowing a little harder, or move closer to the microphone.");
+    }
+    if (warning.includes('quietTooLoud')) {
+      messages.push("It's pretty noisy here — the quiet part was almost as loud as blowing. Try moving somewhere quieter.");
+    }
+
     return (
       <div className="calibration-screen">
-        <p className="calibration-title">It's pretty noisy here!</p>
-        <p className="calibration-sub">
-          The "quiet" part was almost as loud as blowing. Try moving somewhere
-          quieter, or make sure you're close to the microphone when you blow.
-        </p>
+        <p className="calibration-title">Let's try that again</p>
+        {messages.map((m) => <p className="calibration-sub" key={m}>{m}</p>)}
         <div className="calibration-buttons">
           <button className="calibration-btn" onClick={retry}>Try again</button>
           <button className="calibration-btn calibration-btn-secondary" onClick={continueAnyway}>
@@ -158,9 +189,7 @@ export function MicCalibration({ mic, onDone }) {
     <div className="calibration-screen">
       {display.type === 'countdown' && (
         <>
-          <p className="calibration-title">
-            {display.kind === 'blow' ? 'Get ready to blow!' : 'Now get ready to stay quiet!'}
-          </p>
+          <p className="calibration-title">Get ready!</p>
           <p className="calibration-countdown">{countdownLabel(display.segElapsed)}</p>
         </>
       )}
