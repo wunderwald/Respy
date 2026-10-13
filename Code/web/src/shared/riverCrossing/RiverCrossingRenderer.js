@@ -126,20 +126,21 @@ export class RiverCrossingRenderer {
   // ── River ───────────────────────────────────────────────────────────────────
 
   #drawRiver(ctx, layout, now) {
-    const { riverTop, riverBottom, riverLeftX, riverRightX, groundBottom } = layout;
+    const { riverTop, riverLeftX, riverRightX, groundBottom } = layout;
 
     // The water fills all the way to the bottom of the screen (deeper than
     // the visible wave band, where the boat actually sails).
     ctx.fillStyle = COLORS.river;
     ctx.fillRect(riverLeftX, riverTop, riverRightX - riverLeftX, groundBottom - riverTop);
 
-    // waves travel left → right, matching the current direction
+    // waves travel left → right, matching the current direction — spanning
+    // the full water depth now that it reaches the bottom of the screen.
     ctx.strokeStyle = COLORS.inkSoft;
     ctx.lineWidth = 1.5;
     const t = now / 1000;
-    const rows = 4;
+    const rows = 7;
     for (let r = 0; r < rows; r++) {
-      const y = lerp(riverTop + 10, riverBottom - 8, (r + 0.5) / rows);
+      const y = lerp(riverTop + 10, groundBottom - 10, (r + 0.5) / rows);
       ctx.beginPath();
       for (let x = riverLeftX; x <= riverRightX; x += 5) {
         const py = y + Math.sin(x * 0.05 - t * CONFIG.WAVE_SPEED + r * 1.7) * 3;

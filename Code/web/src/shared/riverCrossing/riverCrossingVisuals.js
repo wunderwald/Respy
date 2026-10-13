@@ -21,7 +21,7 @@ export const VISUAL_CONFIG = {
   BOAT_SCALE: 2.8,
 
   // ── Scenery ─────────────────────────────────────────────────────────────
-  WAVE_SPEED: 1.8,           // phase rate for the traveling river-wave pattern
+  WAVE_SPEED: 2.6,           // phase rate for the traveling river-wave pattern (a bit faster = stronger-looking current)
   TREE_COUNT_PER_BANK: 9,    // scattered along each bank's treeline, varied sizes
 };
 
