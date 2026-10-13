@@ -20,10 +20,36 @@ export class TrainingGameRenderer {
   #canvas;
   #ctx;
 
+  // Stable per-sheep/per-tree scatter offsets (normalized [0,1] within their
+  // plot), generated once so positions don't jitter between frames — only
+  // mapped to actual screen coordinates at draw time, so they still adapt
+  // to canvas resizes.
+  #rightSheepScatter;
+  #leftSheepScatter;
+  #leftTrees;
+  #rightTrees;
+
   constructor(container) {
     container.innerHTML = '<canvas id="game-canvas"></canvas>';
     this.#canvas = container.querySelector('#game-canvas');
     this.#ctx = this.#canvas.getContext('2d');
+
+    this.#rightSheepScatter = TrainingGameRenderer.#makeScatter(CONFIG.SHEEP_COUNT_RIGHT);
+    this.#leftSheepScatter  = TrainingGameRenderer.#makeScatter(CONFIG.SHEEP_MAX_SHOWN_LEFT);
+    this.#leftTrees  = TrainingGameRenderer.#makeTrees(CONFIG.TREE_COUNT_PER_BANK);
+    this.#rightTrees = TrainingGameRenderer.#makeTrees(CONFIG.TREE_COUNT_PER_BANK);
+  }
+
+  static #makeScatter(count) {
+    return Array.from({ length: count }, () => ({ tx: Math.random(), ty: Math.random() }));
+  }
+
+  static #makeTrees(count) {
+    return Array.from({ length: count }, (_, i) => ({
+      t: count === 1 ? 0.5 : i / (count - 1),
+      jitter: (Math.random() - 0.5) * 0.7,     // x jitter, as a fraction of tree spacing
+      scale: 0.6 + Math.random() * 0.9,        // varied sizes
+    }));
   }
 
   get canvas() { return this.#canvas; }
@@ -91,10 +117,12 @@ export class TrainingGameRenderer {
   // ── River ───────────────────────────────────────────────────────────────────
 
   #drawRiver(ctx, layout, now) {
-    const { riverTop, riverBottom, riverLeftX, riverRightX } = layout;
+    const { riverTop, riverBottom, riverLeftX, riverRightX, groundBottom } = layout;
 
+    // The water fills all the way to the bottom of the screen (deeper than
+    // the visible wave band, where the boat actually sails).
     ctx.fillStyle = COLORS.river;
-    ctx.fillRect(riverLeftX, riverTop, riverRightX - riverLeftX, riverBottom - riverTop);
+    ctx.fillRect(riverLeftX, riverTop, riverRightX - riverLeftX, groundBottom - riverTop);
 
     // waves travel left → right, matching the current direction
     ctx.strokeStyle = COLORS.inkSoft;
@@ -114,8 +142,8 @@ export class TrainingGameRenderer {
     ctx.strokeStyle = COLORS.ink;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(riverLeftX, riverTop);  ctx.lineTo(riverLeftX, riverBottom);
-    ctx.moveTo(riverRightX, riverTop); ctx.lineTo(riverRightX, riverBottom);
+    ctx.moveTo(riverLeftX, riverTop);  ctx.lineTo(riverLeftX, groundBottom);
+    ctx.moveTo(riverRightX, riverTop); ctx.lineTo(riverRightX, groundBottom);
     ctx.stroke();
   }
 
@@ -136,57 +164,62 @@ export class TrainingGameRenderer {
     ctx.lineTo(x1, riverTop);
     ctx.stroke();
 
-    const treeCount = 3;
-    for (let i = 0; i < treeCount; i++) {
-      const tx = lerp(
-        x0 + (x1 - x0) * 0.14,
-        x1 - (x1 - x0) * 0.14,
-        treeCount === 1 ? 0.5 : i / (treeCount - 1)
-      );
-      this.#drawTree(ctx, tx, riverTop - 4);
+    const trees = side === 'left' ? this.#leftTrees : this.#rightTrees;
+    const plotW = x1 - x0;
+    const step = plotW / trees.length;
+    for (const tree of trees) {
+      const tx = x0 + plotW * 0.08 + tree.t * plotW * 0.84 + tree.jitter * step;
+      this.#drawTree(ctx, tx, riverTop - 2, tree.scale);
     }
   }
 
-  #drawTree(ctx, x, groundY) {
-    ctx.strokeStyle = COLORS.ink;
-    ctx.lineWidth = 2.5;
+  // Brown trunk, green canopy — a deliberate spot of color against the
+  // otherwise monochrome-ink line art.
+  #drawTree(ctx, x, groundY, scale = 1) {
+    const trunkH  = 24 * scale;
+    const canopyR = 15 * scale;
+
+    ctx.strokeStyle = '#7a5233';
+    ctx.lineWidth = Math.max(1.5, 3 * scale);
     ctx.beginPath();
     ctx.moveTo(x, groundY);
-    ctx.lineTo(x, groundY - 26);
+    ctx.lineTo(x, groundY - trunkH);
     ctx.stroke();
 
+    ctx.fillStyle = '#7fcf6e';
+    ctx.strokeStyle = '#4a9a46';
+    ctx.lineWidth = Math.max(1.2, 2 * scale);
     ctx.beginPath();
-    ctx.arc(x, groundY - 38, 16, 0, Math.PI * 2);
+    ctx.arc(x, groundY - trunkH - canopyR * 0.55, canopyR, 0, Math.PI * 2);
+    ctx.fill();
     ctx.stroke();
   }
 
   // ── Sheep ───────────────────────────────────────────────────────────────────
 
   #drawSheepFlock(ctx, layout, score, now) {
-    const { riverRightX, riverLeftX, w, groundBottom } = layout;
+    const { riverRightX, riverLeftX, w, riverTop, groundBottom } = layout;
 
-    const scale = CONFIG.SHEEP_SCALE;
-    const rowStep = 30 * scale;
+    const scale  = CONFIG.SHEEP_SCALE;
+    const marginX  = 30 * scale;
+    const yTop     = riverTop + 36;          // stay clear of the treeline
+    const yBottom  = groundBottom - 26 * scale;
 
-    // right bank — a small flock always available, doesn't deplete
-    const rightCount = CONFIG.SHEEP_COUNT_RIGHT;
-    const rightCols = Math.min(rightCount, 3);
-    for (let i = 0; i < rightCount; i++) {
-      const col = i % rightCols;
-      const row = Math.floor(i / rightCols);
-      const sx = lerp(riverRightX + 26, w - 26, col / (rightCols - 1 || 1));
-      const sy = groundBottom - 26 - row * rowStep + Math.sin(now / 900 + i) * 2;
+    // right bank — a small flock always available, doesn't deplete,
+    // scattered across the whole plot rather than gridded by the river edge
+    for (let i = 0; i < CONFIG.SHEEP_COUNT_RIGHT; i++) {
+      const { tx, ty } = this.#rightSheepScatter[i];
+      const sx = lerp(riverRightX + marginX, w - marginX, tx);
+      const sy = lerp(yTop, yBottom, ty) + Math.sin(now / 900 + i) * 2;
       this.#drawSheep(ctx, sx, sy, scale);
     }
 
-    // left bank — grows with delivered score
+    // left bank — grows with delivered score, scattered the same way
     const leftCount = Math.min(score, CONFIG.SHEEP_MAX_SHOWN_LEFT);
-    const cols = 3;
     for (let i = 0; i < leftCount; i++) {
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      const sx = lerp(26, riverLeftX - 26, col / (cols - 1 || 1));
-      const sy = groundBottom - 26 - row * rowStep;
+      const { tx, ty } = this.#leftSheepScatter[i];
+      const sx = lerp(marginX, riverLeftX - marginX, tx);
+      const sy = lerp(yTop, yBottom, ty);
       this.#drawSheep(ctx, sx, sy, scale);
     }
   }
@@ -227,7 +260,10 @@ export class TrainingGameRenderer {
 
     ctx.save();
     ctx.translate(x, y);
-    ctx.scale(CONFIG.BOAT_SCALE, CONFIG.BOAT_SCALE);
+    // Mirrored horizontally — the hull/sail/sailor are drawn facing right,
+    // but the boat travels left (toward the left bank), so flip it to face
+    // the direction of travel.
+    ctx.scale(-CONFIG.BOAT_SCALE, CONFIG.BOAT_SCALE);
     ctx.strokeStyle = COLORS.ink;
     ctx.fillStyle = COLORS.bg;
     ctx.lineWidth = 2;

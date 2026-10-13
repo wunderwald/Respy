@@ -39,6 +39,7 @@ export const CONFIG = {
   CLOUD_COUNT: 5,
   CLOUD_SPEED_PX_S: 16,
   WAVE_SPEED: 1.8,           // phase rate for the traveling river-wave pattern
+  TREE_COUNT_PER_BANK: 9,    // scattered along each bank's treeline, varied sizes
 };
 
 export const STATE = {
