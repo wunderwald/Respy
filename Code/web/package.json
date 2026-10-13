@@ -5,9 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:trainingGame": "vite --open /trainingGame.html",
+    "dev:chromeDinoGame": "vite --open /chromeDinoGame.html",
     "build": "vite build",
-    "lint": "oxlint",
-    "preview": "vite preview"
+    "build:launcher": "vite build --mode launcher",
+    "build:trainingGame": "vite build --mode trainingGame",
+    "build:chromeDinoGame": "vite build --mode chromeDinoGame",
+    "preview": "vite preview",
+    "lint": "oxlint"
   },
   "dependencies": {
     "react": "^19.2.8",
