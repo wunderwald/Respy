@@ -14,15 +14,15 @@ export const CONFIG = {
   // any single tap. No separate on/off hysteresis is needed here (unlike the
   // breath version's BLOW_HYSTERESIS) — the boat's own coast momentum below
   // already smooths out the transition when tapping lets up.
-  TAP_WINDOW_MS: 500,
-  TAP_COUNT_THRESHOLD: 3,    // ~6 taps/sec sustained to stay "pushing"
+  TAP_WINDOW_MS: 450,
+  TAP_COUNT_THRESHOLD: 3,    // ~6.7 taps/sec sustained to stay "pushing"
 
   // ── Boat physics ────────────────────────────────────────────────────────────
   // Forward speed is a flat constant here (no breath-rate concept) — tuned so
   // sustained max-rate tapping crosses the river in about the same time as a
   // well-paced breath crossing, for comparable pacing between the two games.
   FORWARD_SPEED_POS_PER_SEC: 1 / 3, // full crossing in 3s of sustained tapping
-  CURRENT_SPEED_FACTOR: 0.65,
+  CURRENT_SPEED_FACTOR: 0.8,
   BOAT_ACCEL_TAU_SECS: 0.15,
   BOAT_COAST_TAU_SECS: 0.9,
 

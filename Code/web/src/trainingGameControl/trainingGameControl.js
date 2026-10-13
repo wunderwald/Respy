@@ -204,6 +204,7 @@ export class TrainingGameControl {
       sailAnim:         this.#sailAnim,
       clouds:           this.#clouds,
       now,
+      hint: 'Tap as fast as you can!',
     };
   }
 }

@@ -56,7 +56,7 @@ export class RiverCrossingRenderer {
 
   get canvas() { return this.#canvas; }
 
-  draw({ state, countdownElapsed, score, timeLeftSecs, boatPos, hasSheep, sailAnim, clouds, now }) {
+  draw({ state, countdownElapsed, score, timeLeftSecs, boatPos, hasSheep, sailAnim, clouds, now, hint }) {
     const ctx = this.#ctx;
     const w = this.#canvas.width;
     const h = this.#canvas.height;
@@ -72,6 +72,13 @@ export class RiverCrossingRenderer {
     this.#drawSheepFlock(ctx, layout, score, now);
     this.#drawBoat(ctx, layout, { boatPos, hasSheep, sailAnim, now });
     this.#drawCounters(ctx, w, score, timeLeftSecs);
+
+    // Optional per-game caption shown only while actually playing — e.g. the
+    // tap game's "Tap as fast as you can!" reminder. The breath game simply
+    // doesn't pass one, so nothing is drawn here for it.
+    if (state === STATE.PLAYING && hint) {
+      this.#drawHint(ctx, w, h, hint);
+    }
 
     switch (state) {
       case STATE.IDLE:      return this.#drawIdle(ctx, w, h);
@@ -336,6 +343,16 @@ export class RiverCrossingRenderer {
     ctx.fillStyle = COLORS.ink;
     ctx.font = '300 40px Nunito, sans-serif';
     ctx.fillText(score, w - 24, 86);
+    ctx.restore();
+  }
+
+  #drawHint(ctx, w, h, text) {
+    ctx.save();
+    ctx.fillStyle = COLORS.inkSoft;
+    ctx.font = '300 18px Nunito, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(text, w / 2, h * 0.04);
     ctx.restore();
   }
 
