@@ -22,7 +22,7 @@ Direct-launch shortcuts (skip the start screen):
 npm run ibreath           # iBreath / iBeat experiment
 npm run bioGame           # biofeedback breath game
 npm run baseline          # resting-state baseline (video)
-npm run beltTrainingGame  # belt training game — placeholder, no design yet
+npm run beltTrainingGame  # belt training game
 npm run visualizer        # real-time waveform
 npm run trainingGame         # breath training game (not in the start screen)
 npm run trainingGameControl  # breath-controlled dino-style runner (not in the start screen)
@@ -39,7 +39,7 @@ npm run trainingGameControl  # breath-controlled dino-style runner (not in the s
 | trainingGame | Slow breathing training game (not in the start screen) | [docs/trainingGame.md](docs/trainingGame.md) |
 | trainingGameControl | Breath-controlled dino-style runner (not in the start screen) | [docs/trainingGameControl.md](docs/trainingGameControl.md) |
 | baseline | Resting-state recording (video) | [docs/baseline.md](docs/baseline.md) |
-| beltTrainingGame | Belt training game — placeholder, no design yet | [docs/beltTrainingGame.md](docs/beltTrainingGame.md) |
+| beltTrainingGame | Belt training game — teaches breath control before BioGame | [docs/beltTrainingGame.md](docs/beltTrainingGame.md) |
 | visualizer | Live signal waveform viewer | [docs/visualizer.md](docs/visualizer.md) |
 | signal | Signal processing utilities | [docs/signal.md](docs/signal.md) |
 | calibration | Respiration signal calibration | [docs/calibration.md](docs/calibration.md) |

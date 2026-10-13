@@ -2,6 +2,7 @@
 import { StreamManager } from './modules/stream/stream.js';
 import { CONFIG }        from './modules/ibreath/config.js';
 import { CONFIG as BG }  from './modules/bioGame/bioGame_config.js';
+import { CONFIG as BTG } from './modules/beltTrainingGame/beltTrainingGame_config.js';
 
 // ── Frontend detection ────────────────────────────────────────────────────────
 
@@ -67,7 +68,7 @@ function fmtTime(secs) {
 
 const settingsBar = document.getElementById('settings-bar');
 
-if (!['ibreath', 'bioGame'].includes(frontend)) {
+if (!['ibreath', 'bioGame', 'beltTrainingGame'].includes(frontend)) {
   settingsBar.style.display = 'none';
 }
 
@@ -704,30 +705,88 @@ if (frontend === 'ibreath') {
   window.api.frontend.sendAction({ type: 'ready' });
 
 } else if (frontend === 'beltTrainingGame') {
-  // ── Belt Training Game controls (placeholder frontend) ────────────────────────
+  // ── Belt Training Game HUD ───────────────────────────────────────────────────
 
   statsEl.innerHTML = `
-    <span id="btg-status">waiting for stream…</span>
-    <span id="ib-controls">
-      <button id="btg-start-btn" disabled>Start</button>
-      <button id="btg-abort-btn" style="display:none">Abort</button>
+    <span>
+      <span class="label">status</span>
+      <span id="btg-status">waiting for stream…</span>
     </span>
+    <span>
+      <span class="label">subject</span>
+      <input id="btg-subject" type="text" value="${BTG.SUBJECT_CODE}"
+             placeholder="subject code" autocomplete="off" spellcheck="false" />
+    </span>
+    <span id="ib-controls">
+      <button id="btg-start-btn"       disabled>Start</button>
+      <button id="btg-next-btn"        style="display:none">Next trial</button>
+      <button id="btg-abort-btn"       style="display:none">Abort</button>
+      <button id="btg-cal-retry-btn"   style="display:none">Retry calibration</button>
+      <button id="btg-cal-default-btn" style="display:none">Use default calibration</button>
+    </span>
+    <span id="btg-space-hint" class="space-hint" style="display:none">Press SPACE to continue</span>
   `;
-  const btgStatusEl = document.getElementById('btg-status');
-  const btgStartBtn = document.getElementById('btg-start-btn');
-  const btgAbortBtn = document.getElementById('btg-abort-btn');
 
-  window.api.frontend.onState(({ stateText, startEnabled, abortVisible }) => {
-    if (stateText    !== undefined) btgStatusEl.textContent   = stateText;
-    if (startEnabled !== undefined) btgStartBtn.disabled      = !startEnabled;
+  // ── Belt Training Game settings bar ───────────────────────────────────────
+
+  settingsBar.innerHTML = `
+    <span class="label">settings</span>
+    <span class="label">cal secs</span>
+    <input id="btg-cal-secs" type="number" class="settings-num" min="5" max="120" step="5"
+           value="${BTG.CALIBRATION_SECS}" />
+  `;
+
+  const btgStatusEl      = document.getElementById('btg-status');
+  const btgSubjectEl     = document.getElementById('btg-subject');
+  const btgStartBtn      = document.getElementById('btg-start-btn');
+  const btgNextBtn       = document.getElementById('btg-next-btn');
+  const btgSpaceHintEl   = document.getElementById('btg-space-hint');
+  const btgAbortBtn      = document.getElementById('btg-abort-btn');
+  const btgCalRetryBtn   = document.getElementById('btg-cal-retry-btn');
+  const btgCalDefaultBtn = document.getElementById('btg-cal-default-btn');
+
+  window.api.frontend.onState(({ stateText, startEnabled, startText,
+                                  nextVisible, abortVisible, calFailed, inputsLocked }) => {
+    if (stateText    !== undefined) btgStatusEl.textContent = stateText;
+    if (startEnabled !== undefined) btgStartBtn.disabled    = !startEnabled;
+    if (startText    !== undefined) btgStartBtn.textContent = startText;
+    if (nextVisible  !== undefined) {
+      btgNextBtn.style.display     = nextVisible ? '' : 'none';
+      btgSpaceHintEl.style.display = nextVisible ? '' : 'none';
+    }
     if (abortVisible !== undefined) btgAbortBtn.style.display = abortVisible ? '' : 'none';
+    if (calFailed    !== undefined) {
+      btgCalRetryBtn.style.display   = calFailed ? '' : 'none';
+      btgCalDefaultBtn.style.display = calFailed ? '' : 'none';
+    }
+    if (inputsLocked !== undefined && inputsLocked) {
+      btgSubjectEl.disabled = true;
+      // Stream selection stays live even once everything else locks, so the
+      // experimenter can recover from a dropped stream mid-session.
+      for (const el of settingsBar.querySelectorAll('input, button, select')) {
+        el.disabled = true;
+      }
+    }
   });
 
-  btgStartBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'start' }));
+  btgStartBtn.addEventListener('click', () => {
+    window.api.frontend.sendAction({
+      type:            'start',
+      subjectCode:     btgSubjectEl.value.trim() || 'TEST',
+      calibrationSecs: parseInt(document.getElementById('btg-cal-secs').value) || BTG.CALIBRATION_SECS,
+    });
+  });
+  btgNextBtn.addEventListener('click',  () => window.api.frontend.sendAction({ type: 'next' }));
   btgAbortBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'abort' }));
+  btgCalRetryBtn.addEventListener('click',   () => window.api.frontend.sendAction({ type: 'retryCalibration' }));
+  btgCalDefaultBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'useDefaultCalibration' }));
 
   window.addEventListener('keydown', (e) => {
-    if (e.code === 'Escape') window.api.frontend.sendAction({ type: 'abort' });
+    if (document.activeElement === btgSubjectEl) return;
+    switch (e.code) {
+      case 'Space':  e.preventDefault(); window.api.frontend.sendAction({ type: 'next' });  break;
+      case 'Escape': window.api.frontend.sendAction({ type: 'abort' }); break;
+    }
   });
 
   window.api.frontend.sendAction({ type: 'ready' });
