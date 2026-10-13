@@ -1,0 +1,74 @@
+.calibration-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 32px;
+  background: #0f0f0f;
+  text-align: center;
+  z-index: 10;
+}
+
+.calibration-title {
+  font-size: clamp(22px, 4vw, 34px);
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.92);
+  margin: 0;
+  max-width: 640px;
+}
+
+.calibration-sub {
+  font-size: clamp(14px, 2.2vw, 18px);
+  font-weight: 200;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0;
+  max-width: 560px;
+}
+
+.calibration-countdown {
+  font-size: clamp(64px, 14vw, 120px);
+  font-weight: 200;
+  color: rgba(255, 255, 255, 0.92);
+  margin: 0;
+}
+
+.calibration-level-track {
+  width: 56px;
+  height: 180px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+
+.calibration-level-fill {
+  width: 100%;
+  background: rgba(126, 212, 232, 0.85);
+  border-radius: 28px;
+  transition: height 60ms linear;
+}
+
+.calibration-buttons {
+  display: flex;
+  gap: 16px;
+}
+
+.calibration-btn {
+  font-size: 18px;
+  font-weight: 300;
+  padding: 14px 28px;
+  border-radius: 14px;
+  border: none;
+  background: rgba(126, 212, 232, 0.9);
+  color: #0f0f0f;
+  cursor: pointer;
+}
+
+.calibration-btn-secondary {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+}
