@@ -60,6 +60,14 @@ stream ready → [Start] → Calibration (10 s)
 
 ---
 
+## Sound
+
+- **Ambience** loop plus a **noise** layer whose volume follows the avatar's height — both fade in/out per block.
+- **Curve cue**: a one-shot sound every time the target curve reaches a **peak or minimum** as it passes the avatar (every half breath period; the minima coincide with the `trial_<N>` markers). For now it plays a random pick from the scene's former item-collect sounds (`sounds.collect` in [bioGame_scene.js](../modules/bioGame/bioGame_scene.js)); volume is `CURVE_CUE_VOLUME` in [bioGame_sound_config.js](../modules/bioGame/bioGame_sound_config.js).
+- Collecting an item is **silent**.
+
+---
+
 ## Signal input
 
 Any LSL stream that pushes normalized `[0, 1]` floats is supported. The bridge auto-discovers streams — select one in the **resp stream** selector before pressing Start.

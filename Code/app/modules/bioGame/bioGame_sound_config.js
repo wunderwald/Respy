@@ -7,7 +7,7 @@ export const SOUND_CONFIG = {
   AMBIENCE_VOLUME:  0.5,
   NOISE_VOLUME_MIN: 0.0,
   NOISE_VOLUME_MAX: 0.8,
-  COLLECT_VOLUME:   0.7,
+  CURVE_CUE_VOLUME: 0.7,   // sound at each target curve peak / minimum
 
   // ── Timing ───────────────────────────────────────────────────────────────
   FADE_SECS: 1.0,

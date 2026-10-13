@@ -73,11 +73,14 @@ export class BioGameSound {
 
   // ── One-shot events ───────────────────────────────────────────────────────
 
-  playCollect() {
+  // Played at each peak / minimum of the target curve. For now reuses the
+  // scene's former item-collect sounds (random pick) — item collection itself
+  // is silent.
+  playCurveCue() {
     const bufs = this.#buf.collect;
     if (!bufs?.length) return;
     const buf = bufs[Math.floor(Math.random() * bufs.length)];
-    this.#playOnce(buf, CFG.COLLECT_VOLUME);
+    this.#playOnce(buf, CFG.CURVE_CUE_VOLUME);
   }
 
   #playOnce(buffer, gain) {

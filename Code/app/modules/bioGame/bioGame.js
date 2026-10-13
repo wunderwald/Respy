@@ -63,6 +63,9 @@ export default class BioGame {
   #trialIndex    = 0;
   #nextTrialTime = null;
 
+  // ── Curve cues (sound at each target curve peak / minimum) ────────────────
+  #nextCueTime = null;
+
   // ── Signal processing ─────────────────────────────────────────────────────
   #smoother         = new GaussianSmoother(CONFIG.SMOOTH_WINDOW);
   #lastRaw          = 0;
@@ -294,6 +297,7 @@ export default class BioGame {
 
     this.#csv.initBlockCSV(this.#blockIndex);
     this.#nextTrialTime = (60 / this.#activeBpm) * 0.75;
+    this.#nextCueTime   = (60 / this.#activeBpm) * 0.25;   // first peak
 
     this.#sound.startBlock();
     this.#state = STATE.PLAYING;
@@ -376,6 +380,7 @@ export default class BioGame {
       this.#updateParticles(dt);
       this.#updateAvatarBump(dt);
       this.#checkTrialMarker((now - this.#blockStartTime) / 1000);
+      this.#checkCurveCue((now - this.#blockStartTime) / 1000);
       this.#recordFrame(now);
     }
 
@@ -465,7 +470,6 @@ export default class BioGame {
       this.#scoreBlock[this.#blockIndex], blockTime.toFixed(2));
     this.#burstParticles(item.xRatio, item.normY);
     this.#avatarBumpT = 0;
-    this.#sound.playCollect();
     this.#pushState({ score: this.#scoreBlock[this.#blockIndex] });
   }
 
@@ -599,6 +603,19 @@ export default class BioGame {
       this.#markers.send(`trial_${++this.#trialIndex}`);
       this.#nextTrialTime += period;
     }
+  }
+
+  // ── Curve cue ────────────────────────────────────────────────────────────
+  // Sound at every extremum of the target curve as it passes the avatar:
+  // peaks at P/4 + kP, minima at 3P/4 + kP — i.e. every half period from P/4.
+
+  #checkCurveCue(blockTimeSecs) {
+    if (this.#nextCueTime === null) return;
+    const halfPeriod = 60 / this.#activeBpm / 2;
+    if (blockTimeSecs < this.#nextCueTime) return;
+    // Skip any extrema missed while the window was throttled — one cue, not a burst.
+    while (blockTimeSecs >= this.#nextCueTime) this.#nextCueTime += halfPeriod;
+    this.#sound.playCurveCue();
   }
 
   // ── CSV error display ─────────────────────────────────────────────────────
