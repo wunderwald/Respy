@@ -76,7 +76,17 @@ export class GaussianSmoother {
 
     const n = this.#count;  // actual filled length (≤ windowSize)
 
-    // Build a kernel trimmed to n samples and re-normalised
+    // Steady state: full window, the precomputed kernel is already normalised —
+    // no per-call allocation (this getter runs on every incoming sample).
+    if (n === this.#windowSize) {
+      let out = 0;
+      for (let i = 0; i < n; i++) {
+        out += this.#ring[(this.#head + i) % n] * this.#kernel[i];
+      }
+      return out;
+    }
+
+    // Warm-up: build a kernel trimmed to n samples and re-normalised
     let sum = 0;
     const weights = new Float32Array(n);
     for (let i = 0; i < n; i++) {
@@ -135,7 +145,13 @@ export class GaussianSmoother {
  *   line.reset();
  */
 export class SignalDelayLine {
-  #buf = [];   // [{ t, v }, ...] ascending by t
+  // Parallel arrays, ascending by time. Old samples are dropped by advancing
+  // #head and compacting only occasionally — splicing the front off on every
+  // push would make each push O(buffer size), i.e. cost growing with the
+  // stream's sample rate.
+  #times = [];
+  #values = [];
+  #head = 0;   // index of the oldest sample still inside maxAgeMs
   #maxAgeMs;
 
   /**
@@ -155,11 +171,15 @@ export class SignalDelayLine {
    * @param {number} v  Sample value
    */
   push(t, v) {
-    this.#buf.push({ t, v });
+    this.#times.push(t);
+    this.#values.push(v);
     const cutoff = t - this.#maxAgeMs;
-    let i = 0;
-    while (i < this.#buf.length && this.#buf[i].t < cutoff) i++;
-    if (i > 0) this.#buf.splice(0, i);
+    while (this.#head < this.#times.length && this.#times[this.#head] < cutoff) this.#head++;
+    if (this.#head > 1024 && this.#head * 2 > this.#times.length) {
+      this.#times = this.#times.slice(this.#head);
+      this.#values = this.#values.slice(this.#head);
+      this.#head = 0;
+    }
   }
 
   /**
@@ -172,28 +192,29 @@ export class SignalDelayLine {
    * @returns {number}
    */
   sample(t, delayMs) {
-    const n = this.#buf.length;
-    if (n === 0) return 0;
+    const times = this.#times, values = this.#values;
+    const first = this.#head, last = times.length - 1;
+    if (last < first) return 0;
 
     const target = t - delayMs;
-    if (target <= this.#buf[0].t) return this.#buf[0].v;
-    const last = this.#buf[n - 1];
-    if (target >= last.t) return last.v;
+    if (target <= times[first]) return values[first];
+    if (target >= times[last]) return values[last];
 
     // Binary search for the pair of samples bracketing `target`.
-    let lo = 0, hi = n - 1;
+    let lo = first, hi = last;
     while (hi - lo > 1) {
       const mid = (lo + hi) >> 1;
-      if (this.#buf[mid].t <= target) lo = mid; else hi = mid;
+      if (times[mid] <= target) lo = mid; else hi = mid;
     }
-    const a = this.#buf[lo], b = this.#buf[hi];
-    const frac = (target - a.t) / (b.t - a.t || 1);
-    return a.v + (b.v - a.v) * frac;
+    const frac = (target - times[lo]) / (times[hi] - times[lo] || 1);
+    return values[lo] + (values[hi] - values[lo]) * frac;
   }
 
   /** Discard all buffered samples (e.g. at the start of a new session). */
   reset() {
-    this.#buf = [];
+    this.#times = [];
+    this.#values = [];
+    this.#head = 0;
   }
 }
 

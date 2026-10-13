@@ -170,15 +170,17 @@ export default class IBreath {
     } else {
       this.#smoother.push(rawValue);
     }
+    // Computed once per sample — this runs at the stream's full rate.
+    const smoothed = this.#smoothedValue;
     // Always-on, regardless of state, so a trial's delay buffer already has
     // up to MAX_DELAY_MS of history available the moment it starts.
-    this.#delayLine.push(now, this.#smoothedValue);
-    this.#rangeTracker?.push(now, this.#smoothedValue);
+    this.#delayLine.push(now, smoothed);
+    this.#rangeTracker?.push(now, smoothed);
 
     if (this.#state === STATE.CALIBRATING) {
-      this.#calibration.push(this.#smoothedValue);
+      this.#calibration.push(smoothed);
     } else if (this.#state === STATE.TRIAL) {
-      this.#onTrialSample(rawValue);
+      this.#onTrialSample(smoothed);
     }
   }
 
@@ -374,11 +376,11 @@ export default class IBreath {
     this.#markers.send(`trial_start_t${trial.trialIndex}`);
   }
 
-  #onTrialSample(rawValue) {
+  #onTrialSample(smoothed) {
     const trial = this.#trials[this.#trialIndex];
     if (trial.synchronous) {
       this.#stimulusLevel = Math.max(0, Math.min(1,
-        mapRange(this.#smoothedValue, this.#stimulusRange, [0, 1])
+        mapRange(smoothed, this.#stimulusRange, [0, 1])
       ));
     }
   }
