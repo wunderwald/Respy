@@ -348,8 +348,8 @@ export class RiverCrossingRenderer {
 
   #drawHint(ctx, w, h, text) {
     ctx.save();
-    ctx.fillStyle = COLORS.inkSoft;
-    ctx.font = '300 18px Nunito, sans-serif';
+    ctx.fillStyle = COLORS.ink;
+    ctx.font = '400 36px Nunito, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.fillText(text, w / 2, h * 0.04);
