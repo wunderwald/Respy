@@ -31,7 +31,7 @@ In both phases the fish travels left → right through three timed segments:
 | Target crossing | `TARGET_AREA_DURATION_MS` (3000ms) | fish crosses the (narrow) target zone slowly |
 | Exit | `EXIT_DURATION_MS` (1500ms) | fish exits quickly, off-screen right |
 
-The target zone is deliberately narrow (`TARGET_X_START`–`TARGET_X_END`, default 0.74–0.80 of canvas width) so that, given the durations above, the fish's x-speed is slowest while crossing the target and fastest on exit — matching the intended feel of "slow and deliberate in the target, fast once you're past it."
+The target zone spans `TARGET_X_START`–`TARGET_X_END` (default 0.55–0.82 of canvas width, a wide band). Given the durations above, the fish's exit speed is always clearly faster than its target-crossing speed (≈1.9x with the defaults) — matching the "fast on exit" requirement; its approach speed is comparable to its target speed.
 
 **No scoring or feedback UI** is shown to the participant, by design — this is a pure practice tool. Performance is recorded to CSV only (see below).
 
@@ -41,9 +41,9 @@ The target zone is deliberately narrow (`TARGET_X_START`–`TARGET_X_END`, defau
 
 The target centre y-position is randomized per trial (uniformly within `[TARGET_Y_MIN, TARGET_Y_MAX]`, default `[0.25, 0.75]` of the play area) and reused for both phases of that trial. Three nested bands are drawn around that centre, by half-height:
 
-- `TARGET_HEIGHT` (green, default 0.045) — the "hold" zone
-- `TARGET_HEIGHT_YELLOW` (default 0.090)
-- `TARGET_HEIGHT_RED` (default 0.150)
+- `TARGET_HEIGHT` (green, default 0.090) — the "hold" zone
+- `TARGET_HEIGHT_YELLOW` (default 0.135)
+- `TARGET_HEIGHT_RED` (default 0.195)
 
 Whether the breath signal was inside the green band is tracked continuously during the target-crossing segment of each phase and logged as a fraction (see CSV below) — there's no hard pass/fail cutoff.
 

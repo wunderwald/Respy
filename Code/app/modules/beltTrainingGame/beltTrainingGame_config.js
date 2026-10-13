@@ -25,26 +25,31 @@ export const CONFIG = {
 
   // ── Phase timing ─────────────────────────────────────────────────────────
   // The fish's x-speed over each segment follows from these durations and
-  // the x-geometry below. With the defaults, speed works out to ≈0.000103/ms
-  // while approaching, ≈0.00002/ms while crossing the (narrow) target zone,
-  // and ≈0.000187/ms on exit — i.e. slow in the target zone, fast on exit.
+  // the x-geometry below. With the defaults, speed works out to ≈0.000079/ms
+  // while approaching, ≈0.00009/ms while crossing the target zone, and
+  // ≈0.000173/ms on exit — i.e. clearly faster on exit than in the target
+  // zone (the exit segment is ~1.9x faster), matching the "fast on exit"
+  // requirement. The target zone is wide, so it's no longer much slower than
+  // the approach itself — only the exit speed-up is guaranteed by design.
   APPROACH_DURATION_MS:    8000,  // spawn → target zone
   TARGET_AREA_DURATION_MS: 3000,  // crossing the target zone
   EXIT_DURATION_MS:        1500,  // target zone → off-screen
 
   // ── Target geometry (normalized canvas fractions) ───────────────────────
   SPAWN_X_RATIO:    -0.08,  // fish start x (off-screen left)
-  TARGET_X_START:    0.74,  // left edge of the target x-band
-  TARGET_X_END:      0.80,  // right edge of the target x-band
+  TARGET_X_START:    0.55,  // left edge of the target x-band
+  TARGET_X_END:      0.82,  // right edge of the target x-band (width = 0.27, 4.5x the original 0.06)
   DESPAWN_X_RATIO:   1.08,  // fish end x (off-screen right)
 
   TARGET_Y_MIN:      0.25,  // random target-centre y range (normalized play area)
   TARGET_Y_MAX:      0.75,
 
   // Half-heights of the nested bands around the target centre, outermost last.
-  TARGET_HEIGHT:        0.045,  // green band (the "hold" zone)
-  TARGET_HEIGHT_YELLOW: 0.090,
-  TARGET_HEIGHT_RED:    0.150,
+  // The green band is 2x its original height; yellow/red keep their original
+  // ring thickness, just pushed outward by the same amount green grew.
+  TARGET_HEIGHT:        0.090,  // green band (the "hold" zone) — 2x the original 0.045
+  TARGET_HEIGHT_YELLOW: 0.135,
+  TARGET_HEIGHT_RED:    0.195,
 
   // ── Avatar ───────────────────────────────────────────────────────────────
   AVATAR_SIZE_MIN: 0.09,  // height as fraction of canvas height
