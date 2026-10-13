@@ -5,7 +5,8 @@
  *
  * ── Switching frontends ───────────────────────────────────────────────────
  * Change the FRONTEND constant below to swap the active frontend.
- * Valid values: 'visualizer' | 'trainingGame' | 'chromeDinoGame' | 'ibreath' | 'bioGame' | 'baseline' | 'beltTrainingGame'
+ * Valid values: 'visualizer' | 'ibreath' | 'bioGame' | 'baseline' | 'beltTrainingGame'
+ * (trainingGame/chromeDinoGame moved to ../web — see that project's README)
  *
  * Every frontend module must implement this interface:
  *   pushSample(value: number) → void
@@ -21,7 +22,7 @@ import { GazeManager } from "./modules/webgazer/gazeCalibration.js";
 
 // ── Active frontend ───────────────────────────────────────────────────────────
 //
-// Set via the npm script: npm run ibreath | trainingGame | chromeDinoGame | visualizer | bioGame | baseline
+// Set via the npm script: npm run ibreath | visualizer | bioGame | baseline
 // Falls back to 'ibreath' if no ?frontend= param is present.
 
 const FRONTEND = new URLSearchParams(location.search).get('frontend') || 'ibreath';
@@ -30,7 +31,7 @@ const FRONTEND = new URLSearchParams(location.search).get('frontend') || 'ibreat
 //
 // Set GAZE_ENABLED = true to show the 9-point calibration screen on startup
 // and stream gaze data into window.gazeState for the iBreath CSV logger.
-// Set to false to skip entirely (no webcam needed — useful for trainingGame/visualizer
+// Set to false to skip entirely (no webcam needed — useful for visualizer
 // or when testing ibreath without eye tracking).
 
 const GAZE_ENABLED = false;
@@ -61,8 +62,6 @@ async function init() {
   // 3. Dynamically import the frontend module.
   const FRONTEND_PATHS = {
     visualizer: './modules/visualizer/visualizer.js',
-    trainingGame: './modules/trainingGame/trainingGame.js',
-    chromeDinoGame: './modules/chromeDinoGame/chromeDinoGame.js',
     ibreath:    './modules/ibreath/ibreath.js',
     bioGame:    './modules/bioGame/bioGame.js',
     baseline:   './modules/baseline/baseline.js',
