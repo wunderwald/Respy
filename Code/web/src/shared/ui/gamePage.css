@@ -4,7 +4,8 @@
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: #0f0f0f;
+  /* Both games are light-themed; this is just the flash-of-unpainted-canvas color. */
+  background: #f3f6f8;
 }
 
 .game-canvas-mount {

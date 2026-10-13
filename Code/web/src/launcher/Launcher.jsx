@@ -9,14 +9,16 @@ const GAMES = [
 
 export function Launcher() {
   return (
-    <>
-      <h1>Respy games</h1>
-      <main>
-        {GAMES.map((g) => (
-          <a key={g.href} className="card" href={g.href}>{g.label}</a>
-        ))}
-      </main>
-    </>
+    <div className="launcher-page">
+      <div className="launcher-box">
+        <h1>Respy games</h1>
+        <main>
+          {GAMES.map((g) => (
+            <a key={g.href} className="card" href={g.href}>{g.label}</a>
+          ))}
+        </main>
+      </div>
+    </div>
   );
 }
 
