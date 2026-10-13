@@ -3,10 +3,12 @@
 
 import { STATE, CONFIG } from './beltTrainingGame_config.js';
 import { SceneRenderer } from '../bioGame/sceneRenderer.js';
+import { drawDisplay }  from '../ibreath/animationDisplay.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+function easeOut(t) { return 1 - (1 - t) * (1 - t); }
 
 // ── BeltTrainingGameRenderer ───────────────────────────────────────────────────
 
@@ -15,6 +17,7 @@ export class BeltTrainingGameRenderer {
   #ctx    = null;
 
   #sceneRenderer = null;   // shared bg + avatar drawing (see bioGame/sceneRenderer.js)
+  #images = {};            // key → HTMLImageElement — the ibreath "pre-trial" fish, reused for the countdown
 
   #lastNow = null;
 
@@ -25,6 +28,14 @@ export class BeltTrainingGameRenderer {
 
     this.#sceneRenderer = new SceneRenderer(scene);
     this.#sceneRenderer.warmUpShadow(this.#ctx);
+
+    for (const [key, src] of [['pufferfish', 'images/pufferfish.png'],
+                               ['starfish',   'images/starfish.png'],
+                               ['pinkfish',   'images/pinkfish.png']]) {
+      const img = new Image();
+      img.src = src;
+      this.#images[key] = img;
+    }
   }
 
   draw(renderData) {
@@ -53,6 +64,10 @@ export class BeltTrainingGameRenderer {
 
       case STATE.READY:
         this.#drawReady(ctx, w, h, now);
+        break;
+
+      case STATE.COUNTDOWN:
+        this.#drawCountdown(ctx, w, h, now, renderData.countdownValue ?? 3, renderData.countdownProgress ?? 0);
         break;
 
       case STATE.TRAINING:
@@ -179,6 +194,27 @@ export class BeltTrainingGameRenderer {
     const avatarH = CONFIG.AVATAR_SIZE_MIN * h + (CONFIG.AVATAR_SIZE_MAX - CONFIG.AVATAR_SIZE_MIN) * h * 0.5;
     this.#sceneRenderer.drawAvatar(ctx, avatarScreenX, avatarScreenY, avatarH * 1.3, tilt);
     this.#drawCenter(ctx, w, h * 0.80, 'Press Space or Start to begin', 'rgba(255,255,255,0.30)', 16);
+  }
+
+  // The same "three fish bopping happily" animation ibreath shows before each
+  // trial (see ibreath/animationDisplay.js), plus a simple 3-2-1-GO overlay.
+  #drawCountdown(ctx, w, h, now, value, progress) {
+    drawDisplay(ctx, w, h, now / 1000, this.#images);
+
+    const text  = value === 0 ? 'GO!' : String(value);
+    const color = value === 0 ? 'rgba(126,232,162,0.95)' : 'rgba(255,255,255,0.92)';
+    const size  = value === 0 ? 84 : 108;
+    const scale = 1 + 0.35 * (1 - easeOut(clamp(progress, 0, 1)));
+
+    ctx.save();
+    ctx.translate(w / 2, h / 2);
+    ctx.scale(scale, scale);
+    ctx.fillStyle    = color;
+    ctx.font         = `200 ${size}px Nunito, sans-serif`;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 0, 0);
+    ctx.restore();
   }
 
   #drawDone(ctx, w, h) {

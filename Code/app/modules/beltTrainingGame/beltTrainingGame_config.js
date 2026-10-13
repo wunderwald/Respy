@@ -34,6 +34,7 @@ export const CONFIG = {
   APPROACH_DURATION_MS:    8000,  // spawn → target zone
   TARGET_AREA_DURATION_MS: 3000,  // crossing the target zone
   EXIT_DURATION_MS:        1500,  // target zone → off-screen
+  COUNTDOWN_SECS:          3.75,  // 3-2-1-GO before each phase (3 + 2 + 1 + GO! each 1s, GO 0.75s)
 
   // ── Target geometry (normalized canvas fractions) ───────────────────────
   SPAWN_X_RATIO:    -0.08,  // fish start x (off-screen left)
@@ -67,6 +68,7 @@ export const STATE = {
   IDLE:        'idle',
   CALIBRATING: 'calibrating',
   READY:       'ready',       // waiting for experimenter/Space before a trial
+  COUNTDOWN:   'countdown',   // 3-2-1-GO before each phase (training and test)
   TRAINING:    'training',    // training phase of the current trial (target visible)
   TEST:        'test',        // test phase of the current trial (target hidden)
   DONE:        'done',

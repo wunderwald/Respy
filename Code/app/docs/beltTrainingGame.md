@@ -21,7 +21,7 @@ The game runs `NUM_TRIALS` trials (default **9**). Each trial has two phases, bo
 1. **Training phase** — the target zone (red/yellow/green/yellow/red bands, see screenshot concept) is visible, and so is the fish. The player's goal is to hold their breath level inside the **green** band for the duration of the target crossing.
 2. **Test phase** — the target zone is covered by a drifting bubble overlay, and the fish **disappears** while crossing that zone. The player must reproduce the same breath level as in the training phase, blind.
 
-Before each trial there is a **READY** screen: the fish bobs in place and the experimenter must press **Space** (or click **Next trial**) to start it — once per trial, not once per phase. The transition from the training phase to the test phase within a trial is automatic.
+Before each trial there is a **READY** screen: the fish bobs in place and the experimenter must press **Space** (or click **Next trial**) to start it — once per trial, not once per phase. A **3-2-1-GO countdown** (`COUNTDOWN_SECS`, default 3.75s) automatically precedes *each* phase — both right after READY and again between the training and test phase — showing the same "three fish bopping" animation iBreath shows before its trials (see [`animationDisplay.js`](../modules/ibreath/animationDisplay.js)) with the countdown number overlaid on top. The transition from the training phase to the test phase within a trial is otherwise automatic (no extra Space press).
 
 In both phases the fish travels left → right through three timed segments:
 
@@ -58,7 +58,7 @@ Whether the breath signal was inside the green band is tracked continuously duri
 | Start | Begins calibration (enabled once the resp stream is connected) |
 | Retry calibration / Use default calibration | Shown only if calibration fails (flat/no signal) |
 | Next trial | Shown during the READY screen; same action as pressing **Space** |
-| Abort | Ends the session immediately (available from READY through either phase) |
+| Abort | Ends the session immediately (available from READY, during the countdown, or during either phase) |
 | **Press SPACE to continue** badge | Mirrors the **Next trial** button's visibility |
 
 The resp stream selector is never locked, even once other controls lock, so the experimenter can recover from a dropped stream mid-session (see [stream.md](stream.md)).

@@ -5,9 +5,10 @@
  * belt before they play the main BioGame.
  *
  * State machine:
- *   IDLE → CALIBRATING → READY → TRAINING → TEST → READY → TRAINING → TEST → … → DONE
- *                           ↑________________________________________|
- *                        (one READY per trial, waits for Space/Next)
+ *   IDLE → CALIBRATING → READY → COUNTDOWN → TRAINING → COUNTDOWN → TEST → READY → … → DONE
+ *                           ↑__________________________________________________|
+ *                        (one READY per trial, waits for Space/Next;
+ *                         a 3-2-1-GO COUNTDOWN precedes each phase automatically)
  *
  * Each trial reuses the same random target y-position for both its training
  * and test phases. In both phases the fish travels left→right through three
@@ -73,6 +74,10 @@ export default class BeltTrainingGame {
   #segGreenTime    = 0;     // time spent inside the green band during the 'target' segment
   #segTotalTime    = 0;     // total time spent in the 'target' segment
 
+  // ── Countdown (3-2-1-GO before each phase) ────────────────────────────────
+  #countdownStartTime = null;
+  #pendingPhase       = null;  // phase the countdown is leading into: 'training' | 'test'
+
   // ── Data / frame recording ───────────────────────────────────────────────
   #csv             = null;
   #lastFrameRecord = 0;
@@ -130,11 +135,12 @@ export default class BeltTrainingGame {
         break;
 
       case 'next':
-        if (this.#state === STATE.READY) this.#beginTrialPhase('training');
+        if (this.#state === STATE.READY) this.#beginCountdown('training');
         break;
 
       case 'abort':
-        if (this.#state === STATE.READY || this.#state === STATE.TRAINING || this.#state === STATE.TEST) {
+        if (this.#state === STATE.READY || this.#state === STATE.COUNTDOWN ||
+            this.#state === STATE.TRAINING || this.#state === STATE.TEST) {
           this.#abortTrial();
         }
         break;
@@ -233,6 +239,17 @@ export default class BeltTrainingGame {
     });
   }
 
+  #beginCountdown(phase) {
+    this.#pendingPhase       = phase;
+    this.#countdownStartTime = performance.now();
+    this.#state              = STATE.COUNTDOWN;
+    this.#pushState({
+      stateText:    `trial ${this.#trialIndex + 1} / ${CONFIG.NUM_TRIALS} — starting ${phase}…`,
+      nextVisible:  false,
+      abortVisible: true,
+    });
+  }
+
   #beginTrialPhase(phase) {
     this.#phase          = phase;
     this.#segment        = 'approach';
@@ -263,7 +280,7 @@ export default class BeltTrainingGame {
 
     if (this.#phase === 'training') {
       this.#markers.send(`training_end_t${this.#trialIndex}`);
-      this.#beginTrialPhase('test');
+      this.#beginCountdown('test');
       return;
     }
 
@@ -298,6 +315,14 @@ export default class BeltTrainingGame {
     if (this.#state === STATE.CALIBRATING && !this.#calFailed) {
       if (this.#calibration.isDone) {
         this.#finishCalibration();
+      }
+    }
+
+    if (this.#state === STATE.COUNTDOWN) {
+      if ((performance.now() - this.#countdownStartTime) / 1000 >= CONFIG.COUNTDOWN_SECS) {
+        const phase = this.#pendingPhase;
+        this.#pendingPhase = null;
+        this.#beginTrialPhase(phase);
       }
     }
   }
@@ -419,16 +444,27 @@ export default class BeltTrainingGame {
   // ── Render data builder ───────────────────────────────────────────────────
 
   #buildRenderData(now) {
+    let countdownValue = 3, countdownProgress = 0;
+    if (this.#countdownStartTime != null) {
+      const cdE = (now - this.#countdownStartTime) / 1000;
+      if      (cdE < 1) { countdownValue = 3; countdownProgress = cdE; }
+      else if (cdE < 2) { countdownValue = 2; countdownProgress = cdE - 1; }
+      else if (cdE < 3) { countdownValue = 1; countdownProgress = cdE - 2; }
+      else              { countdownValue = 0; countdownProgress = (cdE - 3) / 0.75; }
+    }
+
     return {
-      state:        this.#state,
+      state:             this.#state,
       now,
-      calProgress:  this.#calibration?.progress ?? 0,
-      calRemaining: Math.ceil(this.#calibration?.remainingSecs ?? this.#calibrationSecs),
-      fishXRatio:   this.#fishXRatio,
-      fishNormY:    this.#avatarNormY,
-      targetNormY:  this.#targetNormY,
-      segment:      this.#segment,
-      avatarTilt:   this.#avatarTilt,
+      calProgress:       this.#calibration?.progress ?? 0,
+      calRemaining:      Math.ceil(this.#calibration?.remainingSecs ?? this.#calibrationSecs),
+      fishXRatio:        this.#fishXRatio,
+      fishNormY:         this.#avatarNormY,
+      targetNormY:       this.#targetNormY,
+      segment:           this.#segment,
+      avatarTilt:        this.#avatarTilt,
+      countdownValue,
+      countdownProgress: clamp(countdownProgress, 0, 1),
     };
   }
 
