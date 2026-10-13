@@ -11,6 +11,7 @@ function lerp(a, b, t) { return a + (b - a) * t; }
 
 const COLORS = {
   bg:       '#ffe4ef',
+  skyTop:   '#bfe6fb',
   ink:      '#4a3350',
   inkSoft:  'rgba(74,51,80,0.55)',
   inkFaint: 'rgba(74,51,80,0.25)',
@@ -79,7 +80,7 @@ export class RiverCrossingRenderer {
 
     const layout = this.#layout(w, h);
 
-    this.#drawBackground(ctx, w, h);
+    this.#drawBackground(ctx, w, h, layout.riverTop);
     this.#drawSun(ctx, w, h, now);
     this.#drawClouds(ctx, clouds);
     this.#drawRiver(ctx, layout, now);
@@ -121,8 +122,12 @@ export class RiverCrossingRenderer {
 
   // ── Background ──────────────────────────────────────────────────────────────
 
-  #drawBackground(ctx, w, h) {
-    ctx.fillStyle = COLORS.bg;
+  #drawBackground(ctx, w, h, horizonY) {
+    const g = ctx.createLinearGradient(0, 0, 0, horizonY);
+    g.addColorStop(0,    COLORS.skyTop);
+    g.addColorStop(0.65, COLORS.skyTop);
+    g.addColorStop(1,    COLORS.bg);
+    ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
   }
 
@@ -176,14 +181,17 @@ export class RiverCrossingRenderer {
 
   #drawClouds(ctx, clouds) {
     if (!clouds) return;
+    ctx.fillStyle = '#ffffff';
     ctx.strokeStyle = COLORS.inkFaint;
     ctx.lineWidth = 2;
     for (const c of clouds) {
       ctx.beginPath();
       ctx.ellipse(c.x, c.y, c.size, c.size * 0.5, 0, 0, Math.PI * 2);
+      ctx.fill();
       ctx.stroke();
       ctx.beginPath();
       ctx.ellipse(c.x + c.size * 0.6, c.y + c.size * 0.1, c.size * 0.6, c.size * 0.38, 0, 0, Math.PI * 2);
+      ctx.fill();
       ctx.stroke();
     }
   }
