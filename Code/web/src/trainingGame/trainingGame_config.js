@@ -1,6 +1,6 @@
 export const CONFIG = {
   // ── Timing ──────────────────────────────────────────────────────────────────
-  TARGET_BPM: 6,             // sets the boat's forward speed via half the breath period
+  TARGET_BPM: 10,            // sets the boat's forward speed via half the breath period (10bpm = 6s cycle = 3s exhale)
   GAME_DURATION_SECS: 180,   // 3 minutes
 
   // ── Breath / blow detection ────────────────────────────────────────────────
