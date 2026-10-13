@@ -48,7 +48,7 @@ export class TrainingGameRenderer {
     return Array.from({ length: count }, (_, i) => ({
       t: count === 1 ? 0.5 : i / (count - 1),
       jitter: (Math.random() - 0.5) * 0.7,     // x jitter, as a fraction of tree spacing
-      scale: 0.6 + Math.random() * 0.9,        // varied sizes
+      scale: 1.0 + Math.random() * 1.1,        // varied sizes
     }));
   }
 

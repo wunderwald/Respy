@@ -33,7 +33,7 @@ export const CONFIG = {
   SHEEP_SCALE: 1.7,
 
   // ── Boat / sailor size ──────────────────────────────────────────────────────
-  BOAT_SCALE: 1.8,
+  BOAT_SCALE: 2.8,
 
   // ── Background ──────────────────────────────────────────────────────────────
   CLOUD_COUNT: 5,
