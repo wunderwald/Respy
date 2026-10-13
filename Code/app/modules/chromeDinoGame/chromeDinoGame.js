@@ -1,8 +1,8 @@
-import { CONFIG, STATE }              from './trainingGameControl_config.js';
-import { TrainingGameControlRenderer } from './trainingGameControl_renderer.js';
-import { ExhaleOnsetDetector }         from '../signal/exhaleOnsetDetector.js';
+import { CONFIG, STATE }       from './chromeDinoGame_config.js';
+import { ChromeDinoGameRenderer } from './chromeDinoGame_renderer.js';
+import { ExhaleOnsetDetector } from '../signal/exhaleOnsetDetector.js';
 
-export class TrainingGameControl {
+export class ChromeDinoGame {
   // state
   #state = STATE.IDLE;
   #score = 0;
@@ -40,7 +40,7 @@ export class TrainingGameControl {
   #renderer;
 
   constructor({ statsContainer, sceneContainer }) {
-    this.#renderer = new TrainingGameControlRenderer(sceneContainer);
+    this.#renderer = new ChromeDinoGameRenderer(sceneContainer);
     this.#initClouds();
 
     window.api.frontend.onAction(({ type }) => {
@@ -149,7 +149,7 @@ export class TrainingGameControl {
     try {
       this.#renderer.draw(this.#buildRenderData(timestamp));
     } catch (e) {
-      console.error('[TrainingGameControl] draw error:', e);
+      console.error('[ChromeDinoGame] draw error:', e);
     }
 
     requestAnimationFrame((t) => this.#rafLoop(t));
@@ -278,4 +278,4 @@ export class TrainingGameControl {
   }
 }
 
-export default TrainingGameControl;
+export default ChromeDinoGame;

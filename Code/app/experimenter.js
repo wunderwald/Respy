@@ -398,7 +398,7 @@ if (frontend === 'ibreath') {
     if (debugLog   !== undefined) logBar.textContent     = debugLog ?? '';
   });
 
-} else if (frontend === 'trainingGameControl') {
+} else if (frontend === 'chromeDinoGame') {
   // ── Game controls ────────────────────────────────────────────────────────────
 
   statsEl.innerHTML = `

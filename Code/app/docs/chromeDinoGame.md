@@ -1,4 +1,4 @@
-# trainingGameControl — Breath-Controlled Runner
+# chromeDinoGame — Breath-Controlled Runner
 
 A breath-controlled replica of the Chrome dino game. A 2D world scrolls left past a stick-figure character fixed at the left edge; white box obstacles approach at random intervals and each exhale onset makes the character jump. Colliding with an obstacle ends the run.
 
@@ -7,7 +7,7 @@ A breath-controlled replica of the Chrome dino game. A 2D world scrolls left pas
 ## Run
 
 ```bash
-cd app && npm run trainingGameControl
+cd app && npm run chromeDinoGame
 ```
 
 Not in the start screen (`npm start`) — launch it directly with the command above.
@@ -48,7 +48,7 @@ Spawned off the right edge of the screen at random intervals between `MIN_OBSTAC
 
 ## Configuration
 
-In [app/modules/trainingGameControl/trainingGameControl_config.js](../modules/trainingGameControl/trainingGameControl_config.js):
+In [app/modules/chromeDinoGame/chromeDinoGame_config.js](../modules/chromeDinoGame/chromeDinoGame_config.js):
 
 | Parameter | Default | Description |
 |---|---|---|

@@ -5,7 +5,7 @@
  *
  * ── Switching frontends ───────────────────────────────────────────────────
  * Change the FRONTEND constant below to swap the active frontend.
- * Valid values: 'visualizer' | 'trainingGame' | 'trainingGameControl' | 'ibreath' | 'bioGame' | 'baseline' | 'beltTrainingGame'
+ * Valid values: 'visualizer' | 'trainingGame' | 'chromeDinoGame' | 'ibreath' | 'bioGame' | 'baseline' | 'beltTrainingGame'
  *
  * Every frontend module must implement this interface:
  *   pushSample(value: number) → void
@@ -21,7 +21,7 @@ import { GazeManager } from "./modules/webgazer/gazeCalibration.js";
 
 // ── Active frontend ───────────────────────────────────────────────────────────
 //
-// Set via the npm script: npm run ibreath | trainingGame | trainingGameControl | visualizer | bioGame | baseline
+// Set via the npm script: npm run ibreath | trainingGame | chromeDinoGame | visualizer | bioGame | baseline
 // Falls back to 'ibreath' if no ?frontend= param is present.
 
 const FRONTEND = new URLSearchParams(location.search).get('frontend') || 'ibreath';
@@ -62,9 +62,9 @@ async function init() {
   const FRONTEND_PATHS = {
     visualizer: './modules/visualizer/visualizer.js',
     trainingGame: './modules/trainingGame/trainingGame.js',
-    trainingGameControl: './modules/trainingGameControl/trainingGameControl.js',
+    chromeDinoGame: './modules/chromeDinoGame/chromeDinoGame.js',
     ibreath:    './modules/ibreath/ibreath.js',
-bioGame:    './modules/bioGame/bioGame.js',
+    bioGame:    './modules/bioGame/bioGame.js',
     baseline:   './modules/baseline/baseline.js',
     beltTrainingGame: './modules/beltTrainingGame/beltTrainingGame.js',
   };

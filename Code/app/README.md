@@ -25,7 +25,7 @@ npm run baseline          # resting-state baseline (video)
 npm run beltTrainingGame  # belt training game
 npm run visualizer        # real-time waveform
 npm run trainingGame         # breath training game (not in the start screen)
-npm run trainingGameControl  # breath-controlled dino-style runner (not in the start screen)
+npm run chromeDinoGame       # breath-controlled dino-style runner (not in the start screen)
 ```
 
 ---
@@ -37,7 +37,7 @@ npm run trainingGameControl  # breath-controlled dino-style runner (not in the s
 | iBreath / iBeat | Interoception experiment | [docs/ibreath.md](docs/ibreath.md) |
 | bioGame | Biofeedback game | [docs/bioGame.md](docs/bioGame.md) |
 | trainingGame | Slow breathing training game (not in the start screen) | [docs/trainingGame.md](docs/trainingGame.md) |
-| trainingGameControl | Breath-controlled dino-style runner (not in the start screen) | [docs/trainingGameControl.md](docs/trainingGameControl.md) |
+| chromeDinoGame | Breath-controlled dino-style runner (not in the start screen) | [docs/chromeDinoGame.md](docs/chromeDinoGame.md) |
 | baseline | Resting-state recording (video) | [docs/baseline.md](docs/baseline.md) |
 | beltTrainingGame | Belt training game — teaches breath control before BioGame | [docs/beltTrainingGame.md](docs/beltTrainingGame.md) |
 | visualizer | Live signal waveform viewer | [docs/visualizer.md](docs/visualizer.md) |

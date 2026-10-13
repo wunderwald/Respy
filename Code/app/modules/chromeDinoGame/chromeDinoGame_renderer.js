@@ -1,11 +1,11 @@
-import { STATE } from './trainingGameControl_config.js';
+import { STATE } from './chromeDinoGame_config.js';
 
-// ── TrainingGameControlRenderer ─────────────────────────────────────────────
+// ── ChromeDinoGameRenderer ─────────────────────────────────────────────
 // Minimal 2D canvas renderer: dark scrolling world, parallax clouds, a
 // stick-figure character, and white box obstacles. Pure rendering — all
-// game state/physics live in trainingGameControl.js.
+// game state/physics live in chromeDinoGame.js.
 
-export class TrainingGameControlRenderer {
+export class ChromeDinoGameRenderer {
   #canvas;
   #ctx;
 
@@ -201,4 +201,4 @@ export class TrainingGameControlRenderer {
   }
 }
 
-export default TrainingGameControlRenderer;
+export default ChromeDinoGameRenderer;
