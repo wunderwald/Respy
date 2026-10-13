@@ -3,8 +3,7 @@
 #stream-bar,
 #gaze-bar,
 #timer-bar,
-#settings-bar,
-#log-bar {
+#settings-bar {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -19,10 +18,7 @@
 #stream-bar .label,
 #gaze-bar .label,
 #timer-bar .label,
-#settings-bar .label,
-#log-bar .label { opacity: 0.6; }
-
-#log-bar { font-family: 'Nunito', monospace; letter-spacing: 0.06em; }
+#settings-bar .label { opacity: 0.6; }
 
 #timer-bar #ib-state-text { margin-right: 6px; }
 #timer-bar #ib-clock { display: flex; align-items: center; gap: 6px; opacity: 0.75; }
