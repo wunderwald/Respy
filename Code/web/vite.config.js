@@ -3,7 +3,7 @@ import { defineConfig } from 'vite'
 
 // Games this project bundles. Each one gets its own HTML entry
 // (<name>.html) alongside the launcher (index.html).
-export const GAMES = ['trainingGame', 'chromeDinoGame']
+export const GAMES = ['trainingGame', 'chromeDinoGame', 'trainingGameControl']
 
 // The Vite --mode flag selects what `vite build`/`vite dev` targets:
 //   (default mode, 'development'/'production') -> everything (launcher + every

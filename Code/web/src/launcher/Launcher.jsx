@@ -4,6 +4,7 @@ import './launcher.css';
 // equivalent of the Electron app's launcher spawning a separate frontend.
 const GAMES = [
   { href: 'trainingGame.html', label: 'River Crossing' },
+  { href: 'trainingGameControl.html', label: 'River Crossing (Tap)' },
   { href: 'chromeDinoGame.html', label: 'Breath Runner' },
 ];
 

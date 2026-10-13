@@ -7,10 +7,12 @@
     "dev": "vite",
     "dev:trainingGame": "vite --open /trainingGame.html",
     "dev:chromeDinoGame": "vite --open /chromeDinoGame.html",
+    "dev:trainingGameControl": "vite --open /trainingGameControl.html",
     "build": "vite build",
     "build:launcher": "vite build --mode launcher",
     "build:trainingGame": "vite build --mode trainingGame",
     "build:chromeDinoGame": "vite build --mode chromeDinoGame",
+    "build:trainingGameControl": "vite build --mode trainingGameControl",
     "preview": "vite preview",
     "lint": "oxlint"
   },
