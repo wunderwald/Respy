@@ -231,6 +231,7 @@ export default class IBreath {
     this.#trialIndex = 0;
     this.#trialData = [];
     this.#currentDelayMs = CONFIG.MAX_DELAY_MS;
+    this.#hud.trialType = null;
     this.#updateDelayHud();
     this.#calibration = new RespCalibration({ durationSecs: CONFIG.CALIBRATION_SECS });
     this.#calibration.start();
@@ -357,6 +358,8 @@ export default class IBreath {
       : '';
     this.#hud.stateText = (trial.synchronous ? 'sync trial' : 'async trial') + flashNote;
     this.#hud.trialText = `${this.#trialIndex + 1} / ${this.#trials.length}`;
+    this.#hud.trialType = trial.synchronous ? 'sync' : 'async';
+    this.#updateDelayHud(trial);
   }
 
   #beginTrial() {
@@ -437,7 +440,7 @@ export default class IBreath {
         this.#currentDelayMs = Math.min(CONFIG.MAX_DELAY_MS, this.#currentDelayMs + CONFIG.DELAY_STEP_MS);
       }
       // 'timeout' leaves the current delay unchanged.
-      this.#updateDelayHud();
+      // (HUD shows the new value once the ITI starts — see #startITIorEnd.)
     }
 
     this.#markers.send(`response_${response}_t${trial.trialIndex}`);
@@ -446,14 +449,18 @@ export default class IBreath {
     this.#startITIorEnd(trial);
   }
 
-  // Keeps the experimenter HUD's "delay" readout in sync with the adaptive
-  // staircase, so the experimenter always sees the delay the next async
-  // trial will use.
-  #updateDelayHud() {
-    this.#hud.delayText = `${this.#currentDelayMs} ms`;
+  // The experimenter HUD's "delay" readout. With a trial: the delay actually
+  // applied to it (0 ms for sync), from its display phase through its
+  // response. Without: the staircase value the next async trial will use.
+  #updateDelayHud(trial = null) {
+    this.#hud.delayText = trial
+      ? `${trial.synchronous ? 0 : trial.delayMs} ms`
+      : `next async: ${this.#currentDelayMs} ms`;
   }
 
   #startITIorEnd(trial) {
+    this.#hud.trialType = null;
+    this.#updateDelayHud();
     if (this.#trialIndex >= this.#trials.length) {
       this.#endExperiment();
       return;

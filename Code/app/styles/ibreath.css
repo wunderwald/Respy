@@ -18,6 +18,19 @@
 #stats span { white-space: nowrap; }
 #stats .label { opacity: 0.6; margin-right: 4px; }
 
+/* Sync / async badge for the current trial (experimenter window) */
+#ib-trial-type {
+  min-width: 4.5em;
+  padding: 2px 10px;
+  border-radius: 99px;
+  text-align: center;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  opacity: 0.5;
+}
+#ib-trial-type[data-type="sync"]  { background: #3f9d6a; color: #fff; opacity: 1; }
+#ib-trial-type[data-type="async"] { background: #c9772f; color: #fff; opacity: 1; }
+
 /* Subject code inputs (iBreath + bioGame share same underline style) */
 #ib-subject,
 #bg-subject {

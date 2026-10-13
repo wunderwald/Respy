@@ -98,7 +98,7 @@ Async trials play back the participant's own real-time breath signal, delayed by
   - The value is always clamped to `[MIN_DELAY_MS, MAX_DELAY_MS]`.
   - **This requires a `sync` entry in the active question set with answers `['yes', 'no']`.** If a loaded preset's `questions` omit `sync` entirely, the delay has nothing to drive it and will sit at `MAX_DELAY_MS` all session — the experimenter HUD shows a warning next to the preset selector in that case.
 - The delay used for a given trial is fixed at the start of that trial and recorded in `trialData.csv` as `delayMs`.
-- The current value is shown live in the experimenter HUD's **delay** readout, updated whenever the staircase steps.
+- The experimenter HUD shows a coloured **SYNC** / **ASYNC** badge for the current trial (from its pre-trial display through its response), and the **delay** readout shows the delay applied to that trial — `0 ms` for sync trials. Between trials (ITI) the badge clears and the readout shows `next async: <N> ms`, the staircase value the next async trial will use.
 
 ---
 

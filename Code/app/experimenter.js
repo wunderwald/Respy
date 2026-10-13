@@ -91,6 +91,7 @@ if (frontend === 'ibreath') {
       <span class="label">trial</span>
       <span id="ib-trial">—</span>
     </span>
+    <span id="ib-trial-type">—</span>
     <span>
       <span class="label">delay</span>
       <span id="ib-delay">—</span>
@@ -151,6 +152,7 @@ if (frontend === 'ibreath') {
   const remainingEl        = document.getElementById('ib-remaining');     // in #timer-bar
   const trialEl            = document.getElementById('ib-trial');
   const delayEl            = document.getElementById('ib-delay');
+  const trialTypeEl        = document.getElementById('ib-trial-type');
   const subjectInput       = document.getElementById('ib-subject');
   const startBtn           = document.getElementById('ib-start-btn');
   const nextBtn            = document.getElementById('ib-next-btn');
@@ -191,7 +193,7 @@ if (frontend === 'ibreath') {
   let gazeActive      = false;
   let gazeCalibrating = false;
 
-  window.api.hud.onState(({ stateText, stateColor, trialText, delayText,
+  window.api.hud.onState(({ stateText, stateColor, trialText, delayText, trialType,
                              startEnabled, nextVisible, abortVisible, pauseVisible, playVisible, inputsLocked,
                              experimentStartedAt: esa, stateTimer: st, gazeActive: ga, gazeCalibrating: gc, calFailed,
                              eyelinkState }) => {
@@ -201,6 +203,10 @@ if (frontend === 'ibreath') {
     if (stateColor   !== undefined) stateEl.style.color        = stateColor;
     if (trialText    !== undefined) trialEl.textContent        = trialText;
     if (delayText    !== undefined) delayEl.textContent        = delayText;
+    if (trialType    !== undefined) {
+      trialTypeEl.textContent  = trialType ? trialType.toUpperCase() : '—';
+      trialTypeEl.dataset.type = trialType ?? '';
+    }
     if (startEnabled !== undefined) startBtn.disabled          = !startEnabled;
     if (nextVisible  !== undefined) {
       nextBtn.style.display     = nextVisible ? '' : 'none';

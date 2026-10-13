@@ -65,6 +65,7 @@ export class LocalHud {
   set stateColor(v)    { this.#stateEl.style.color = v ?? ''; }
   set trialText(v)     { this.#trialEl.textContent = v; }
   set delayText(v)     { this.#delayEl.textContent = v; }
+  set trialType(_v)    {}   // sync/async badge lives in the experimenter window only
   set startEnabled(v)  { this.#startBtn.disabled = !v; }
   set nextVisible(v)   { this.#nextBtn.style.display  = v ? '' : 'none'; }
   set abortVisible(v)  { this.#abortBtn.style.display = v ? '' : 'none'; }
