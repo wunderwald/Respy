@@ -7,8 +7,6 @@
     "start":               "electron .",
     "ibreath":             "electron . --frontend=ibreath",
     "visualizer":          "electron . --frontend=visualizer",
-    "trainingGame":        "electron . --frontend=trainingGame",
-    "chromeDinoGame": "electron . --frontend=chromeDinoGame",
     "bioGame":             "electron . --frontend=bioGame",
     "baseline":            "electron . --frontend=baseline",
     "beltTrainingGame":    "electron . --frontend=beltTrainingGame"
