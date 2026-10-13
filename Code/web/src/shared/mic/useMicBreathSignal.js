@@ -12,6 +12,12 @@
 //   mic.stop();                        // releases the mic + audio graph
 import { useRef, useCallback, useEffect } from 'react';
 import { RollingMean } from '../signal/RollingMean.js';
+// The `?url` suffix is Vite's explicit "give me this file's built, hashed
+// URL" convention — unlike `new URL('./x.js', import.meta.url)`, which Vite
+// only auto-detects for new Worker(...)/new SharedWorker(...) call sites,
+// this form is guaranteed to copy the file into the build output under any
+// usage (audioWorklet.addModule() included).
+import breathWorkletUrl from './breathEnvelopeProcessor.js?url';
 
 // Bandpass passband matches simulation/mic_breath.py (80-300Hz), implemented
 // as two cascaded native BiquadFilterNodes (2nd-order each) approximating
@@ -50,8 +56,7 @@ export function useMicBreathSignal() {
         },
       });
 
-      const workletUrl = new URL('./breathEnvelopeProcessor.js', import.meta.url);
-      await audioCtx.audioWorklet.addModule(workletUrl);
+      await audioCtx.audioWorklet.addModule(breathWorkletUrl);
 
       const source = audioCtx.createMediaStreamSource(stream);
       const bp1 = audioCtx.createBiquadFilter();
