@@ -7,7 +7,7 @@
   justify-content: center;
   gap: 24px;
   padding: 32px;
-  background: #ffffff;
+  background: #ffdce8;
   text-align: center;
   z-index: 10;
 }
@@ -15,15 +15,15 @@
 .calibration-title {
   font-size: clamp(22px, 4vw, 34px);
   font-weight: 300;
-  color: #1a1a1a;
+  color: #c43d73;
   margin: 0;
   max-width: 640px;
 }
 
 .calibration-sub {
   font-size: clamp(14px, 2.2vw, 18px);
-  font-weight: 200;
-  color: rgba(0, 0, 0, 0.55);
+  font-weight: 300;
+  color: rgba(196, 61, 115, 0.75);
   margin: 0;
   max-width: 560px;
 }
@@ -31,7 +31,7 @@
 .calibration-countdown {
   font-size: clamp(64px, 14vw, 120px);
   font-weight: 200;
-  color: #1a1a1a;
+  color: #c43d73;
   margin: 0;
 }
 
@@ -40,7 +40,7 @@
   height: 180px;
   border-radius: 28px;
   background: #ffeaf2;
-  border: 1px solid rgba(214, 51, 108, 0.18);
+  border: 1px solid rgba(214, 51, 108, 0.22);
   display: flex;
   align-items: flex-end;
   overflow: hidden;
@@ -60,11 +60,11 @@
 
 .calibration-btn {
   font-size: 18px;
-  font-weight: 300;
+  font-weight: 400;
   padding: 14px 28px;
   border-radius: 14px;
   border: none;
-  background: #ff6fa5;
+  background: #c43d73;
   color: #ffffff;
   cursor: pointer;
 }
