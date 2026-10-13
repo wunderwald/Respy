@@ -1,9 +1,11 @@
-import { CONFIG, STATE } from './trainingGame_config.js';
+import { VISUAL_CONFIG as CONFIG, STATE } from './riverCrossingVisuals.js';
 
-// ── TrainingGameRenderer — River Crossing ───────────────────────────────────
+// ── RiverCrossingRenderer ────────────────────────────────────────────────────
 // Bright pastel line-art rendering, sized for young kids: soft pink sky,
-// cheerful blue water, pastel green banks. Pure drawing, given state built
-// by trainingGame.js. Static camera — the boat moves across a fixed river.
+// cheerful blue water, pastel green banks. Pure drawing, given render data
+// built by the game class. Static camera — the boat moves across a fixed
+// river. Shared by every River Crossing variant (breath, tap, ...) — they
+// all look identical, only the input mechanic driving the boat differs.
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 
@@ -16,7 +18,7 @@ const COLORS = {
   bank:     '#c8f2c4',
 };
 
-export class TrainingGameRenderer {
+export class RiverCrossingRenderer {
   #canvas;
   #ctx;
 
@@ -34,10 +36,10 @@ export class TrainingGameRenderer {
     this.#canvas = container.querySelector('#game-canvas');
     this.#ctx = this.#canvas.getContext('2d');
 
-    this.#rightSheepScatter = TrainingGameRenderer.#makeScatter(CONFIG.SHEEP_COUNT_RIGHT);
-    this.#leftSheepScatter  = TrainingGameRenderer.#makeScatter(CONFIG.SHEEP_MAX_SHOWN_LEFT);
-    this.#leftTrees  = TrainingGameRenderer.#makeTrees(CONFIG.TREE_COUNT_PER_BANK);
-    this.#rightTrees = TrainingGameRenderer.#makeTrees(CONFIG.TREE_COUNT_PER_BANK);
+    this.#rightSheepScatter = RiverCrossingRenderer.#makeScatter(CONFIG.SHEEP_COUNT_RIGHT);
+    this.#leftSheepScatter  = RiverCrossingRenderer.#makeScatter(CONFIG.SHEEP_MAX_SHOWN_LEFT);
+    this.#leftTrees  = RiverCrossingRenderer.#makeTrees(CONFIG.TREE_COUNT_PER_BANK);
+    this.#rightTrees = RiverCrossingRenderer.#makeTrees(CONFIG.TREE_COUNT_PER_BANK);
   }
 
   static #makeScatter(count) {
@@ -283,7 +285,7 @@ export class TrainingGameRenderer {
     ctx.lineTo(-4, -46);
     ctx.stroke();
 
-    // sail — flat/limp when not blowing, billowed when blowing
+    // sail — flat/limp when not pushing, billowed when pushing
     const bulge = lerp(2, 20, sailAnim);
     ctx.beginPath();
     ctx.moveTo(-4, -44);
@@ -379,4 +381,4 @@ export class TrainingGameRenderer {
   }
 }
 
-export default TrainingGameRenderer;
+export default RiverCrossingRenderer;

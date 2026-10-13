@@ -1,3 +1,7 @@
+// Game-logic-only config — shared visuals (river/bank layout, sheep, boat
+// size, trees) live in shared/riverCrossing/riverCrossingVisuals.js.
+export { STATE } from '../shared/riverCrossing/riverCrossingVisuals.js';
+
 export const CONFIG = {
   // ── Timing ──────────────────────────────────────────────────────────────────
   TARGET_BPM: 10,            // sets the boat's forward speed via half the breath period (10bpm = 6s cycle = 3s exhale)
@@ -21,30 +25,7 @@ export const CONFIG = {
   BOAT_ACCEL_TAU_SECS: 0.15,
   BOAT_COAST_TAU_SECS: 0.9,
 
-  // ── Layout ──────────────────────────────────────────────────────────────────
-  RIVER_TOP_RATIO:        0.52,
-  RIVER_BOTTOM_RATIO:     0.80,
-  RIVER_LEFT_BANK_RATIO:  0.16,
-  RIVER_RIGHT_BANK_RATIO: 0.16,
-
-  // ── Sheep ───────────────────────────────────────────────────────────────────
-  SHEEP_COUNT_RIGHT:    4,   // always-available flock on the right bank
-  SHEEP_MAX_SHOWN_LEFT: 24,  // cap on delivered-sheep icons drawn on the left bank
-  SHEEP_SCALE: 1.7,
-
-  // ── Boat / sailor size ──────────────────────────────────────────────────────
-  BOAT_SCALE: 2.8,
-
   // ── Background ──────────────────────────────────────────────────────────────
   CLOUD_COUNT: 5,
   CLOUD_SPEED_PX_S: 16,
-  WAVE_SPEED: 1.8,           // phase rate for the traveling river-wave pattern
-  TREE_COUNT_PER_BANK: 9,    // scattered along each bank's treeline, varied sizes
-};
-
-export const STATE = {
-  IDLE:      'idle',
-  COUNTDOWN: 'countdown',
-  PLAYING:   'playing',
-  GAME_OVER: 'game_over',
 };

@@ -1,6 +1,6 @@
 import { GaussianSmoother }     from '../shared/signal/GaussianSmoother.js';
 import { CONFIG, STATE }        from './trainingGame_config.js';
-import { TrainingGameRenderer } from './trainingGame_renderer.js';
+import { RiverCrossingRenderer } from '../shared/riverCrossing/RiverCrossingRenderer.js';
 
 // ── TrainingGame — River Crossing ───────────────────────────────────────────
 // A ship ferries sheep from the right bank to the left bank against a river
@@ -50,7 +50,7 @@ export class TrainingGame {
   #renderer;
 
   constructor({ sceneContainer, onStateChange }) {
-    this.#renderer = new TrainingGameRenderer(sceneContainer);
+    this.#renderer = new RiverCrossingRenderer(sceneContainer);
     this.#onStateChange = onStateChange;
     this.#initClouds();
 
