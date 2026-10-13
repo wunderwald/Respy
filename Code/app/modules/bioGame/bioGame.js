@@ -232,11 +232,11 @@ export default class BioGame {
     const result = this.#calibration.finish();
 
     if (!result) {
-      console.warn('[BioGame] calibration produced no samples');
+      console.warn('[BioGame] calibration produced no usable range (no samples, or flat signal)');
       this.#markers.send('calibration_failed');
       this.#calFailed = true;
       this.#pushState({
-        stateText: '⚠ calibration failed — no signal received',
+        stateText: '⚠ calibration failed — no signal or flat signal',
         calFailed: true,
       });
       return;

@@ -26,7 +26,7 @@ Two windows open:
 | **Natural BPM** | Only visible in the natural condition. Sets the target curve frequency. |
 | **Show target curve** | Overlays the sinusoidal target curve on screen (for debugging / operator monitoring). |
 | **Cal secs** | How many seconds to calibrate the breath signal (default 10 s). Calibration captures the participant's breathing range. |
-| **Retry calibration** | Appears only if calibration fails (no signal received). Restarts the calibration recording. |
+| **Retry calibration** | Appears only if calibration fails (no signal received, or the signal was flat). Restarts the calibration recording. |
 | **Use default calibration** | Appears only if calibration fails. Skips to the ready state using `CONFIG.DEFAULT_CAL_RANGE` instead of a measured range. |
 | **Data dir** | Folder where CSV files are saved. Click **…** to pick a different folder. Default: `bioGameData/` inside the app folder. |
 | **Score** | Live count of starfish collected in the current game. |

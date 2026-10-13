@@ -24,7 +24,7 @@ Two windows open:
 |---|---|
 | **Subject** | Subject code written to the CSV filename. Locked once calibration begins. |
 | **Cal secs** | Calibration recording duration (default 10 s). |
-| **Retry calibration** | Appears only if calibration fails (no signal received). Restarts the calibration recording. |
+| **Retry calibration** | Appears only if calibration fails (no signal received, or the signal was flat). Restarts the calibration recording. |
 | **Use default calibration** | Appears only if calibration fails. Skips ahead using `CONFIG.DEFAULT_CAL_RANGE` instead of a measured range. |
 | **Data dir** | Folder for CSV output. Default: `iBreathData/` inside the app folder. |
 | **Signal type** | *Physiological* (default) or *Peaks only* — see [Input signal types](#input-signal-types) below. Locked immediately if a loaded preset defines it, otherwise locked once calibration begins. |

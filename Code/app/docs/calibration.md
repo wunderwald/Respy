@@ -12,15 +12,23 @@ One module:
 
 ### RespCalibration
 
-Records samples for a fixed duration, then derives a `[min, max]` range (scaled
-by `gain`) used to normalize live incoming signal values. Used by
+Records samples for a fixed duration, then derives a `[min, max]` range used to
+normalize live incoming signal values. The range comes from **percentiles** of
+the recording (5th / 95th by default), not its absolute min/max, so a single
+artefact (cough, swallow, movement) doesn't stretch it. It works on the
+signal's native scale — the input does **not** need to be in `[0, 1]`. Used by
 [bioGame](bioGame.md) and [iBreath](ibreath.md) to turn a raw calibration
 recording into a scaling range for the rest of the session.
 
 ```js
 import { RespCalibration } from './modules/calibration/calibration.js';
 
-const cal = new RespCalibration({ durationSecs: 10, gain: 0.8 });  // gain defaults to 0.8
+const cal = new RespCalibration({
+  durationSecs: 10,
+  lowerPercentile: 5,    // default 5
+  upperPercentile: 95,   // default 95
+  gain: 1,               // default 1 (range width unchanged)
+});
 cal.start();
 
 // push a sample each time one arrives during the calibration phase
@@ -30,7 +38,8 @@ cal.push(sample);
 if (cal.isDone) {
   const result = cal.finish();   // { min, max, sampleCount } | null
   if (!result) {
-    // no samples recorded (e.g. stream hiccup) — caller decides what to do next
+    // no samples recorded (e.g. stream hiccup), or a flat signal with no usable
+    // range — caller decides what to do next
   } else {
     const [min, max] = [result.min, result.max];
   }
@@ -47,10 +56,9 @@ experimenter as a **Retry calibration** / **Use default calibration** choice
 in the HUD, falling back to each frontend's `CONFIG.DEFAULT_CAL_RANGE` when
 "use default" is chosen.
 
-`gain` narrows (or widens) the calibrated range around its recorded values —
-narrowing (the default, `0.8`) increases sensitivity over the calibrated
-range, useful since participants often breathe more shallowly during a short
-calibration than during the task itself.
+`gain` scales the width of the percentile range **around its centre**: `< 1`
+narrows it (more sensitive, saturates sooner), `> 1` widens it (headroom for
+deeper breaths than during calibration). The default `1` leaves it unchanged.
 
 `RespCalibration` only records samples and computes the range — it does not
 smooth the signal (use [`GaussianSmoother`](signal.md) beforehand if needed)

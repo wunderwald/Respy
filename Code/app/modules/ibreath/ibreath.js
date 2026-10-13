@@ -254,10 +254,10 @@ export default class IBreath {
 
     const result = this.#calibration.finish();
     if (!result) {
-      console.warn('[IBreath] calibration produced no samples');
+      console.warn('[IBreath] calibration produced no usable range (no samples, or flat signal)');
       this.#markers.send('calibration_failed');
       this.#calFailed = true;
-      this.#hud.stateText = '⚠ calibration failed — no signal received';
+      this.#hud.stateText = '⚠ calibration failed — no signal or flat signal';
       this.#hud.calFailed = true;
       return;
     }
