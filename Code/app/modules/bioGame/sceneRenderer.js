@@ -72,8 +72,8 @@ export class SceneRenderer {
   }
 
   #buildBgTex() {
-    const tw  = CONFIG.BG_TEX_WIDTH;
-    const th  = CONFIG.BG_TEX_HEIGHT;
+    const tw  = BG_TEX_WIDTH;
+    const th  = BG_TEX_HEIGHT;
     const c   = document.createElement('canvas');
     c.width   = tw;
     c.height  = th;
