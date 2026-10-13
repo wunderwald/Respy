@@ -5,7 +5,7 @@
  *
  * ── Switching frontends ───────────────────────────────────────────────────
  * Change the FRONTEND constant below to swap the active frontend.
- * Valid values: 'visualizer' | 'trainingGame' | 'trainingGameControl' | 'ibreath' | 'bioGame' | 'baseline' | 'baselineGame'
+ * Valid values: 'visualizer' | 'trainingGame' | 'trainingGameControl' | 'ibreath' | 'bioGame' | 'baseline' | 'beltTrainingGame'
  *
  * Every frontend module must implement this interface:
  *   pushSample(value: number) → void
@@ -66,7 +66,7 @@ async function init() {
     ibreath:    './modules/ibreath/ibreath.js',
 bioGame:    './modules/bioGame/bioGame.js',
     baseline:   './modules/baseline/baseline.js',
-    baselineGame: './modules/baselineGame/baselineGame.js',
+    beltTrainingGame: './modules/beltTrainingGame/beltTrainingGame.js',
   };
   const { default: FrontendClass } = await import(FRONTEND_PATHS[FRONTEND]);
 

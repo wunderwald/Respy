@@ -11,7 +11,7 @@
     "trainingGameControl": "electron . --frontend=trainingGameControl",
     "bioGame":             "electron . --frontend=bioGame",
     "baseline":            "electron . --frontend=baseline",
-    "baselineGame":        "electron . --frontend=baselineGame"
+    "beltTrainingGame":    "electron . --frontend=beltTrainingGame"
   },
   "devDependencies": {
     "electron": "^42.4.0"

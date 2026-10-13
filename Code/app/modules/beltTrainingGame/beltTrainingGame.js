@@ -1,6 +1,6 @@
 /**
- * baselineGame.js — Baseline Game
- * ================================
+ * beltTrainingGame.js — Belt Training Game
+ * ==========================================
  * Placeholder frontend — scaffolding only, no game design yet. Implements
  * the standard frontend interface and a minimal IDLE -> PLAYING -> DONE
  * state machine (Start / Abort) so it's launchable and wired into the app;
@@ -10,9 +10,9 @@
  */
 
 import { MarkerStream } from '../stream/markerStream.js';
-import { CONFIG, STATE } from './baselineGame_config.js';
+import { CONFIG, STATE } from './beltTrainingGame_config.js';
 
-export default class BaselineGame {
+export default class BeltTrainingGame {
   #state       = STATE.IDLE;
   #streamReady = false;
   #startTime   = null;
@@ -22,8 +22,8 @@ export default class BaselineGame {
   #markers = null;
 
   constructor({ sceneContainer }) {
-    sceneContainer.innerHTML = '<canvas id="bgg-canvas"></canvas>';
-    this.#canvas = sceneContainer.querySelector('#bgg-canvas');
+    sceneContainer.innerHTML = '<canvas id="btg-canvas"></canvas>';
+    this.#canvas = sceneContainer.querySelector('#btg-canvas');
     this.#ctx    = this.#canvas.getContext('2d');
 
     this.#markers = CONFIG.SEND_MARKERS
@@ -71,7 +71,7 @@ export default class BaselineGame {
   #begin() {
     this.#startTime = performance.now();
     this.#state     = STATE.PLAYING;
-    this.#markers.send('baselineGame_start');
+    this.#markers.send('beltTrainingGame_start');
     this.#pushState({
       stateText:    'playing',
       startEnabled: false,
@@ -81,14 +81,14 @@ export default class BaselineGame {
 
   #finish(aborted = false) {
     this.#state = STATE.DONE;
-    this.#markers.send(aborted ? 'baselineGame_abort' : 'baselineGame_end');
+    this.#markers.send(aborted ? 'beltTrainingGame_abort' : 'beltTrainingGame_end');
     this.#pushState({ stateText: aborted ? 'aborted' : 'done', abortVisible: false });
   }
 
   // ── Render loop ───────────────────────────────────────────────────────────
 
   #rafLoop(now) {
-    try { this.#draw(now); } catch (e) { console.error('[BaselineGame] draw error:', e); }
+    try { this.#draw(now); } catch (e) { console.error('[BeltTrainingGame] draw error:', e); }
     requestAnimationFrame((t) => this.#rafLoop(t));
   }
 
@@ -107,7 +107,7 @@ export default class BaselineGame {
     ctx.fillStyle    = 'rgba(255,255,255,0.3)';
 
     if (this.#state === STATE.IDLE) {
-      ctx.fillText('Baseline Game — coming soon', w / 2, h / 2);
+      ctx.fillText('Belt Training Game — coming soon', w / 2, h / 2);
     } else if (this.#state === STATE.PLAYING) {
       const elapsed = ((now - this.#startTime) / 1000).toFixed(0);
       ctx.fillText(`Playing… ${elapsed}s`, w / 2, h / 2);
