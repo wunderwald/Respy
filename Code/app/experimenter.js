@@ -229,8 +229,8 @@ if (frontend === 'ibreath') {
     if (inputsLocked !== undefined) {
       subjectInput.disabled       = inputsLocked;
       if (inputsLocked) {
-        respStream.disable();
-        gazeStream?.disable();
+        // Stream selection stays live even once everything else locks, so the
+        // experimenter can recover from a dropped stream mid-session.
         for (const el of settingsBar.querySelectorAll('input, button, select')) {
           el.disabled = true;
         }
@@ -584,7 +584,8 @@ if (frontend === 'ibreath') {
       bgGroupEl.disabled   = true;
       bgSceneEl.disabled   = true;
       bgNatBpmEl.disabled  = true;
-      respStream.disable();
+      // Stream selection stays live even once everything else locks, so the
+      // experimenter can recover from a dropped stream mid-session.
       for (const el of settingsBar.querySelectorAll('input, button, select')) {
         el.disabled = true;
       }
@@ -683,7 +684,8 @@ if (frontend === 'ibreath') {
     }
     if (inputsLocked) {
       blSubjectEl.disabled = true;
-      respStream.disable();
+      // Stream selection stays live even once everything else locks, so the
+      // experimenter can recover from a dropped stream mid-session.
     }
   });
 

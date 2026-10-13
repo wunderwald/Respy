@@ -41,10 +41,6 @@ export class StreamManager {
     return this;
   }
 
-  disable() {
-    if (this.#selectEl) this.#selectEl.disabled = true;
-  }
-
   // UI
 
   #buildUI(container, label) {

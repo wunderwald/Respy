@@ -23,13 +23,16 @@ sm.on('status', ({ type, text, stream }) => {
   // type: 'connected' | 'disconnected' | 'searching'
 });
 sm.on('streams', (streams) => { /* full list whenever it changes */ });
-
-sm.disable();  // lock the dropdown (call after calibration starts)
 ```
 
 **Auto-selection**: if `filter` is set and no stream has been manually chosen, `StreamManager` automatically selects the first stream whose name contains the filter string (excluding marker streams). It will not override a user's explicit "— none —" selection.
 
-**Reconnection**: the WebSocket reconnects automatically after a 3-second delay if the connection drops.
+**The stream-selection dropdown is never locked**, even once an experiment session is underway and every other control is disabled — there's no `disable()` method, and no frontend calls one. This is deliberate: if the input stream drops mid-session, the experimenter must always be able to reselect or recheck it without the session blocking that.
+
+**Reconnection**: the WebSocket reconnects automatically after a 3-second delay if the connection drops. Recovering the *same* selected stream by name is handled on the bridge side, not by resending `select_stream` on reconnect — the bridge keeps `selected_stream_name` as process-level state, independent of any one client connection, so:
+- If the **LSL stream itself** drops (sensor unplugged, source app closed, …), the bridge's `read_one_stream` loop keeps retrying `resolve_byprop` for that same name indefinitely and reconnects automatically the moment it reappears — no client involvement needed.
+- If the **WebSocket connection** between Electron and the bridge drops and `StreamManager` reconnects, the bridge's `ws_handler` immediately replies with the current status (`connected`/`searching`/`disconnected`) derived from its still-intact `selected_stream_name` — so the previously-selected stream carries over automatically, with no explicit reselection step required.
+- The only case that doesn't recover automatically is the **bridge process itself** dying and restarting (not just a dropped connection) — that resets its in-memory selection, and the experimenter needs to reselect from the dropdown once it's back.
 
 ---
 
