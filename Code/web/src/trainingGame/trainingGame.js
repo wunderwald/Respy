@@ -31,6 +31,7 @@ export class TrainingGame {
 
   // boat
   #boatPos = 0;   // 0 = docked right, 1 = docked left
+  #boatVel = 0;   // current eased velocity (pos/sec) — see #tickBoat's momentum
   #hasSheep = true;
   #sailAnim = 0;  // 0..1, eased toward #blowing for smooth sail motion
   #forwardSpeed;  // pos/sec while blowing
@@ -86,6 +87,7 @@ export class TrainingGame {
     this.#state = STATE.PLAYING;
     this.#score = 0;
     this.#boatPos = 0;
+    this.#boatVel = 0;
     this.#hasSheep = true;
     this.#blowing = false;
     this.#sailAnim = 0;
@@ -148,11 +150,18 @@ export class TrainingGame {
       if (v >= CONFIG.BLOW_THRESHOLD) this.#blowing = true;
     }
 
-    if (this.#blowing) {
-      this.#boatPos = Math.min(1, this.#boatPos + this.#forwardSpeed * dt);
-    } else {
-      this.#boatPos = Math.max(0, this.#boatPos - this.#currentSpeed * dt);
-    }
+    // Momentum: velocity eases toward its target rather than snapping
+    // instantly, so a brief dip below threshold (a micro-pause, mic noise)
+    // doesn't immediately reverse the boat — it coasts forward for a moment
+    // first. Ramping up when blowing starts stays snappy (small tau);
+    // decaying away when it stops is deliberately slow (large tau) — that's
+    // the "a little more momentum" forgiveness.
+    const targetVel = this.#blowing ? this.#forwardSpeed : -this.#currentSpeed;
+    const tau = this.#blowing ? CONFIG.BOAT_ACCEL_TAU_SECS : CONFIG.BOAT_COAST_TAU_SECS;
+    const alpha = 1 - Math.exp(-dt / tau);
+    this.#boatVel += (targetVel - this.#boatVel) * alpha;
+
+    this.#boatPos = Math.max(0, Math.min(1, this.#boatPos + this.#boatVel * dt));
 
     if (this.#boatPos >= 1 && this.#hasSheep) {
       this.#hasSheep = false;
