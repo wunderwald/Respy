@@ -4,6 +4,8 @@ Electron app for real-time respiration biofeedback experiments.
 
 Receives a normalized breath signal `[0, 1]` over WebSocket from `lsl_ws_bridge/` and renders one of several experiment frontends.
 
+The tablet-deployed breath-training games (river crossing, breath runner) have moved to [`../web`](../web) — a standalone browser/React project using the microphone directly, with no lab stream infrastructure. This app is for the lab frontends only (iBreath, BioGame, baseline, belt training game).
+
 ## Setup
 
 ```bash
@@ -24,8 +26,6 @@ npm run bioGame           # biofeedback breath game
 npm run baseline          # resting-state baseline (video)
 npm run beltTrainingGame  # belt training game
 npm run visualizer        # real-time waveform
-npm run trainingGame         # breath training game (not in the start screen)
-npm run chromeDinoGame       # breath-controlled dino-style runner (not in the start screen)
 ```
 
 ---
@@ -36,8 +36,6 @@ npm run chromeDinoGame       # breath-controlled dino-style runner (not in the s
 |---|---|---|
 | iBreath / iBeat | Interoception experiment | [docs/ibreath.md](docs/ibreath.md) |
 | bioGame | Biofeedback game | [docs/bioGame.md](docs/bioGame.md) |
-| trainingGame | Slow breathing training game (not in the start screen) | [docs/trainingGame.md](docs/trainingGame.md) |
-| chromeDinoGame | Breath-controlled dino-style runner (not in the start screen) | [docs/chromeDinoGame.md](docs/chromeDinoGame.md) |
 | baseline | Resting-state recording (video) | [docs/baseline.md](docs/baseline.md) |
 | beltTrainingGame | Belt training game — teaches breath control before BioGame | [docs/beltTrainingGame.md](docs/beltTrainingGame.md) |
 | visualizer | Live signal waveform viewer | [docs/visualizer.md](docs/visualizer.md) |
