@@ -1,9 +1,21 @@
 import { STATE } from './chromeDinoGame_config.js';
 
 // ── ChromeDinoGameRenderer ─────────────────────────────────────────────
-// Minimal 2D canvas renderer: dark scrolling world, parallax clouds, a
-// stick-figure character, and white box obstacles. Pure rendering — all
-// game state/physics live in chromeDinoGame.js.
+// Minimal 2D canvas renderer: light daytime-sky scrolling world, parallax
+// clouds, a stick-figure character, and dark box obstacles. Pure rendering —
+// all game state/physics live in chromeDinoGame.js.
+
+const COLORS = {
+  skyTop:    '#eaf6ff',
+  skyBottom: '#cdeaff',
+  ground:    'rgba(40,52,66,0.35)',
+  obstacle:  '#37474f',
+  character: '#2b3640',
+  cloud:     '#ffffff',
+  ink:       'rgba(30,40,50,0.90)',
+  inkSoft:   'rgba(30,40,50,0.55)',
+  inkFaint:  'rgba(30,40,50,0.42)',
+};
 
 export class ChromeDinoGameRenderer {
   #canvas;
@@ -42,8 +54,8 @@ export class ChromeDinoGameRenderer {
 
   #drawBackground(ctx, w, h) {
     const g = ctx.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, '#1a1a1e');
-    g.addColorStop(1, '#3a3a40');
+    g.addColorStop(0, COLORS.skyTop);
+    g.addColorStop(1, COLORS.skyBottom);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
   }
@@ -52,7 +64,7 @@ export class ChromeDinoGameRenderer {
     if (!clouds) return;
     for (const c of clouds) {
       ctx.globalAlpha = c.alpha;
-      ctx.fillStyle = '#c9c9d0';
+      ctx.fillStyle = COLORS.cloud;
       ctx.beginPath();
       ctx.ellipse(c.x, c.y, c.size, c.size * 0.55, 0, 0, Math.PI * 2);
       ctx.fill();
@@ -64,7 +76,7 @@ export class ChromeDinoGameRenderer {
   }
 
   #drawGround(ctx, w, groundY) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.strokeStyle = COLORS.ground;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(0, groundY);
@@ -74,7 +86,7 @@ export class ChromeDinoGameRenderer {
 
   #drawObstacles(ctx, obstacles, groundY) {
     if (!obstacles) return;
-    ctx.fillStyle = '#f2f2f2';
+    ctx.fillStyle = COLORS.obstacle;
     for (const o of obstacles) {
       ctx.fillRect(o.x, groundY - o.height, o.width, o.height);
     }
@@ -87,7 +99,7 @@ export class ChromeDinoGameRenderer {
     const headCy = bottomY - height + headR;
     const hipY = bottomY - height * 0.42;
 
-    ctx.strokeStyle = '#eaeaea';
+    ctx.strokeStyle = COLORS.character;
     ctx.lineWidth = 3;
     ctx.lineCap = 'round';
 
@@ -129,7 +141,7 @@ export class ChromeDinoGameRenderer {
   }
 
   #drawIdle(ctx, w, h) {
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillStyle = COLORS.inkSoft;
     ctx.font = '300 20px Nunito, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -145,9 +157,9 @@ export class ChromeDinoGameRenderer {
     else                     label = 'GO!';
 
     ctx.save();
-    ctx.shadowColor  = 'rgba(0,0,0,0.4)';
-    ctx.shadowBlur   = 16;
-    ctx.fillStyle    = label === 'GO!' ? 'rgba(255,220,80,0.95)' : 'rgba(255,255,255,0.92)';
+    ctx.shadowColor  = 'rgba(0,0,0,0.12)';
+    ctx.shadowBlur   = 12;
+    ctx.fillStyle    = label === 'GO!' ? '#2e9e62' : COLORS.ink;
     ctx.font         = '300 80px Nunito, sans-serif';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
@@ -158,20 +170,18 @@ export class ChromeDinoGameRenderer {
   #drawGameOver(ctx, w, h, score, highScore) {
     const cx = w / 2, cy = h / 2 - 60;
     ctx.save();
-    ctx.shadowColor  = 'rgba(0,0,0,0.25)';
-    ctx.shadowBlur   = 8;
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
 
-    ctx.fillStyle = 'rgba(255,255,255,0.90)';
+    ctx.fillStyle = COLORS.ink;
     ctx.font      = '300 42px Nunito, sans-serif';
     ctx.fillText(`Score: ${score}`, cx, cy - 10);
 
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.fillStyle = COLORS.inkSoft;
     ctx.font      = '300 22px Nunito, sans-serif';
     ctx.fillText(`Best score: ${highScore}`, cx, cy + 36);
 
-    ctx.fillStyle = 'rgba(255,255,255,0.42)';
+    ctx.fillStyle = COLORS.inkFaint;
     ctx.font      = '200 14px Nunito, sans-serif';
     ctx.fillText('Tap to play again', cx, cy + 78);
     ctx.restore();
@@ -179,22 +189,20 @@ export class ChromeDinoGameRenderer {
 
   #drawCounters(ctx, w, score, highScore) {
     ctx.save();
-    ctx.shadowColor  = 'rgba(0,0,0,0.35)';
-    ctx.shadowBlur   = 10;
     ctx.textAlign    = 'right';
 
     ctx.textBaseline = 'top';
-    ctx.fillStyle    = 'rgba(255,255,255,0.45)';
+    ctx.fillStyle    = COLORS.inkFaint;
     ctx.font         = '200 13px Nunito, sans-serif';
     ctx.fillText('best', w - 24, 14);
-    ctx.fillStyle    = 'rgba(255,255,255,0.65)';
+    ctx.fillStyle    = COLORS.inkSoft;
     ctx.font         = '300 26px Nunito, sans-serif';
     ctx.fillText(highScore, w - 24, 30);
 
-    ctx.fillStyle    = 'rgba(255,255,255,0.45)';
+    ctx.fillStyle    = COLORS.inkFaint;
     ctx.font         = '200 13px Nunito, sans-serif';
     ctx.fillText('score', w - 24, 70);
-    ctx.fillStyle    = 'rgba(255,255,255,0.88)';
+    ctx.fillStyle    = COLORS.ink;
     ctx.font         = '300 40px Nunito, sans-serif';
     ctx.fillText(score, w - 24, 86);
     ctx.restore();

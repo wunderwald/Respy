@@ -6,6 +6,13 @@ import { ExhaleOnsetDetector }    from '../shared/signal/exhaleOnsetDetector.js'
 // experimenter-window IPC (pushState/onAction/setStatus) replaced by a plain
 // start() method and an onStateChange(state) callback the host page uses to
 // know when tapping the screen should (re)start the game.
+//
+// Difficulty ramps smoothly over the first DIFFICULTY_RAMP_SECS of each run
+// (scroll speed and obstacle spacing both ease from the easy START values up
+// to the base CONFIG values) rather than starting at full difficulty.
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
 
 export class ChromeDinoGame {
   // state
@@ -15,6 +22,9 @@ export class ChromeDinoGame {
 
   // countdown
   #countdownStart = null;
+
+  // difficulty ramp
+  #playStartTime = null;
 
   // breath
   #detector = new ExhaleOnsetDetector({
@@ -87,8 +97,21 @@ export class ChromeDinoGame {
       debounceMs: CONFIG.EXHALE_DEBOUNCE_MS,
     });
 
+    this.#playStartTime = performance.now();
     this.#nextObstacleAt = performance.now() + CONFIG.FIRST_OBSTACLE_DELAY_MS;
     this.#onStateChange?.(this.#state);
+  }
+
+  // ── Difficulty ramp ────────────────────────────────────────────────────────
+  // 0 at the start of a run, 1 once DIFFICULTY_RAMP_SECS has elapsed.
+
+  #difficultyT(now) {
+    if (this.#playStartTime == null) return 0;
+    return clamp((now - this.#playStartTime) / 1000 / CONFIG.DIFFICULTY_RAMP_SECS, 0, 1);
+  }
+
+  #currentScrollSpeed(now) {
+    return lerp(CONFIG.SCROLL_SPEED_START_PX_S, CONFIG.SCROLL_SPEED_PX_S, this.#difficultyT(now));
   }
 
   #endGame() {
@@ -156,7 +179,7 @@ export class ChromeDinoGame {
   // ── Obstacles ────────────────────────────────────────────────────────────
 
   #tickObstacles(dt, now) {
-    const dx = CONFIG.SCROLL_SPEED_PX_S * dt / 1000;
+    const dx = this.#currentScrollSpeed(now) * dt / 1000;
     const groundY = this.#groundY();
     const charLeft  = this.#charX();
     const charRight = charLeft + CONFIG.CHAR_WIDTH;
@@ -188,8 +211,10 @@ export class ChromeDinoGame {
 
     if (now >= this.#nextObstacleAt) {
       this.#spawnObstacle();
-      this.#nextObstacleAt = now + CONFIG.MIN_OBSTACLE_INTERVAL_MS +
-        Math.random() * (CONFIG.MAX_OBSTACLE_INTERVAL_MS - CONFIG.MIN_OBSTACLE_INTERVAL_MS);
+      const t = this.#difficultyT(now);
+      const minGap = lerp(CONFIG.MIN_OBSTACLE_INTERVAL_START_MS, CONFIG.MIN_OBSTACLE_INTERVAL_MS, t);
+      const maxGap = lerp(CONFIG.MAX_OBSTACLE_INTERVAL_START_MS, CONFIG.MAX_OBSTACLE_INTERVAL_MS, t);
+      this.#nextObstacleAt = now + minGap + Math.random() * (maxGap - minGap);
     }
   }
 
@@ -219,7 +244,7 @@ export class ChromeDinoGame {
       y: h * (0.1 + Math.random() * 0.35),
       size,
       speed: CONFIG.SCROLL_SPEED_PX_S * CONFIG.CLOUD_SPEED_RATIO * (0.7 + Math.random() * 0.6),
-      alpha: 0.08 + Math.random() * 0.1,
+      alpha: 0.55 + Math.random() * 0.3, // light-mode sky — clouds need to read as solid white, not a faint tint
     };
   }
 
