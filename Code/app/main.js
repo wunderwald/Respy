@@ -354,7 +354,10 @@ app.whenReady().then(() => {
   setupPermissions();
   startBridge();
 
-  const frontend = process.env.FRONTEND;
+  // `--frontend=<name>` (used by the npm scripts — works on every platform),
+  // or the FRONTEND env var as a fallback.
+  const frontendArg = process.argv.find((a) => a.startsWith("--frontend="));
+  const frontend = frontendArg?.slice("--frontend=".length) || process.env.FRONTEND;
   if (frontend) {
     // Direct launch via `npm run ibreath` etc. — skip the launcher.
     // Brief delay so the bridge socket is ready before the renderer connects.

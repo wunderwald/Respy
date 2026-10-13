@@ -59,5 +59,5 @@ setStatus({ type, text }) // called on stream connection changes
 
 2. Create `styles/<name>.css`.
 3. Add the path to `FRONTEND_PATHS` in `renderer.js`.
-4. Add a script entry to `package.json`: `"<name>": "FRONTEND=<name> electron ."`.
+4. Add a script entry to `package.json`: `"<name>": "electron . --frontend=<name>"` (a CLI flag rather than a `FRONTEND=<name>` env prefix, which `cmd.exe` doesn't understand on Windows).
 5. If it should appear in the start screen, add a button to `launcher.html`. Otherwise it's still reachable via its direct-launch script.
