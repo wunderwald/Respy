@@ -23,6 +23,7 @@ export const VISUAL_CONFIG = {
   // ── Scenery ─────────────────────────────────────────────────────────────
   WAVE_SPEED: 2.6,           // phase rate for the traveling river-wave pattern (a bit faster = stronger-looking current)
   TREE_COUNT_PER_BANK: 9,    // scattered along each bank's treeline, varied sizes
+  FISH_COUNT: 6,             // small decorative fish swimming back and forth in the water
 };
 
 export const STATE = {

@@ -18,6 +18,8 @@ const COLORS = {
   bank:     '#c8f2c4',
 };
 
+const FISH_COLORS = ['#f48fb1', '#ce93d8', '#f06292', '#ba68c8'];
+
 export class RiverCrossingRenderer {
   #canvas;
   #ctx;
@@ -30,6 +32,7 @@ export class RiverCrossingRenderer {
   #leftSheepScatter;
   #leftTrees;
   #rightTrees;
+  #fish;
 
   constructor(container) {
     container.innerHTML = '<canvas id="game-canvas"></canvas>';
@@ -40,6 +43,7 @@ export class RiverCrossingRenderer {
     this.#leftSheepScatter  = RiverCrossingRenderer.#makeScatter(CONFIG.SHEEP_MAX_SHOWN_LEFT);
     this.#leftTrees  = RiverCrossingRenderer.#makeTrees(CONFIG.TREE_COUNT_PER_BANK);
     this.#rightTrees = RiverCrossingRenderer.#makeTrees(CONFIG.TREE_COUNT_PER_BANK);
+    this.#fish = RiverCrossingRenderer.#makeFish(CONFIG.FISH_COUNT);
   }
 
   static #makeScatter(count) {
@@ -54,6 +58,17 @@ export class RiverCrossingRenderer {
     }));
   }
 
+  static #makeFish(count) {
+    return Array.from({ length: count }, () => ({
+      laneT:    Math.random(),                        // vertical position within the water
+      startT:   Math.random(),                         // phase offset so fish don't move in sync
+      speed:    0.012 + Math.random() * 0.01,           // fraction of water width per second
+      bobPhase: Math.random() * Math.PI * 2,
+      scale:    0.7 + Math.random() * 0.5,
+      color:    FISH_COLORS[Math.floor(Math.random() * FISH_COLORS.length)],
+    }));
+  }
+
   get canvas() { return this.#canvas; }
 
   draw({ state, countdownElapsed, score, timeLeftSecs, boatPos, hasSheep, sailAnim, clouds, now, hint }) {
@@ -65,8 +80,10 @@ export class RiverCrossingRenderer {
     const layout = this.#layout(w, h);
 
     this.#drawBackground(ctx, w, h);
+    this.#drawSun(ctx, w, h, now);
     this.#drawClouds(ctx, clouds);
     this.#drawRiver(ctx, layout, now);
+    this.#drawFish(ctx, layout, now);
     this.#drawBank(ctx, layout, 'left');
     this.#drawBank(ctx, layout, 'right');
     this.#drawSheepFlock(ctx, layout, score, now);
@@ -107,6 +124,54 @@ export class RiverCrossingRenderer {
   #drawBackground(ctx, w, h) {
     ctx.fillStyle = COLORS.bg;
     ctx.fillRect(0, 0, w, h);
+  }
+
+  // A simple smiling sun, anchored in the top-left corner (clear of the
+  // time/score counters, which live top-right) but bouncing very softly in
+  // place.
+  #drawSun(ctx, w, h, now) {
+    const t = now / 1000;
+    const r  = Math.min(w, h) * 0.055;
+    const cx = w * 0.10 + Math.sin(t * 0.35) * r * 0.12;
+    const cy = h * 0.12 + Math.sin(t * 0.5 + 1.3) * r * 0.18;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    ctx.strokeStyle = '#ffcf4d';
+    ctx.lineWidth = 3;
+    const rayCount = 8;
+    for (let i = 0; i < rayCount; i++) {
+      const a = (i / rayCount) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * r * 1.25, Math.sin(a) * r * 1.25);
+      ctx.lineTo(Math.cos(a) * r * 1.55, Math.sin(a) * r * 1.55);
+      ctx.stroke();
+    }
+
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffe17a';
+    ctx.fill();
+    ctx.strokeStyle = COLORS.ink;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = COLORS.ink;
+    ctx.beginPath();
+    ctx.arc(-r * 0.32, -r * 0.1, r * 0.09, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(r * 0.32, -r * 0.1, r * 0.09, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(0, r * 0.05, r * 0.42, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.strokeStyle = COLORS.ink;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.restore();
   }
 
   #drawClouds(ctx, clouds) {
@@ -155,6 +220,57 @@ export class RiverCrossingRenderer {
     ctx.moveTo(riverLeftX, riverTop);  ctx.lineTo(riverLeftX, groundBottom);
     ctx.moveTo(riverRightX, riverTop); ctx.lineTo(riverRightX, groundBottom);
     ctx.stroke();
+  }
+
+  // Small minimalist pink/purple fish, swimming back and forth across the
+  // water (turning around at each edge) at their own randomized depth/speed.
+  #drawFish(ctx, layout, now) {
+    const { riverLeftX, riverRightX, riverTop, groundBottom } = layout;
+    const margin = 24;
+    const yTop = riverTop + 16;
+    const yBottom = groundBottom - 16;
+    const t = now / 1000;
+
+    for (const f of this.#fish) {
+      const cycle = ((f.startT + t * f.speed) % 1 + 1) % 1;
+      const goingRight = cycle < 0.5;
+      const pos = goingRight ? cycle * 2 : 2 - cycle * 2; // 0 -> 1 -> 0
+
+      const fx = lerp(riverLeftX + margin, riverRightX - margin, pos);
+      const fy = lerp(yTop, yBottom, f.laneT) + Math.sin(t * 0.9 + f.bobPhase) * 4;
+
+      this.#drawOneFish(ctx, fx, fy, f.scale, goingRight, f.color, t + f.bobPhase);
+    }
+  }
+
+  #drawOneFish(ctx, x, y, scale, facingRight, color, tailPhase) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(facingRight ? scale : -scale, scale);
+    ctx.lineWidth = 1.2;
+
+    const wag = Math.sin(tailPhase * 4.5) * 4;
+    ctx.fillStyle = color;
+    ctx.strokeStyle = COLORS.ink;
+    ctx.beginPath();
+    ctx.moveTo(-8, 0);
+    ctx.lineTo(-15, -5 + wag);
+    ctx.lineTo(-15, 5 + wag);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 9, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = COLORS.ink;
+    ctx.beginPath();
+    ctx.arc(4, -1, 1.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
   }
 
   // ── Banks ───────────────────────────────────────────────────────────────────
