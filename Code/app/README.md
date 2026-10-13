@@ -19,12 +19,13 @@ npm start              # start screen — choose a frontend in the UI
 Direct-launch shortcuts (skip the start screen):
 
 ```bash
-npm run ibreath       # iBreath experiment
+npm run ibreath       # iBreath / iBeat experiment
 npm run bioGame       # biofeedback breath game
-npm run trainingGame  # breath training game
-npm run trainingGameControl # breath-controlled dino-style runner
-npm run baseline      # resting-state baseline
+npm run baseline      # resting-state baseline (video)
+npm run baselineGame  # resting-state baseline (game) — placeholder, no design yet
 npm run visualizer    # real-time waveform
+npm run trainingGame         # breath training game (not in the start screen)
+npm run trainingGameControl  # breath-controlled dino-style runner (not in the start screen)
 ```
 
 ---
@@ -35,9 +36,10 @@ npm run visualizer    # real-time waveform
 |---|---|---|
 | iBreath / iBeat | Interoception experiment | [docs/ibreath.md](docs/ibreath.md) |
 | bioGame | Biofeedback game | [docs/bioGame.md](docs/bioGame.md) |
-| trainingGame | Slow breathing training game | [docs/trainingGame.md](docs/trainingGame.md) |
-| trainingGameControl | Breath-controlled dino-style runner | [docs/trainingGameControl.md](docs/trainingGameControl.md) |
-| baseline | Resting-state recording | [docs/baseline.md](docs/baseline.md) |
+| trainingGame | Slow breathing training game (not in the start screen) | [docs/trainingGame.md](docs/trainingGame.md) |
+| trainingGameControl | Breath-controlled dino-style runner (not in the start screen) | [docs/trainingGameControl.md](docs/trainingGameControl.md) |
+| baseline | Resting-state recording (video) | [docs/baseline.md](docs/baseline.md) |
+| baselineGame | Resting-state recording (game) — placeholder, no design yet | [docs/baselineGame.md](docs/baselineGame.md) |
 | visualizer | Live signal waveform viewer | [docs/visualizer.md](docs/visualizer.md) |
 | signal | Signal processing utilities | [docs/signal.md](docs/signal.md) |
 | calibration | Respiration signal calibration | [docs/calibration.md](docs/calibration.md) |
@@ -58,3 +60,4 @@ setStatus({ type, text }) // called on stream connection changes
 2. Create `styles/<name>.css`.
 3. Add the path to `FRONTEND_PATHS` in `renderer.js`.
 4. Add a script entry to `package.json`: `"<name>": "FRONTEND=<name> electron ."`.
+5. If it should appear in the start screen, add a button to `launcher.html`. Otherwise it's still reachable via its direct-launch script.

@@ -10,6 +10,8 @@ A breath-controlled ferry game. A ship starts on the right bank, picks up a shee
 cd app && npm run trainingGame
 ```
 
+Not in the start screen (`npm start`) — launch it directly with the command above.
+
 Two windows open:
 - **Scene window** — shown on the participant's screen (river, boat, banks)
 - **Experimenter window** — your control panel

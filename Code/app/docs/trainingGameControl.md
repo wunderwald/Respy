@@ -10,6 +10,8 @@ A breath-controlled replica of the Chrome dino game. A 2D world scrolls left pas
 cd app && npm run trainingGameControl
 ```
 
+Not in the start screen (`npm start`) — launch it directly with the command above.
+
 Two windows open:
 - **Scene window** — shown on the participant's screen (the runner)
 - **Experimenter window** — your control panel

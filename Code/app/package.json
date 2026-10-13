@@ -10,7 +10,8 @@
     "trainingGame": "FRONTEND=trainingGame electron .",
     "trainingGameControl": "FRONTEND=trainingGameControl electron .",
 "bioGame":    "FRONTEND=bioGame    electron .",
-    "baseline":   "FRONTEND=baseline   electron ."
+    "baseline":   "FRONTEND=baseline   electron .",
+    "baselineGame": "FRONTEND=baselineGame electron ."
   },
   "devDependencies": {
     "electron": "^42.4.0"

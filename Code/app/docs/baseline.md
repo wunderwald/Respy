@@ -10,7 +10,7 @@ Resting-state recording. The participant watches a 7-minute resting-state video 
 cd app && npm run baseline
 ```
 
-Or select **Baseline** from the start screen (`npm start`).
+Or select **Baseline Video** from the start screen (`npm start`).
 
 ---
 

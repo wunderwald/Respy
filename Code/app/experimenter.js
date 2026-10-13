@@ -695,6 +695,35 @@ if (frontend === 'ibreath') {
 
   window.api.frontend.sendAction({ type: 'ready' });
 
+} else if (frontend === 'baselineGame') {
+  // ── Baseline Game controls (placeholder frontend) ─────────────────────────────
+
+  statsEl.innerHTML = `
+    <span id="bgg-status">waiting for stream…</span>
+    <span id="ib-controls">
+      <button id="bgg-start-btn" disabled>Start</button>
+      <button id="bgg-abort-btn" style="display:none">Abort</button>
+    </span>
+  `;
+  const bggStatusEl = document.getElementById('bgg-status');
+  const bggStartBtn = document.getElementById('bgg-start-btn');
+  const bggAbortBtn = document.getElementById('bgg-abort-btn');
+
+  window.api.frontend.onState(({ stateText, startEnabled, abortVisible }) => {
+    if (stateText    !== undefined) bggStatusEl.textContent   = stateText;
+    if (startEnabled !== undefined) bggStartBtn.disabled      = !startEnabled;
+    if (abortVisible !== undefined) bggAbortBtn.style.display = abortVisible ? '' : 'none';
+  });
+
+  bggStartBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'start' }));
+  bggAbortBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'abort' }));
+
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Escape') window.api.frontend.sendAction({ type: 'abort' });
+  });
+
+  window.api.frontend.sendAction({ type: 'ready' });
+
 } else {
   statsEl.style.display = 'none';
 }
