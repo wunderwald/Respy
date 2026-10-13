@@ -40,12 +40,13 @@ export const CONFIG = {
   ITI_MAX: 3000,       // ms
 
   // Async signal — delayed real-time breath signal.
-  // Delay is adaptive: it starts at MAX_DELAY_MS and steps toward MIN_DELAY_MS
-  // each time the participant correctly identifies an async trial as
-  // out-of-sync, or back toward MAX_DELAY_MS when they get it wrong.
-  MIN_DELAY_MS: 2000,
-  MAX_DELAY_MS: 3000,
-  DELAY_STEP_MS: 200,
+  // Delay is adaptive over this fixed set of values (not a continuous step):
+  // it starts at DEFAULT_DELAY_MS and moves one step toward the front of the
+  // array (smaller/harder) each time the participant correctly identifies an
+  // async trial as out-of-sync, or one step toward the back (larger/easier)
+  // when they get it wrong. Clamped at both ends of the array.
+  DELAY_VALUES_MS: [200, 500, 800, 1000, 1200, 1600, 2200, 3000],
+  DEFAULT_DELAY_MS: 1000,
 
   // Cloud stimulus size (fraction of the shorter half-scene dimension)
   CLOUD_SIZE_MIN: 0.10,     // at stimulusLevel = 0

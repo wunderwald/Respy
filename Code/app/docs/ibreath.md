@@ -87,16 +87,16 @@ The signal range that's mapped onto the stimulus `[0, 1]` starts as the calibrat
 
 ### Async delay staircase
 
-Async trials play back the participant's own real-time breath signal, delayed by a running `currentDelayMs` value:
+Async trials play back the participant's own real-time breath signal, delayed by a value that steps through a **fixed set** of millisecond values, not a continuous range:
 
-- **Range**: `MIN_DELAY_MS` (2000 ms) to `MAX_DELAY_MS` (3000 ms), in steps of `DELAY_STEP_MS` (200 ms).
-- **Start**: `currentDelayMs` is reset to `MAX_DELAY_MS` at the start of every session (i.e. at Start / calibration).
+- **Values**: `DELAY_VALUES_MS` — `[200, 500, 800, 1000, 1200, 1600, 2200, 3000]` ms. Steps between adjacent values are uneven on purpose (e.g. 300 ms near the bottom, 800 ms near the top).
+- **Start**: the staircase starts at the array index of `DEFAULT_DELAY_MS` (`1000` ms) at the start of every session (i.e. at Start / calibration) — not at the extreme either end.
 - **Adaptation**: it only changes on the `sync` question (`questionType === 'sync'`) asked after an **async** trial:
-  - Answered **"no"** (correctly identified as out of sync) → `currentDelayMs` decreases by `DELAY_STEP_MS` (harder next time).
-  - Answered **"yes"** (mistaken for in sync) → `currentDelayMs` increases by `DELAY_STEP_MS` (easier next time).
+  - Answered **"no"** (correctly identified as out of sync) → move one step toward the front of the array, i.e. to the next-*smaller* value (harder next time).
+  - Answered **"yes"** (mistaken for in sync) → move one step toward the back of the array, i.e. to the next-*larger* value (easier next time).
   - **Timeout**, or any other question type, leaves it unchanged.
-  - The value is always clamped to `[MIN_DELAY_MS, MAX_DELAY_MS]`.
-  - **This requires a `sync` entry in the active question set with answers `['yes', 'no']`.** If a loaded preset's `questions` omit `sync` entirely, the delay has nothing to drive it and will sit at `MAX_DELAY_MS` all session — the experimenter HUD shows a warning next to the preset selector in that case.
+  - Clamped at both ends — stays at `200` ms if already there and answered correctly again, and at `3000` ms if already there and answered wrong again.
+  - **This requires a `sync` entry in the active question set with answers `['yes', 'no']`.** If a loaded preset's `questions` omit `sync` entirely, the delay has nothing to drive it and will sit at `DEFAULT_DELAY_MS` all session — the experimenter HUD shows a warning next to the preset selector in that case.
 - The delay used for a given trial is fixed at the start of that trial and recorded in `trialData.csv` as `delayMs`.
 - The experimenter HUD shows a coloured **SYNC** / **ASYNC** badge for the current trial (from its pre-trial display through its response), and the **delay** readout shows the delay applied to that trial — `0 ms` for sync trials. Between trials (ITI) the badge clears and the readout shows `next async: <N> ms`, the staircase value the next async trial will use.
 
@@ -118,9 +118,8 @@ Flags in [app/modules/ibreath/config.js](./modules/ibreath/config.js):
 | `MAX_NUM_TRIALS` | `80` | Total trial count |
 | `MAX_TRIAL_TIME` | `30` | Trial auto-ends after this many seconds |
 | `CALIBRATION_SECS` | `10` | Duration of the calibration recording |
-| `MIN_DELAY_MS` | `2000` | Lower bound of the async delay staircase |
-| `MAX_DELAY_MS` | `3000` | Upper bound of the async delay staircase; also its starting value each session |
-| `DELAY_STEP_MS` | `200` | Step size the async delay staircase moves by per sync-question response (see [Async delay staircase](#async-delay-staircase)) |
+| `DELAY_VALUES_MS` | `[200, 500, 800, 1000, 1200, 1600, 2200, 3000]` | The fixed set of values the async delay staircase steps through (see [Async delay staircase](#async-delay-staircase)) |
+| `DEFAULT_DELAY_MS` | `1000` | The value (must be one of `DELAY_VALUES_MS`) the staircase starts at each session |
 | `RANGE_ADAPT` | `true` | Track drift in the signal range after calibration (see [Signal range](#signal-range)); `false` keeps the calibrated range all session |
 | `RANGE_WINDOW_SECS` | `60` | Rolling window the range percentiles are computed over |
 | `RANGE_TIME_CONSTANT_SECS` | `10` | How quickly the range follows that window |

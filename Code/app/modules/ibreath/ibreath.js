@@ -60,8 +60,8 @@ export default class IBreath {
     fadeMs: CONFIG.PEAK_FADE_MS,
     crossFraction: CONFIG.PEAK_CROSS_FRACTION,
   });
-  #delayLine = new SignalDelayLine({ maxAgeMs: CONFIG.MAX_DELAY_MS + 500 });  // async's real-time delay buffer
-  #currentDelayMs = CONFIG.MAX_DELAY_MS;   // adaptive staircase — see #onResponse
+  #delayLine = new SignalDelayLine({ maxAgeMs: Math.max(...CONFIG.DELAY_VALUES_MS) + 500 });  // async's real-time delay buffer
+  #delayIndex = CONFIG.DELAY_VALUES_MS.indexOf(CONFIG.DEFAULT_DELAY_MS);   // index into DELAY_VALUES_MS — adaptive staircase, see #onResponse
   #stimulusRange = [0.3, 0.4];   // raw native-scale window — used to rescale the live signal into [0,1]; fixed per trial
 
   // ── per-trial state ────────────────────────────────────────────────────
@@ -146,6 +146,11 @@ export default class IBreath {
       : this.#smoother.value;
   }
 
+  // Current adaptive-delay value in ms, looked up from CONFIG.DELAY_VALUES_MS.
+  get #currentDelayMs() {
+    return CONFIG.DELAY_VALUES_MS[this.#delayIndex];
+  }
+
   // ── Public interface ───────────────────────────────────────────────────
 
   pushGazeSample(channels) {
@@ -173,7 +178,8 @@ export default class IBreath {
     // Computed once per sample — this runs at the stream's full rate.
     const smoothed = this.#smoothedValue;
     // Always-on, regardless of state, so a trial's delay buffer already has
-    // up to MAX_DELAY_MS of history available the moment it starts.
+    // up to the largest DELAY_VALUES_MS entry's worth of history available
+    // the moment it starts.
     this.#delayLine.push(now, smoothed);
     this.#rangeTracker?.push(now, smoothed);
 
@@ -230,7 +236,7 @@ export default class IBreath {
     this.#trials = makeTrialParams(CONFIG.MAX_NUM_TRIALS);
     this.#trialIndex = 0;
     this.#trialData = [];
-    this.#currentDelayMs = CONFIG.MAX_DELAY_MS;
+    this.#delayIndex = CONFIG.DELAY_VALUES_MS.indexOf(CONFIG.DEFAULT_DELAY_MS);
     this.#hud.trialType = null;
     this.#updateDelayHud();
     this.#calibration = new RespCalibration({ durationSecs: CONFIG.CALIBRATION_SECS });
@@ -433,11 +439,11 @@ export default class IBreath {
     // trial tells us anything about the current delay's detectability.
     if (!trial.synchronous && trial.questionType === 'sync') {
       if (response === 'no') {
-        // Correctly identified as out-of-sync — make the next one harder.
-        this.#currentDelayMs = Math.max(CONFIG.MIN_DELAY_MS, this.#currentDelayMs - CONFIG.DELAY_STEP_MS);
+        // Correctly identified as out-of-sync — step to a smaller (harder) delay.
+        this.#delayIndex = Math.max(0, this.#delayIndex - 1);
       } else if (response === 'yes') {
-        // Mistaken for in-sync — make the next one easier.
-        this.#currentDelayMs = Math.min(CONFIG.MAX_DELAY_MS, this.#currentDelayMs + CONFIG.DELAY_STEP_MS);
+        // Mistaken for in-sync — step to a larger (easier) delay.
+        this.#delayIndex = Math.min(CONFIG.DELAY_VALUES_MS.length - 1, this.#delayIndex + 1);
       }
       // 'timeout' leaves the current delay unchanged.
       // (HUD shows the new value once the ITI starts — see #startITIorEnd.)
