@@ -19,7 +19,7 @@
  */
 
 import { GaussianSmoother, SignalDelayLine, PeakEnvelopeFollower, mapRange } from '../signal/signalUtils.js';
-import { RespCalibration } from '../calibration/calibration.js';
+import { RespCalibration, AdaptiveRange } from '../calibration/calibration.js';
 import { IBreathSound } from './ibreath_sound.js';
 import { CONFIG, CONFIG_DEFAULTS, STATE } from './config.js';
 import { makeTrialParams } from './trialParams.js';
@@ -47,8 +47,9 @@ export default class IBreath {
   #trialData = [];
 
   // ── calibration ────────────────────────────────────────────────────────
-  #calibration = null;   // RespCalibration — derives the sync stimulus range
+  #calibration = null;   // RespCalibration — derives the initial stimulus range
   #calFailed = false;
+  #rangeTracker = null;  // AdaptiveRange — follows drift after calibration (RANGE_ADAPT)
 
   // ── signal pipeline ────────────────────────────────────────────────────
   // Exactly one of these two feeds #smoothedValue, chosen by #inputSignalType;
@@ -61,14 +62,13 @@ export default class IBreath {
   });
   #delayLine = new SignalDelayLine({ maxAgeMs: CONFIG.MAX_DELAY_MS + 500 });  // async's real-time delay buffer
   #currentDelayMs = CONFIG.MAX_DELAY_MS;   // adaptive staircase — see #onResponse
-  #syncStimulusRange = [0.3, 0.4];   // raw native-scale window — used to rescale the live signal into [0,1]
+  #stimulusRange = [0.3, 0.4];   // raw native-scale window — used to rescale the live signal into [0,1]; fixed per trial
 
   // ── per-trial state ────────────────────────────────────────────────────
   #trialStartTime = null;
   #stimulusLevel = 0;
   #lastRawSample = 0;
   #lastScaledSample = 0;
-  #syncStimulusSignal = [];
   #frameRows = [];
 
   // ── ITI / display ─────────────────────────────────────────────────────
@@ -173,6 +173,7 @@ export default class IBreath {
     // Always-on, regardless of state, so a trial's delay buffer already has
     // up to MAX_DELAY_MS of history available the moment it starts.
     this.#delayLine.push(now, this.#smoothedValue);
+    this.#rangeTracker?.push(now, this.#smoothedValue);
 
     if (this.#state === STATE.CALIBRATING) {
       this.#calibration.push(this.#smoothedValue);
@@ -232,6 +233,15 @@ export default class IBreath {
     this.#calibration = new RespCalibration({ durationSecs: CONFIG.CALIBRATION_SECS });
     this.#calibration.start();
     this.#calFailed = false;
+    // Created here (not in the constructor) so preset configOverrides apply.
+    // Collects from calibration on, so its window is already full once seeded.
+    this.#rangeTracker = CONFIG.RANGE_ADAPT
+      ? new AdaptiveRange({
+          windowSecs:       CONFIG.RANGE_WINDOW_SECS,
+          timeConstantSecs: CONFIG.RANGE_TIME_CONSTANT_SECS,
+          minSpanFraction:  CONFIG.RANGE_MIN_SPAN_FRACTION,
+        })
+      : null;
     this.#smoother.reset();
     this.#peakEnvelope.reset();
     this.#delayLine.reset();
@@ -265,8 +275,9 @@ export default class IBreath {
     this.#completeCalibration([result.min, result.max]);
   }
 
-  #completeCalibration(range) {
-    this.#syncStimulusRange = range;
+  #completeCalibration(range, { fromData = true } = {}) {
+    this.#stimulusRange = [...range];
+    this.#rangeTracker?.seed(range, { fromData });
 
     this.#hud.trialText = `0 / ${this.#trials.length}`;
     this.#calFailed = false;
@@ -296,7 +307,7 @@ export default class IBreath {
   #useDefaultCalibration() {
     if (this.#state !== STATE.CALIBRATING || !this.#calFailed) return;
     this.#markers.send('calibration_default_used');
-    this.#completeCalibration(CONFIG.DEFAULT_CAL_RANGE);
+    this.#completeCalibration(CONFIG.DEFAULT_CAL_RANGE, { fromData: false });
   }
 
   #advanceTrial() {
@@ -308,7 +319,6 @@ export default class IBreath {
     const trial = this.#trials[this.#trialIndex];
     trial.delayMs = trial.synchronous ? null : this.#currentDelayMs;
 
-    this.#syncStimulusSignal = [];
     this.#frameRows = [];
     this.#stimulusLevel = 0;
     this.#flashShown = false;
@@ -351,6 +361,10 @@ export default class IBreath {
     const trial = this.#trials[this.#trialIndex];
     this.#trialStartTime = performance.now();
     trial.startTime = new Date().toISOString();
+    // Snapshot the drift-tracked range: fixed for the whole trial, and the
+    // same mapping for sync (live) and async (delayed) readback.
+    this.#stimulusRange = this.#rangeTracker?.range ?? this.#stimulusRange;
+    [trial.rangeMin, trial.rangeMax] = this.#stimulusRange;
     this.#csv.initFrameCSV(trial.trialIndex);
     this.#state = STATE.TRIAL;
     this.#sound.stopDisplay();
@@ -363,10 +377,8 @@ export default class IBreath {
   #onTrialSample(rawValue) {
     const trial = this.#trials[this.#trialIndex];
     if (trial.synchronous) {
-      const smoothedRaw = this.#smoothedValue;
-      this.#syncStimulusSignal.push(smoothedRaw);
       this.#stimulusLevel = Math.max(0, Math.min(1,
-        mapRange(smoothedRaw, this.#syncStimulusRange, [0, 1])
+        mapRange(this.#smoothedValue, this.#stimulusRange, [0, 1])
       ));
     }
   }
@@ -375,14 +387,6 @@ export default class IBreath {
     const trial = this.#trials[this.#trialIndex];
     trial.endTime = new Date().toISOString();
     trial.aborted = aborted;
-
-    // Rescale future frames to the amplitude actually observed in this sync
-    // trial (auto-gain, independent of async's delayed-signal readback).
-    if (trial.synchronous && this.#syncStimulusSignal.length > 0) {
-      const rawLvls = this.#syncStimulusSignal;
-      const rawMin = Math.min(...rawLvls), rawMax = Math.max(...rawLvls);
-      this.#syncStimulusRange = [rawMin, rawMax];
-    }
 
     trial.flashShown = this.#flashShown;
     this.#sound.stopTrial();
@@ -677,7 +681,7 @@ export default class IBreath {
 
       if (!trial.synchronous) {
         const delayedRaw = this.#delayLine.sample(now, trial.delayMs);
-        this.#stimulusLevel = mapRange(delayedRaw, this.#syncStimulusRange, [0, 1]);
+        this.#stimulusLevel = mapRange(delayedRaw, this.#stimulusRange, [0, 1]);
       }
       const stimLevel = Math.max(0, Math.min(1, this.#stimulusLevel));
       this.#sound.setNoiseLevel(stimLevel);

@@ -20,7 +20,7 @@ export class BioGameCSV {
   #currentBlockIndex = 0;
 
   #frameHeader = 'timestamp,blockIndex,breathRaw,breathSmoothed,breathNorm,' +
-                 'avatarY,targetY,itemCount\n';
+                 'normMin,normMax,avatarY,targetY,itemCount\n';
   #eventHeader = 'timestamp,blockIndex,event,value1,value2\n';
 
   constructor(subjectCode, group, scene, onWarn) {
@@ -74,7 +74,7 @@ export class BioGameCSV {
 
     const csv = buf.map(r =>
       `${r.t},${r.block},${r.raw.toFixed(4)},${r.smoothed.toFixed(4)},` +
-      `${r.norm.toFixed(4)},${r.avatarY.toFixed(4)},${r.targetY.toFixed(4)},${r.itemCount}`
+      `${r.norm.toFixed(4)},${r.normMin.toFixed(6)},${r.normMax.toFixed(6)},${r.avatarY.toFixed(4)},${r.targetY.toFixed(4)},${r.itemCount}`
     ).join('\n') + '\n';
 
     const res = await window.api.appendCSV(this.#framePath(blockIndex), csv);

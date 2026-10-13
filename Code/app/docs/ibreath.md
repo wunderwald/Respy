@@ -72,10 +72,18 @@ The `[READY]` step is skipped when `AUTO_ADVANCE` is on. The `[DISPLAY]` step is
 ## Trial design
 
 - **80 trials** per session, balanced in blocks of 2: 1 sync, 1 async.
-- **Synchronous trials** — cloud animation tracks the Gaussian-smoothed breath signal, rescaled into `[0, 1]` using the calibration range (see [calibration](calibration.md)).
+- **Synchronous trials** — cloud animation tracks the Gaussian-smoothed breath signal, rescaled into `[0, 1]` using the current signal range — taken from calibration, then drift-tracked (see [Signal range](#signal-range) below).
 - **Asynchronous trials** — cloud tracks the participant's own real-time breath signal, delayed by the current adaptive delay (see [Async delay staircase](#async-delay-staircase) below), then rescaled the same way as sync trials.
 - **Flash stimulus** (`FLASHING_IMAGE`) — a lightning image appears on 50 % of trials at a random time between `FLASH_TIME_MIN` and `FLASH_TIME_MAX` seconds into the trial.
 - **Post-trial question** (`CONFIG.QUESTIONS`) — after each non-aborted trial, a question is shown for up to `RESPONSE_TIMEOUT_SECS` seconds. Non-responses are recorded as `timeout`. Which question(s) can appear, in what mix, is defined by `CONFIG.QUESTIONS` — either the built-in default (100% `sync`) or a loaded preset's `questions` list. See [Presets](#presets) for the full mechanism.
+
+### Signal range
+
+The signal range that's mapped onto the stimulus `[0, 1]` starts as the calibration result (5th–95th percentile of the calibration recording) and is then **drift-tracked** by [`AdaptiveRange`](calibration.md#adaptiverange) over a rolling 60 s window for the rest of the session (`RANGE_ADAPT`).
+
+- The range is **snapshotted at each trial start and fixed for that trial** — sync (live) and async (delayed) trials are scaled the same way, and the mapping doesn't shift mid-trial.
+- The range used is recorded per trial as `rangeMin` / `rangeMax` in `trialData.csv`.
+- The tracker keeps learning during every state (display, response, ITI), not only during trials.
 
 ### Async delay staircase
 
@@ -113,6 +121,10 @@ Flags in [app/modules/ibreath/config.js](./modules/ibreath/config.js):
 | `MIN_DELAY_MS` | `2000` | Lower bound of the async delay staircase |
 | `MAX_DELAY_MS` | `3000` | Upper bound of the async delay staircase; also its starting value each session |
 | `DELAY_STEP_MS` | `200` | Step size the async delay staircase moves by per sync-question response (see [Async delay staircase](#async-delay-staircase)) |
+| `RANGE_ADAPT` | `true` | Track drift in the signal range after calibration (see [Signal range](#signal-range)); `false` keeps the calibrated range all session |
+| `RANGE_WINDOW_SECS` | `60` | Rolling window the range percentiles are computed over |
+| `RANGE_TIME_CONSTANT_SECS` | `10` | How quickly the range follows that window |
+| `RANGE_MIN_SPAN_FRACTION` | `0.3` | Range never narrows below this fraction of the calibrated span |
 
 ---
 
@@ -135,6 +147,7 @@ One row per trial, appended after each trial ends (or after the response screen)
 | `stimX0`, `stimY0` | Cloud start position (normalised 0–1) |
 | `stimX1`, `stimY1` | Cloud end position (normalised 0–1) |
 | `delayMs` | Async delay applied to this trial (ms), or empty (sync trials) — see [Async delay staircase](#async-delay-staircase) |
+| `rangeMin`, `rangeMax` | Signal range (native units) mapped to stimulus `[0, 1]` for this trial — see [Signal range](#signal-range) |
 | `ITI` | Inter-trial interval in ms |
 | `startTime` | ISO-8601 trial start time |
 | `endTime` | ISO-8601 trial end time |
@@ -188,7 +201,7 @@ Sent to `MARKER_STREAM_URL` (default `ws://localhost:9001`).
 
 ## Signal input
 
-Any LSL stream is supported — the raw signal doesn't need to already be normalised. It's rescaled into `[0, 1]` using the calibration-derived range (see [calibration](calibration.md)), the same way bioGame does.
+Any LSL stream is supported — the raw signal doesn't need to already be normalised. It's rescaled into `[0, 1]` using the calibration-derived, drift-tracked range (see [Signal range](#signal-range)), the same way bioGame does.
 
 For testing, use:
 

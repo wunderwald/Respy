@@ -91,6 +91,8 @@ export function makeTrialParams(numTrials) {
       ITI:          iti,               // ms
       questionType: sync ? syncQuestionSeq[syncQIdx++] : asyncQuestionSeq[asyncQIdx++],
       delayMs:      null,              // async trials only — set at trial start from the adaptive staircase
+      rangeMin:     null,              // signal range mapped to stimulus [0,1] — set at trial start
+      rangeMax:     null,
       flashImage:   null,              // image name, or null if no flash this trial
       flashTime:    null,              // seconds into trial when flash fires
       flashX:       null,              // normalised [0,1] horizontal position

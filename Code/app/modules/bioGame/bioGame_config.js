@@ -18,6 +18,14 @@ export const CONFIG = {
   // TODO: measure real min/max from pilot recordings and replace these placeholders
   DEFAULT_CAL_RANGE:     [0.2, 0.8],  // used if the experimenter chooses "use default" after a failed calibration
 
+  // ── Range adaptation ─────────────────────────────────────────────────────
+  // Follows drift in the signal's range after calibration (see AdaptiveRange
+  // in calibration.js). Applied continuously during play.
+  RANGE_ADAPT:              true,  // false = keep the calibrated range for the whole session
+  RANGE_WINDOW_SECS:        60,    // rolling window the 5th/95th percentiles are taken over
+  RANGE_TIME_CONSTANT_SECS: 10,    // how quickly the range follows that window
+  RANGE_MIN_SPAN_FRACTION:  0.3,   // range never narrows below this fraction of the calibrated span
+
   // ── Breath target ────────────────────────────────────────────────────────
   SLOW_BPM:              6,
 

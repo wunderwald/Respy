@@ -90,7 +90,8 @@ One row every 50 ms during a game.
 | `blockIndex` | 0 = Game 1, 1 = Game 2 |
 | `breathRaw` | Raw LSL sample |
 | `breathSmoothed` | Gaussian-smoothed sample |
-| `breathNorm` | Normalized to calibration range `[0, 1]` |
+| `breathNorm` | Normalized to the current signal range, `[0, 1]` |
+| `normMin`, `normMax` | Signal range (native units) used for `breathNorm` at this frame — calibrated, then drift-tracked (`RANGE_ADAPT`, see [calibration](calibration.md#adaptiverange)) |
 | `fishY` | Fish vertical position `[0 = bottom, 1 = top]` |
 | `targetY` | Target curve value at this moment |
 | `starfishCount` | Starfish currently on screen (uncollected) |

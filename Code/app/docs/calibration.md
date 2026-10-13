@@ -64,3 +64,46 @@ deeper breaths than during calibration). The default `1` leaves it unchanged.
 smooth the signal (use [`GaussianSmoother`](signal.md) beforehand if needed)
 or apply the scaling itself (use [`mapRange`](signal.md) with the returned
 `[min, max]`).
+
+---
+
+### AdaptiveRange
+
+Follows **drift** in the signal's range after calibration — baseline wander,
+belt slipping, breath depth changing over a long session. Keeps a rolling
+window of recent samples (default 60 s, decimated to one sample every 20 ms
+so cost is independent of the stream's sample rate), recomputes the same
+5th / 95th percentile range over it once per second, and moves the current
+range toward that target exponentially (default time constant 10 s) — so the
+mapping follows slow changes without jumping.
+
+```js
+import { AdaptiveRange } from './modules/calibration/calibration.js';
+
+const tracker = new AdaptiveRange({
+  windowSecs: 60,          // rolling window (default 60)
+  timeConstantSecs: 10,    // how fast the range follows the window (default 10)
+  minSpanFraction: 0.3,    // floor on range width, relative to the calibrated span (default 0.3)
+});
+
+tracker.push(performance.now(), value);    // every sample, from calibration start on
+tracker.seed([cal.min, cal.max]);          // once calibration is done
+tracker.seed(DEFAULT_RANGE, { fromData: false });  // …or after a "use default" fallback
+tracker.range;                             // current [min, max] (a copy), or null before seed()
+```
+
+- **Min-span floor**: the range never narrows below `minSpanFraction` × the
+  calibrated span, so a breath hold or a stretch of very shallow breathing
+  doesn't blow noise up to full scale. After a `fromData: false` seed, the
+  reference span is taken from the first span measured from data instead.
+- **Default-range fallback**: since the tracker adapts from real data, a
+  placeholder `DEFAULT_CAL_RANGE` on the wrong scale converges to the real
+  signal range within about a minute.
+- Pushing from calibration start on means the window is already full when
+  `seed()` is called.
+
+Used by [iBreath](ibreath.md) (range snapshotted at each trial start, fixed
+for the trial) and [bioGame](bioGame.md) (applied continuously during play).
+Both expose `RANGE_ADAPT` / `RANGE_WINDOW_SECS` / `RANGE_TIME_CONSTANT_SECS` /
+`RANGE_MIN_SPAN_FRACTION` in their config; `RANGE_ADAPT: false` keeps the
+calibrated range for the whole session.

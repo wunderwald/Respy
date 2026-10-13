@@ -13,7 +13,7 @@
  */
 
 import { GaussianSmoother } from '../signal/signalUtils.js';
-import { RespCalibration }  from '../calibration/calibration.js';
+import { RespCalibration, AdaptiveRange } from '../calibration/calibration.js';
 import { MarkerStream }     from '../stream/markerStream.js';
 import { CONFIG, STATE }    from './bioGame_config.js';
 import { BioGameRenderer }  from './bioGame_renderer.js';
@@ -69,6 +69,7 @@ export default class BioGame {
   #calibration      = null;
   #calFailed        = false;
   #normRange        = [0, 1];
+  #rangeTracker     = null;   // AdaptiveRange — follows drift after calibration (RANGE_ADAPT)
 
   // ── Avatar state ──────────────────────────────────────────────────────────
   #avatarNormY     = 0.5;
@@ -146,6 +147,7 @@ export default class BioGame {
   pushSample(rawValue) {
     this.#lastRaw = rawValue;
     this.#smoother.push(rawValue);
+    this.#rangeTracker?.push(performance.now(), this.#smoother.value);
 
     if (this.#state === STATE.CALIBRATING) {
       this.#calibration.push(this.#smoother.value);
@@ -210,6 +212,14 @@ export default class BioGame {
     this.#calibration = new RespCalibration({ durationSecs: this.#calibrationSecs });
     this.#calibration.start();
     this.#calFailed = false;
+    // Collects from calibration on, so its window is already full once seeded.
+    this.#rangeTracker = CONFIG.RANGE_ADAPT
+      ? new AdaptiveRange({
+          windowSecs:       CONFIG.RANGE_WINDOW_SECS,
+          timeConstantSecs: CONFIG.RANGE_TIME_CONSTANT_SECS,
+          minSpanFraction:  CONFIG.RANGE_MIN_SPAN_FRACTION,
+        })
+      : null;
     this.#smoother.reset();
     this.#inputsLocked = true;
     this.#blockIndex   = 0;
@@ -245,8 +255,9 @@ export default class BioGame {
     this.#completeCalibration([result.min, result.max]);
   }
 
-  #completeCalibration(range) {
-    this.#normRange = range;
+  #completeCalibration(range, { fromData = true } = {}) {
+    this.#normRange = [...range];
+    this.#rangeTracker?.seed(range, { fromData });
     console.log(`[BioGame] norm range: [${range[0].toFixed(3)}, ${range[1].toFixed(3)}]`);
 
     this.#state = STATE.READY;
@@ -262,7 +273,7 @@ export default class BioGame {
 
   #useDefaultCalibration() {
     this.#markers.send('calibration_default_used');
-    this.#completeCalibration(CONFIG.DEFAULT_CAL_RANGE);
+    this.#completeCalibration(CONFIG.DEFAULT_CAL_RANGE, { fromData: false });
   }
 
   #startCountdown() {
@@ -380,6 +391,9 @@ export default class BioGame {
   // ── Signal normalization ──────────────────────────────────────────────────
 
   #updateSignal(dt) {
+    if (this.#state === STATE.PLAYING) {
+      this.#normRange = this.#rangeTracker?.range ?? this.#normRange;
+    }
     const [rMin, rMax] = this.#normRange;
     const range = rMax - rMin || 1e-6;
     const norm  = clamp((this.#smoother.value - rMin) / range, 0, 1);
@@ -512,6 +526,8 @@ export default class BioGame {
       raw:       this.#lastRaw,
       smoothed:  this.#smoother.value,
       norm:      this.#avatarNormY,
+      normMin:   this.#normRange[0],
+      normMax:   this.#normRange[1],
       avatarY:   this.#avatarNormY,
       targetY:   targetCurveY((now - this.#blockStartTime) / 1000, this.#activeBpm),
       itemCount: this.#items.filter(s => !s.checked).length,
