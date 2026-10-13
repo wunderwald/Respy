@@ -1,18 +1,19 @@
 import { CONFIG, STATE } from './trainingGame_config.js';
 
 // ── TrainingGameRenderer — River Crossing ───────────────────────────────────
-// Minimal black/white line-art rendering: pure drawing, given state built by
-// trainingGame.js. Static camera — the boat moves across a fixed river.
+// Bright pastel line-art rendering, sized for young kids: soft pink sky,
+// cheerful blue water, pastel green banks. Pure drawing, given state built
+// by trainingGame.js. Static camera — the boat moves across a fixed river.
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 
 const COLORS = {
-  bg:       '#f7f4ec',
-  ink:      '#1c1c1c',
-  inkSoft:  'rgba(28,28,28,0.55)',
-  inkFaint: 'rgba(28,28,28,0.25)',
-  river:    '#dce8ea',
-  bank:     '#eef0e2',
+  bg:       '#ffe4ef',
+  ink:      '#4a3350',
+  inkSoft:  'rgba(74,51,80,0.55)',
+  inkFaint: 'rgba(74,51,80,0.25)',
+  river:    '#7fd8f7',
+  bank:     '#c8f2c4',
 };
 
 export class TrainingGameRenderer {
@@ -252,7 +253,7 @@ export class TrainingGameRenderer {
     ctx.moveTo(-4, -44);
     ctx.quadraticCurveTo(-4 + bulge, -28, -4, -8);
     ctx.closePath();
-    ctx.fillStyle = `rgba(28,28,28,${lerp(0.02, 0.08, sailAnim)})`;
+    ctx.fillStyle = `rgba(74,51,80,${lerp(0.02, 0.08, sailAnim)})`;
     ctx.fill();
     ctx.stroke();
 
