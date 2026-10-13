@@ -155,18 +155,12 @@ export function MicCalibration({ mic, onDone }) {
   }
 
   if (warning) {
-    const messages = [];
-    if (warning.includes('blowTooQuiet')) {
-      messages.push("Your blow seemed pretty quiet — try blowing a little harder, or move closer to the microphone.");
-    }
-    if (warning.includes('quietTooLoud')) {
-      messages.push("It's pretty noisy here — the quiet part was almost as loud as blowing. Try moving somewhere quieter.");
-    }
-
     return (
       <div className="calibration-screen">
         <p className="calibration-title">Let's try that again</p>
-        {messages.map((m) => <p className="calibration-sub" key={m}>{m}</p>)}
+        <p className="calibration-sub">
+          Move to a quieter place, or blow more directly into the mic, and try again!
+        </p>
         <div className="calibration-buttons">
           <button className="calibration-btn" onClick={retry}>Try again</button>
           <button className="calibration-btn calibration-btn-secondary" onClick={continueAnyway}>
