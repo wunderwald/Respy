@@ -31,5 +31,11 @@ export default defineConfig(({ mode }) => ({
   build: {
     outDir: mode === 'development' || mode === 'production' ? 'dist' : `dist/${mode}`,
     rollupOptions: { input: inputsFor(mode) },
+    // The AudioWorklet processor module (shared/mic/breathEnvelopeProcessor.js)
+    // is small enough to otherwise get base64-inlined as a data: URL — but
+    // Safari (the realistic iPad target) has known issues loading worklet
+    // modules from data: URLs, so disable inlining to guarantee it's always
+    // served as a real, fetchable .js file.
+    assetsInlineLimit: 0,
   },
 }))
