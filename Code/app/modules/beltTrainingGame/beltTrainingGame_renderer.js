@@ -212,8 +212,13 @@ export class BeltTrainingGameRenderer {
     const marginY   = CONFIG.PHOTO_ZOOM_MARGIN_Y * playH;
     const redHalfPx = CONFIG.TARGET_HEIGHT_RED * playH;
     const centerYpx = normToScreenY(targetNormY);
-    const cropY1 = centerYpx - redHalfPx - marginY;
-    const cropY2 = centerYpx + redHalfPx + marginY;
+    const fishYpx   = normToScreenY(fishNormY);
+
+    // Normally just the red band + margin, but if the fish's best moment
+    // still landed well outside the target (a missed trial), zoom out
+    // further so the shot still includes both the full target and the fish.
+    const cropY1 = Math.min(centerYpx - redHalfPx, fishYpx) - marginY;
+    const cropY2 = Math.max(centerYpx + redHalfPx, fishYpx) + marginY;
 
     const cropW = cropX2 - cropX1;
     const cropH = cropY2 - cropY1;
