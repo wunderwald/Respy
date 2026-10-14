@@ -40,6 +40,7 @@ import { CONFIG, STATE } from './beltTrainingGame_config.js';
 import { BeltTrainingGameRenderer } from './beltTrainingGame_renderer.js';
 import { BeltTrainingGameCSV } from './beltTrainingGame_csv.js';
 import { resolveScene } from '../bioGame/bioGame_scene.js';
+import { BioGameSound } from '../bioGame/bioGame_sound.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -108,9 +109,20 @@ export default class BeltTrainingGame {
   // ── Sub-modules ───────────────────────────────────────────────────────────
   #markers  = null;
   #renderer = null;
+  #sound    = null;
 
   constructor({ sceneContainer }) {
-    this.#renderer = new BeltTrainingGameRenderer(sceneContainer, resolveScene(CONFIG.SCENE));
+    const scene = resolveScene(CONFIG.SCENE);
+    this.#renderer = new BeltTrainingGameRenderer(sceneContainer, scene);
+
+    // Reuses bioGame's ocean soundscape as-is: a steady ambience loop plus a
+    // noise layer whose volume tracks the live breath signal in real time
+    // (see #rafLoop's setNoiseLevel call). Scene is fixed here, so the
+    // buffers are loaded once up front rather than per-calibration.
+    this.#sound = new BioGameSound();
+    this.#sound.init()
+      .then(() => this.#sound.loadScene(scene.sounds))
+      .catch(e => console.warn('[BeltTrainingGame] sound init failed:', e));
 
     this.#markers = CONFIG.SEND_MARKERS
       ? new MarkerStream(CONFIG.MARKER_STREAM_URL)
@@ -296,6 +308,7 @@ export default class BeltTrainingGame {
       this.#markers.send(`training_start_t${this.#trialIndex}`);
       this.#csv.initTrialCSV(this.#trialIndex);
       this.#state = STATE.TRAINING;
+      this.#sound.startBlock();  // spans the whole trial — training through test
     } else {
       this.#markers.send(`test_start_t${this.#trialIndex}`);
       this.#state = STATE.TEST;
@@ -320,6 +333,7 @@ export default class BeltTrainingGame {
     this.#markers.send(`test_end_t${this.#trialIndex}`);
     this.#markers.send(`trial_end_t${this.#trialIndex}`);
     this.#csv.appendEvent(this.#trialIndex, 'test', 'trial_end');
+    this.#sound.stopBlock();
 
     this.#beginPhotoReview();
   }
@@ -354,6 +368,7 @@ export default class BeltTrainingGame {
     this.#csv?.flushFrames(this.#trialIndex);
     this.#markers.send(`trial_abort_t${this.#trialIndex}`);
     this.#csv?.appendEvent(this.#trialIndex, this.#phase, 'trial_abort');
+    this.#sound?.stopBlock();  // no-op if the soundscape wasn't playing
     this.#endExperiment();
   }
 
@@ -402,6 +417,7 @@ export default class BeltTrainingGame {
     if (inGameplay) {
       this.#updatePhase(now, dt);
       this.#recordFrame(now);
+      this.#sound.setNoiseLevel(this.#avatarNormY);
     }
 
     try {
