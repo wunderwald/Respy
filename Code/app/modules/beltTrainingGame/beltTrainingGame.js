@@ -78,6 +78,14 @@ export default class BeltTrainingGame {
   #segGreenTime    = 0;     // time spent inside the green band during the 'target' segment
   #segTotalTime    = 0;     // total time spent in the 'target' segment
 
+  // ── Best-moment tracking (test phase only) — feeds the post-test photo ────
+  #bestTargetDistance = Infinity;
+  #bestFishXRatio     = 0;
+  #bestFishNormY      = 0.5;
+
+  // ── Post-test photo review ────────────────────────────────────────────────
+  #photoStartTime = null;
+
   // ── Countdown (3-2-1-GO before each phase) ────────────────────────────────
   #countdownStartTime = null;
   #pendingPhase       = null;  // phase the countdown is leading into: 'training' | 'test'
@@ -149,7 +157,8 @@ export default class BeltTrainingGame {
 
       case 'abort':
         if (this.#state === STATE.READY || this.#state === STATE.COUNTDOWN ||
-            this.#state === STATE.TRAINING || this.#state === STATE.TEST) {
+            this.#state === STATE.TRAINING || this.#state === STATE.TEST ||
+            this.#state === STATE.PHOTO) {
           this.#abortTrial();
         }
         break;

@@ -30,6 +30,14 @@ export const CONFIG = {
   EXIT_DURATION_MS:        1500,  // target zone → off-screen
   COUNTDOWN_SECS:          3.75,  // 3-2-1-GO before each phase (3 + 2 + 1 + GO! each 1s, GO 0.75s)
 
+  // ── Post-test "photo" review ─────────────────────────────────────────────
+  // Shown after each test phase: a polaroid of the fish at its single best
+  // (closest-to-target) moment during that phase's target crossing.
+  PHOTO_DEVELOP_MS:   2000,  // how long the polaroid takes to "develop" (fade in)
+  PHOTO_HOLD_MS:      2500,  // how long it stays fully visible before auto-advancing
+  PHOTO_ZOOM_MARGIN_X: 0.04, // extra horizontal margin around the target band, as a fraction of canvas width
+  PHOTO_ZOOM_MARGIN_Y: 0.05, // extra vertical margin around the outer (red) band, as a fraction of play height
+
   // ── Target geometry (normalized canvas fractions) ───────────────────────
   SPAWN_X_RATIO:    -0.08,  // fish start x (off-screen left)
   TARGET_X_START:    0.55,  // left edge of the target x-band
@@ -64,5 +72,6 @@ export const STATE = {
   COUNTDOWN:   'countdown',   // 3-2-1-GO before each phase (training and test)
   TRAINING:    'training',    // training phase of the current trial (target visible)
   TEST:        'test',        // test phase of the current trial (target hidden)
+  PHOTO:       'photo',       // post-test polaroid review of the best target-crossing moment
   DONE:        'done',
 };
