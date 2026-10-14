@@ -662,6 +662,9 @@ if (frontend === 'ibreath') {
       <input id="btg-subject" type="text" value="${BTG.SUBJECT_CODE}"
              placeholder="subject code" autocomplete="off" spellcheck="false" />
     </span>
+    <span>
+      <label><input type="checkbox" id="btg-auto-proceed"> auto-proceed</label>
+    </span>
     <span id="ib-controls">
       <button id="btg-start-btn"       disabled>Start</button>
       <button id="btg-next-btn"        style="display:none">Next trial</button>
@@ -683,6 +686,7 @@ if (frontend === 'ibreath') {
 
   const btgStatusEl      = document.getElementById('btg-status');
   const btgSubjectEl     = document.getElementById('btg-subject');
+  const btgAutoProceedEl = document.getElementById('btg-auto-proceed');
   const btgStartBtn      = document.getElementById('btg-start-btn');
   const btgNextBtn       = document.getElementById('btg-next-btn');
   const btgSpaceHintEl   = document.getElementById('btg-space-hint');
@@ -719,8 +723,12 @@ if (frontend === 'ibreath') {
       type:            'start',
       subjectCode:     btgSubjectEl.value.trim() || 'TEST',
       calibrationSecs: parseInt(document.getElementById('btg-cal-secs').value) || BTG.CALIBRATION_SECS,
+      autoProceed:     btgAutoProceedEl.checked,
     });
   });
+  btgAutoProceedEl.addEventListener('change', () =>
+    window.api.frontend.sendAction({ type: 'setAutoProceed', autoProceed: btgAutoProceedEl.checked })
+  );
   btgNextBtn.addEventListener('click',  () => window.api.frontend.sendAction({ type: 'next' }));
   btgAbortBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'abort' }));
   btgCalRetryBtn.addEventListener('click',   () => window.api.frontend.sendAction({ type: 'retryCalibration' }));
