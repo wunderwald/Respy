@@ -26,13 +26,14 @@ export const CONFIG = {
   OBSTACLE_HEIGHT_MIN: 40,
   OBSTACLE_HEIGHT_MAX: 70,
   // Spacing (time between spawns) ramps from the wide START range down to
-  // this smaller, tighter range as difficulty increases. Tightened again
-  // (was 1800/3000 and 500/1100) for more obstacles overall.
-  MIN_OBSTACLE_INTERVAL_START_MS: 1300,
-  MAX_OBSTACLE_INTERVAL_START_MS: 2000,
+  // this smaller, tighter range as difficulty increases. The START range is
+  // widened well clear of the hardest range (was only 1300/2000 — too close
+  // to the 320/650 target, not enough contrast between easy and hard).
+  MIN_OBSTACLE_INTERVAL_START_MS: 2200,
+  MAX_OBSTACLE_INTERVAL_START_MS: 3200,
   MIN_OBSTACLE_INTERVAL_MS: 320,
   MAX_OBSTACLE_INTERVAL_MS: 650,
-  FIRST_OBSTACLE_DELAY_MS: 2000,
+  FIRST_OBSTACLE_DELAY_MS: 1200,  // the very first obstacle still arrives promptly (was 2000ms)
 
   // ── Breath / exhale onset detection ────────────────────────────────────────
   EXHALE_ONSET_THRESHOLD: 0.40,
