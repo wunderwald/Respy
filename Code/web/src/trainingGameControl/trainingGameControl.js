@@ -204,7 +204,9 @@ export class TrainingGameControl {
       sailAnim:         this.#sailAnim,
       clouds:           this.#clouds,
       now,
-      hint: 'Tap as fast as you can!',
+      // Only during the tapping phase itself — not on the idle/countdown/
+      // game-over screens, which have their own "tap to…" text.
+      hint: this.#state === STATE.PLAYING ? 'Tap as fast as you can!' : null,
     };
   }
 }
