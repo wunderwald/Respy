@@ -1,0 +1,7 @@
+# Python 3.10 or 3.11 (Cardioception refuses others).
+#
+# Pinned to a GitHub commit rather than the PyPI 0.7.1 release: the release
+# freezes the confidence slider on macOS in mouse mode (upstream issue #103),
+# fixed on master. The code run.py patches is identical in both.
+cardioception-toolbox @ git+https://github.com/embodied-computation-group/Cardioception.git@305ff790fe84ce8afb11ae74730b6653ca29be47
+pylsl>=1.16
