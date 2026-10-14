@@ -25,13 +25,13 @@ export const CONFIG = {
 
   // ── Phase timing ─────────────────────────────────────────────────────────
   // The fish's x-speed over each segment follows from these durations and
-  // the x-geometry below. With the defaults, speed works out to ≈0.000079/ms
+  // the x-geometry below. With the defaults, speed works out to ≈0.000159/ms
   // while approaching, ≈0.00009/ms while crossing the target zone, and
   // ≈0.000173/ms on exit — i.e. clearly faster on exit than in the target
   // zone (the exit segment is ~1.9x faster), matching the "fast on exit"
   // requirement. The target zone is wide, so it's no longer much slower than
   // the approach itself — only the exit speed-up is guaranteed by design.
-  APPROACH_DURATION_MS:    8000,  // spawn → target zone
+  APPROACH_DURATION_MS:    4000,  // spawn → target zone (halved from the original 8000ms)
   TARGET_AREA_DURATION_MS: 3000,  // crossing the target zone
   EXIT_DURATION_MS:        1500,  // target zone → off-screen
   COUNTDOWN_SECS:          3.75,  // 3-2-1-GO before each phase (3 + 2 + 1 + GO! each 1s, GO 0.75s)
