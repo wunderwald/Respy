@@ -5,13 +5,16 @@
  * belt before they play the main BioGame.
  *
  * State machine:
- *   IDLE → CALIBRATING → READY → COUNTDOWN → TRAINING → COUNTDOWN → TEST → READY → … → DONE
- *                           ↑__________________________________________________|
+ *   IDLE → CALIBRATING → READY → COUNTDOWN → TRAINING → COUNTDOWN → TEST → PHOTO → READY → … → DONE
+ *                           ↑________________________________________________________|
  *                        (one READY per trial, waits for Space/Next — the fish is
  *                         live breath-driven here too, so the child can see the
  *                         connection before the trial starts; skipped entirely if
  *                         "auto-proceed" is on. A 3-2-1-GO COUNTDOWN precedes each
- *                         phase automatically.)
+ *                         phase automatically. PHOTO is a polaroid of the fish's
+ *                         best target-crossing moment that trial's test phase —
+ *                         auto-advances if "auto-proceed" is on, otherwise also
+ *                         waits for Space/Next.)
  *
  * Each trial reuses the same random target y-position for both its training
  * and test phases. In both phases the fish travels left→right through three
@@ -21,7 +24,9 @@
  * the target zone is covered by a bubble overlay and the fish disappears
  * while crossing it — the child must reproduce the same breath level blind.
  *
- * No scoring/feedback UI (by design) — only CSV data output.
+ * No scoring/feedback UI during gameplay (by design) — the only feedback is
+ * the post-test photo, which is purely celebratory (best moment, not a
+ * score). Full data output is via CSV only.
  *
  * Implements the standard frontend interface:
  *   pushSample(value: number) → void
@@ -85,6 +90,9 @@ export default class BeltTrainingGame {
 
   // ── Post-test photo review ────────────────────────────────────────────────
   #photoStartTime = null;
+  #photoSeq       = 0;  // increments every photo review — cache key for the renderer
+                         // (trialIndex alone would collide across separate sessions,
+                         // since it resets to 0 each time calibration restarts)
 
   // ── Countdown (3-2-1-GO before each phase) ────────────────────────────────
   #countdownStartTime = null;
@@ -153,6 +161,7 @@ export default class BeltTrainingGame {
 
       case 'next':
         if (this.#state === STATE.READY) this.#beginCountdown('training');
+        else if (this.#state === STATE.PHOTO) this.#finishPhotoReview();
         break;
 
       case 'abort':
@@ -312,6 +321,27 @@ export default class BeltTrainingGame {
     this.#markers.send(`trial_end_t${this.#trialIndex}`);
     this.#csv.appendEvent(this.#trialIndex, 'test', 'trial_end');
 
+    this.#beginPhotoReview();
+  }
+
+  // Shows the post-test polaroid (see beltTrainingGame_renderer.js's
+  // #capturePhoto/#drawPhotoReview) of the fish at its best (closest-to-
+  // target) moment during the test phase's target crossing. With
+  // auto-proceed on, it auto-advances itself (see #tick) once developed plus
+  // a short hold; otherwise it waits for Space/Next trial, like READY.
+  #beginPhotoReview() {
+    this.#state = STATE.PHOTO;
+    this.#photoStartTime = performance.now();
+    this.#photoSeq++;
+    this.#pushState({
+      stateText:    `trial ${this.#trialIndex + 1} / ${CONFIG.NUM_TRIALS} — here's how you did`,
+      nextVisible:  !this.#autoProceed,
+      abortVisible: true,
+    });
+  }
+
+  #finishPhotoReview() {
+    this.#photoStartTime = null;
     this.#trialIndex++;
     if (this.#trialIndex >= CONFIG.NUM_TRIALS) {
       this.#endExperiment();
@@ -347,6 +377,12 @@ export default class BeltTrainingGame {
         const phase = this.#pendingPhase;
         this.#pendingPhase = null;
         this.#beginTrialPhase(phase);
+      }
+    }
+
+    if (this.#state === STATE.PHOTO && this.#autoProceed) {
+      if (performance.now() - this.#photoStartTime >= CONFIG.PHOTO_DEVELOP_MS + CONFIG.PHOTO_HOLD_MS) {
+        this.#finishPhotoReview();
       }
     }
   }
@@ -422,6 +458,7 @@ export default class BeltTrainingGame {
         this.#markers.send(`target_enter_t${this.#trialIndex}`);
         this.#segGreenTime = 0;
         this.#segTotalTime = 0;
+        if (this.#phase === 'test') this.#bestTargetDistance = Infinity;
       }
       if (this.#segment === 'target' && newSegment !== 'target') {
         const greenFraction = this.#segTotalTime > 0 ? this.#segGreenTime / this.#segTotalTime : 0;
@@ -433,8 +470,14 @@ export default class BeltTrainingGame {
 
     if (this.#segment === 'target') {
       this.#segTotalTime += dt;
-      if (Math.abs(this.#avatarNormY - this.#targetNormY) <= CONFIG.TARGET_HEIGHT) {
+      const distance = Math.abs(this.#avatarNormY - this.#targetNormY);
+      if (distance <= CONFIG.TARGET_HEIGHT) {
         this.#segGreenTime += dt;
+      }
+      if (this.#phase === 'test' && distance < this.#bestTargetDistance) {
+        this.#bestTargetDistance = distance;
+        this.#bestFishXRatio     = this.#fishXRatio;
+        this.#bestFishNormY      = this.#avatarNormY;
       }
     }
 
@@ -492,6 +535,11 @@ export default class BeltTrainingGame {
                         : null,
       countdownValue,
       countdownProgress: clamp(countdownProgress, 0, 1),
+      trialIndex:        this.#trialIndex,
+      photoKey:          this.#photoSeq,
+      bestFishXRatio:    this.#bestFishXRatio,
+      bestFishNormY:     this.#bestFishNormY,
+      photoElapsedMs:    this.#photoStartTime != null ? now - this.#photoStartTime : 0,
     };
   }
 

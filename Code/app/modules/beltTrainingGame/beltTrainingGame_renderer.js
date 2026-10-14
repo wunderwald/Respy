@@ -21,6 +21,13 @@ export class BeltTrainingGameRenderer {
 
   #lastNow = null;
 
+  // Post-test polaroid — captured once per photo review (keyed by the game's
+  // monotonic photoKey, not trialIndex, since trialIndex resets across
+  // separate sessions) and cached, not re-rendered every frame. See
+  // #capturePhoto/#drawPhotoReview.
+  #cachedPhotoCanvas = null;
+  #cachedPhotoKey    = null;
+
   constructor(container, scene) {
     container.innerHTML = '<canvas id="btg-canvas"></canvas>';
     this.#canvas = container.querySelector('#btg-canvas');
@@ -76,6 +83,10 @@ export class BeltTrainingGameRenderer {
 
       case STATE.TEST:
         this.#drawGameplay(ctx, w, h, renderData, true, now);
+        break;
+
+      case STATE.PHOTO:
+        this.#drawPhotoReview(ctx, w, h, renderData);
         break;
 
       case STATE.DONE:
@@ -159,6 +170,121 @@ export class BeltTrainingGameRenderer {
       ctx.arc(bx, by, r, 0, Math.PI * 2);
       ctx.fill();
     }
+    ctx.restore();
+  }
+
+  // ── Post-test photo review ────────────────────────────────────────────────
+
+  // Renders a zoomed-in snapshot (fish + full target bands + a little
+  // surrounding background) into an offscreen canvas, as the scene looked at
+  // the single best (closest-to-target) moment of the test phase's target
+  // crossing. Reuses the exact same drawing calls as live gameplay, just
+  // under a scale+translate that crops/zooms into the target area.
+  #capturePhoto(bigW, bigH, fishXRatio, fishNormY, targetNormY) {
+    const topPad = bigH * 0.10;
+    const playH  = bigH * 0.80;
+    const normToScreenY = (ny) => topPad + (1 - ny) * playH;
+
+    const marginX = CONFIG.PHOTO_ZOOM_MARGIN_X * bigW;
+    const cropX1  = CONFIG.TARGET_X_START * bigW - marginX;
+    const cropX2  = CONFIG.TARGET_X_END   * bigW + marginX;
+
+    const marginY   = CONFIG.PHOTO_ZOOM_MARGIN_Y * playH;
+    const redHalfPx = CONFIG.TARGET_HEIGHT_RED * playH;
+    const centerYpx = normToScreenY(targetNormY);
+    const cropY1 = centerYpx - redHalfPx - marginY;
+    const cropY2 = centerYpx + redHalfPx + marginY;
+
+    const cropW = cropX2 - cropX1;
+    const cropH = cropY2 - cropY1;
+
+    const photo = document.createElement('canvas');
+    photo.width  = 360;
+    photo.height = Math.max(1, Math.round(360 * cropH / cropW));
+    const pctx = photo.getContext('2d');
+
+    const zoom = photo.width / cropW;
+    pctx.save();
+    pctx.scale(zoom, zoom);
+    pctx.translate(-cropX1, -cropY1);
+
+    this.#sceneRenderer.drawBg(pctx, bigW, bigH, 0);
+    this.#drawTargetBands(pctx, CONFIG.TARGET_X_START * bigW, CONFIG.TARGET_X_END * bigW, centerYpx, playH);
+
+    const avatarH = CONFIG.AVATAR_SIZE_MIN * bigH +
+      (CONFIG.AVATAR_SIZE_MAX - CONFIG.AVATAR_SIZE_MIN) * bigH * 0.5;
+    this.#sceneRenderer.drawAvatar(pctx, fishXRatio * bigW, normToScreenY(fishNormY), avatarH, 0);
+
+    pctx.restore();
+    return photo;
+  }
+
+  // A playful polaroid: blank, then "develops" into the captured photo over
+  // PHOTO_DEVELOP_MS. The photo itself is captured once per photo review and
+  // cached (keyed by photoKey) rather than re-rendered every frame.
+  #drawPhotoReview(ctx, w, h, data) {
+    const { photoKey, bestFishXRatio, bestFishNormY, targetNormY, photoElapsedMs = 0 } = data;
+
+    if (this.#cachedPhotoKey !== photoKey) {
+      this.#cachedPhotoCanvas = this.#capturePhoto(w, h, bestFishXRatio, bestFishNormY, targetNormY);
+      this.#cachedPhotoKey = photoKey;
+    }
+    const photo = this.#cachedPhotoCanvas;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(0, 0, w, h);
+
+    this.#drawCenter(ctx, w, h * 0.13, "Here's how you did!", 'rgba(255,255,255,0.92)', 28, '400');
+
+    const frameW   = Math.min(w * 0.46, 420);
+    const border   = 14;
+    const captionH = 46;
+    const innerW   = frameW - border * 2;
+    const innerH   = innerW * (photo.height / photo.width);
+    const frameH   = innerH + border * 2 + captionH;
+
+    const fx = w / 2 - frameW / 2;
+    const fy = h / 2 - frameH / 2 + h * 0.03;
+
+    ctx.save();
+    ctx.translate(w / 2, fy + frameH / 2);
+    ctx.rotate(-0.035);
+    ctx.translate(-w / 2, -(fy + frameH / 2));
+
+    // card
+    ctx.save();
+    ctx.shadowColor   = 'rgba(0,0,0,0.35)';
+    ctx.shadowBlur    = 18;
+    ctx.shadowOffsetY = 8;
+    ctx.fillStyle = '#fbfbf6';
+    ctx.beginPath();
+    ctx.roundRect(fx, fy, frameW, frameH, 6);
+    ctx.fill();
+    ctx.restore();
+
+    // photo area — blank, then develops in
+    const px = fx + border, py = fy + border;
+    const developT = clamp(photoElapsedMs / CONFIG.PHOTO_DEVELOP_MS, 0, 1);
+    const reveal = easeOut(developT);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(px, py, innerW, innerH);
+    ctx.clip();
+
+    ctx.fillStyle = '#cfcac0';
+    ctx.fillRect(px, py, innerW, innerH);
+
+    if (reveal > 0) {
+      ctx.globalAlpha = reveal;
+      ctx.drawImage(photo, px, py, innerW, innerH);
+      ctx.globalAlpha = 1;
+      // a fading chemical-development wash for a photo-booth feel
+      ctx.fillStyle = `rgba(90,70,40,${0.35 * (1 - reveal)})`;
+      ctx.fillRect(px, py, innerW, innerH);
+    }
+    ctx.restore();
+
     ctx.restore();
   }
 

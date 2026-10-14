@@ -32,9 +32,11 @@ export const CONFIG = {
 
   // ── Post-test "photo" review ─────────────────────────────────────────────
   // Shown after each test phase: a polaroid of the fish at its single best
-  // (closest-to-target) moment during that phase's target crossing.
+  // (closest-to-target) moment during that phase's target crossing. With
+  // auto-proceed on, it auto-advances after PHOTO_DEVELOP_MS + PHOTO_HOLD_MS;
+  // otherwise it waits for Space/Next trial, same as the READY screen.
   PHOTO_DEVELOP_MS:   2000,  // how long the polaroid takes to "develop" (fade in)
-  PHOTO_HOLD_MS:      2500,  // how long it stays fully visible before auto-advancing
+  PHOTO_HOLD_MS:      2000,  // (auto-proceed only) how long it stays visible after developing, before auto-advancing
   PHOTO_ZOOM_MARGIN_X: 0.04, // extra horizontal margin around the target band, as a fraction of canvas width
   PHOTO_ZOOM_MARGIN_Y: 0.05, // extra vertical margin around the outer (red) band, as a fraction of play height
 

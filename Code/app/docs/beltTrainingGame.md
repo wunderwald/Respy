@@ -35,7 +35,7 @@ In both phases the fish travels left → right through three timed segments:
 
 The target zone spans `TARGET_X_START`–`TARGET_X_END` (default 0.55–0.82 of canvas width, a wide band). Given the durations above, the fish's exit speed is always clearly faster than its target-crossing speed (≈1.9x with the defaults) — matching the "fast on exit" requirement; its approach speed is comparable to its target speed.
 
-**No scoring or feedback UI** is shown to the participant, by design — this is a pure practice tool. Performance is recorded to CSV only (see below).
+After each test phase, a **polaroid photo review** appears (see below) — the only feedback shown during the session, and purely celebratory rather than a score. Full data is recorded to CSV (see below).
 
 ---
 
@@ -51,6 +51,19 @@ Whether the breath signal was inside the green band is tracked continuously duri
 
 ---
 
+## Photo review
+
+Right after each test phase ends, a **polaroid** appears over the scene with the caption "Here's how you did!". It shows a zoomed-in crop of the fish inside the full red/yellow/green target band (plus a little surrounding background) — captured at the test phase's single **best moment**: whichever instant during the target crossing had the fish closest to the target centre. This is deliberately a celebratory snapshot, not an average or a score.
+
+The photo starts blank and "develops" in over `PHOTO_DEVELOP_MS` (default 2000ms), with a fading sepia-ish wash for a photo-booth feel.
+
+- **Auto-proceed on**: the review auto-advances to the next trial once developed, after an additional `PHOTO_HOLD_MS` (default 2000ms).
+- **Auto-proceed off**: it waits for **Space** / **Next trial**, same as the READY screen.
+
+`PHOTO_ZOOM_MARGIN_X`/`PHOTO_ZOOM_MARGIN_Y` control how much surrounding background is included around the target band in the crop. The snapshot is rendered once per trial into an offscreen canvas (reusing the same scene/avatar/target-band drawing calls as live gameplay) and cached — not re-rendered every frame.
+
+---
+
 ## Experimenter controls
 
 | Control | Description |
@@ -60,8 +73,8 @@ Whether the breath signal was inside the green band is tracked continuously duri
 | Cal secs | Calibration duration in seconds (settings bar) |
 | Start | Begins calibration (enabled once the resp stream is connected) |
 | Retry calibration / Use default calibration | Shown only if calibration fails (flat/no signal) |
-| Next trial | Shown during the READY screen (hidden entirely if auto-proceed is on); same action as pressing **Space** |
-| Abort | Ends the session immediately (available from READY, during the countdown, or during either phase) — also bound to **Escape** |
+| Next trial | Shown during the READY screen and, if auto-proceed is off, the photo review; same action as pressing **Space** |
+| Abort | Ends the session immediately (available from READY, during the countdown, during either phase, or during the photo review) — also bound to **Escape** |
 | **Press SPACE to continue** badge | Mirrors the **Next trial** button's visibility |
 
 The resp stream selector is never locked, even once other controls lock, so the experimenter can recover from a dropped stream mid-session (see [stream.md](stream.md)).
