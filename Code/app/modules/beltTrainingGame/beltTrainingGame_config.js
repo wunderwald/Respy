@@ -61,6 +61,10 @@ export const CONFIG = {
 
   // ── Test-phase cover ─────────────────────────────────────────────────────
   BUBBLE_COUNT: 24,
+  // How far outside the bubble-covered target zone (as a fraction of canvas
+  // width) the fish's opacity fade ramps over, so it fades smoothly in/out
+  // rather than blinking the instant it crosses the zone's edge.
+  FISH_FADE_WIDTH_RATIO: 0.035,
 
   // ── Data recording ───────────────────────────────────────────────────────
   FRAME_INTERVAL_MS: 50,    // 20 fps of frame data

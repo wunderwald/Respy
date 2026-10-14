@@ -98,7 +98,7 @@ export class BeltTrainingGameRenderer {
   // ── Gameplay (training + test phases) ─────────────────────────────────────
 
   #drawGameplay(ctx, w, h, data, isTest, now) {
-    const { fishXRatio, fishNormY, targetNormY, segment, avatarTilt = 0, promptText } = data;
+    const { fishXRatio, fishNormY, targetNormY, avatarTilt = 0, promptText } = data;
 
     const topPad = h * 0.10;
     const playH  = h * 0.80;
@@ -114,18 +114,38 @@ export class BeltTrainingGameRenderer {
       this.#drawTargetBands(ctx, targetScreenX1, targetScreenX2, targetScreenY, playH);
     }
 
-    const fishHidden = isTest && segment === 'target';
-    if (!fishHidden) {
+    // Continuous opacity fade as the fish enters/leaves the bubble-covered
+    // zone (test phase only) — driven by its actual x position, not the
+    // discrete segment label, so it fades smoothly instead of blinking.
+    const opacity = isTest ? this.#fishOpacity(fishXRatio) : 1;
+    if (opacity > 0.001) {
       const fishScreenX = fishXRatio * w;
       const fishScreenY = normToScreenY(fishNormY);
       const avatarH = CONFIG.AVATAR_SIZE_MIN * h +
         (CONFIG.AVATAR_SIZE_MAX - CONFIG.AVATAR_SIZE_MIN) * h * 0.5;
+      ctx.save();
+      ctx.globalAlpha = opacity;
       this.#sceneRenderer.drawAvatar(ctx, fishScreenX, fishScreenY, avatarH, avatarTilt);
+      ctx.restore();
     }
 
     if (promptText) {
       this.#drawCenter(ctx, w, h * 0.08, promptText, 'rgba(255,255,255,0.80)', 22);
     }
+  }
+
+  // 1 outside the target zone, 0 fully inside it, with a linear ramp of
+  // width FISH_FADE_WIDTH_RATIO just outside each edge.
+  #fishOpacity(fishXRatio) {
+    const fadeW = CONFIG.FISH_FADE_WIDTH_RATIO;
+    const x1 = CONFIG.TARGET_X_START;
+    const x2 = CONFIG.TARGET_X_END;
+
+    if (fishXRatio <= x1 - fadeW) return 1;
+    if (fishXRatio < x1)          return (x1 - fishXRatio) / fadeW;
+    if (fishXRatio <= x2)         return 0;
+    if (fishXRatio < x2 + fadeW)  return (fishXRatio - x2) / fadeW;
+    return 1;
   }
 
   // Nested red/yellow/green/yellow/red bands, drawn as three overlapping
