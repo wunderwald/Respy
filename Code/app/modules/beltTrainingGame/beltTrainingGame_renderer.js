@@ -87,7 +87,7 @@ export class BeltTrainingGameRenderer {
   // ── Gameplay (training + test phases) ─────────────────────────────────────
 
   #drawGameplay(ctx, w, h, data, isTest, now) {
-    const { fishXRatio, fishNormY, targetNormY, segment, avatarTilt = 0 } = data;
+    const { fishXRatio, fishNormY, targetNormY, segment, avatarTilt = 0, promptText } = data;
 
     const topPad = h * 0.10;
     const playH  = h * 0.80;
@@ -110,6 +110,10 @@ export class BeltTrainingGameRenderer {
       const avatarH = CONFIG.AVATAR_SIZE_MIN * h +
         (CONFIG.AVATAR_SIZE_MAX - CONFIG.AVATAR_SIZE_MIN) * h * 0.5;
       this.#sceneRenderer.drawAvatar(ctx, fishScreenX, fishScreenY, avatarH, avatarTilt);
+    }
+
+    if (promptText) {
+      this.#drawCenter(ctx, w, h * 0.08, promptText, 'rgba(255,255,255,0.80)', 22);
     }
   }
 
