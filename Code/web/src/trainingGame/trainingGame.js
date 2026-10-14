@@ -215,6 +215,11 @@ export class TrainingGame {
       sailAnim:         this.#sailAnim,
       clouds:           this.#clouds,
       now,
+      // Only during actual gameplay — coaches the paced breathing: push on
+      // the exhale, rest/inhale while the current drifts the boat back.
+      hint: this.#state === STATE.PLAYING
+        ? (this.#blowing ? "Blow into the boat's sail!" : 'Breathe in')
+        : null,
     };
   }
 }
