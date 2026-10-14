@@ -161,7 +161,7 @@ export class BeltTrainingGameRenderer {
       const seed  = i * 137.508;                         // golden-angle spacing
       const speed = 0.00004 + (i % 5) * 0.000012;
       const phase = ((now * speed + seed) % 1 + 1) % 1;
-      const bx = x1 + (((seed * 0.6180339887) % 1 + 1) % 1) * (x2 - x1);
+      const bx = x1 + (((i * 0.6180339887) % 1 + 1) % 1) * (x2 - x1);
       const by = h * (1 - phase);
       const r  = 3 + (i % 4) * 2.2;
 
