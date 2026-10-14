@@ -50,6 +50,7 @@ export default class BeltTrainingGame {
   // ── Experiment settings (overridden by experimenter on start) ─────────────
   #subjectCode     = CONFIG.SUBJECT_CODE;
   #calibrationSecs = CONFIG.CALIBRATION_SECS;
+  #autoProceed     = false;  // when true, READY screens are skipped — trials chain automatically
 
   // ── Signal processing ─────────────────────────────────────────────────────
   #smoother     = new GaussianSmoother(CONFIG.SMOOTH_WINDOW);
@@ -126,12 +127,17 @@ export default class BeltTrainingGame {
 
   // ── Action handler ────────────────────────────────────────────────────────
 
-  #onAction({ type, subjectCode, calibrationSecs }) {
+  #onAction({ type, subjectCode, calibrationSecs, autoProceed }) {
     switch (type) {
       case 'start':
         if (subjectCode     !== undefined) this.#subjectCode     = subjectCode;
         if (calibrationSecs !== undefined) this.#calibrationSecs = calibrationSecs;
+        if (autoProceed     !== undefined) this.#autoProceed     = autoProceed;
         if (this.#state === STATE.IDLE && this.#streamReady) this.#beginCalibration();
+        break;
+
+      case 'setAutoProceed':
+        this.#autoProceed = !!autoProceed;
         break;
 
       case 'next':
@@ -230,7 +236,13 @@ export default class BeltTrainingGame {
     this.#targetNormY = randBetween(CONFIG.TARGET_Y_MIN, CONFIG.TARGET_Y_MAX);
     this.#phase       = null;
     this.#segment     = null;
-    this.#state       = STATE.READY;
+
+    if (this.#autoProceed) {
+      this.#beginCountdown('training');
+      return;
+    }
+
+    this.#state = STATE.READY;
     this.#pushState({
       stateText:    `ready — trial ${this.#trialIndex + 1} / ${CONFIG.NUM_TRIALS} — press Space or Start`,
       nextVisible:  true,
@@ -335,7 +347,7 @@ export default class BeltTrainingGame {
 
     const inGameplay = this.#state === STATE.TRAINING || this.#state === STATE.TEST;
 
-    if (inGameplay || this.#state === STATE.CALIBRATING) {
+    if (inGameplay || this.#state === STATE.CALIBRATING || this.#state === STATE.READY) {
       this.#updateSignal(dt);
     }
 
@@ -356,7 +368,7 @@ export default class BeltTrainingGame {
   // ── Signal normalization ──────────────────────────────────────────────────
 
   #updateSignal(dt) {
-    if (this.#state === STATE.TRAINING || this.#state === STATE.TEST) {
+    if (this.#state === STATE.TRAINING || this.#state === STATE.TEST || this.#state === STATE.READY) {
       this.#normRange = this.#rangeTracker?.range ?? this.#normRange;
     }
     const [rMin, rMax] = this.#normRange;
@@ -463,6 +475,9 @@ export default class BeltTrainingGame {
       targetNormY:       this.#targetNormY,
       segment:           this.#segment,
       avatarTilt:        this.#avatarTilt,
+      promptText:        this.#phase === 'training' ? 'Hold your breath in the green area!'
+                        : this.#phase === 'test'     ? 'Hold your breath just like before!'
+                        : null,
       countdownValue,
       countdownProgress: clamp(countdownProgress, 0, 1),
     };

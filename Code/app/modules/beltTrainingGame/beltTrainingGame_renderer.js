@@ -63,7 +63,7 @@ export class BeltTrainingGameRenderer {
         break;
 
       case STATE.READY:
-        this.#drawReady(ctx, w, h, now);
+        this.#drawReady(ctx, w, h, renderData);
         break;
 
       case STATE.COUNTDOWN:
@@ -184,16 +184,17 @@ export class BeltTrainingGameRenderer {
     this.#drawCenter(ctx, w, cy + r + 28, 'calibrating signal…', 'rgba(255,255,255,0.28)', 14);
   }
 
-  #drawReady(ctx, w, h, now) {
-    const bobNormY      = 0.5 + 0.25 * Math.sin(now / 1000 * 1.5);
-    const tilt          = -0.2 * Math.cos(now / 1000 * 1.5);
+  // Driven by the live breath signal (fishNormY/avatarTilt), exactly like
+  // gameplay — lets the child see the fish respond to their own breathing
+  // before the trial actually starts.
+  #drawReady(ctx, w, h, { fishNormY = 0.5, avatarTilt = 0 }) {
     const topPad        = h * 0.10;
     const playH         = h * 0.80;
     const avatarScreenX = w / 2;
-    const avatarScreenY = topPad + (1 - bobNormY) * playH;
+    const avatarScreenY = topPad + (1 - fishNormY) * playH;
     const avatarH = CONFIG.AVATAR_SIZE_MIN * h + (CONFIG.AVATAR_SIZE_MAX - CONFIG.AVATAR_SIZE_MIN) * h * 0.5;
-    this.#sceneRenderer.drawAvatar(ctx, avatarScreenX, avatarScreenY, avatarH * 1.3, tilt);
-    this.#drawCenter(ctx, w, h * 0.80, 'Press Space or Start to begin', 'rgba(255,255,255,0.30)', 16);
+    this.#sceneRenderer.drawAvatar(ctx, avatarScreenX, avatarScreenY, avatarH * 1.3, avatarTilt);
+    this.#drawCenter(ctx, w, h * 0.85, 'See how your breath moves the fish!', 'rgba(255,255,255,0.75)', 20);
   }
 
   // The same "three fish bopping happily" animation ibreath shows before each
