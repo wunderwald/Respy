@@ -3,12 +3,12 @@ Cardioception on LSL peak pulses
 ================================
 Runs Cardioception's Heart Rate Discrimination (HRD) or Heartbeat Counting
 (HBC) task with heartbeats taken from an LSL stream of Fast Response Output
-pulses instead of a Nonin pulse oximeter.
+pulses instead of a pulse oximeter.
 
     python run.py
 
 A dialog lists the LSL streams on the network and preselects the first one
-with "peak" in its name. See README.md for what is patched and why.
+with "peak" in its name.
 """
 
 import logging

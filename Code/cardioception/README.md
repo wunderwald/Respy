@@ -101,7 +101,7 @@ Same files and columns as with the oximeter (`signal`, `peaks`, `instant_rr`,
 The bundled analysis notebooks re-detect peaks with `ppg_peaks(..., sfreq=75)`.
 For this data, use the `peaks` column or the edges instead.
 
-## Known gaps
+## Known issues
 
 - The HRD tutorial still shows the pulse-oximeter screens and asks which finger
   the sensor is on. Answer anything. The tutorial can be switched off in the dialog.
