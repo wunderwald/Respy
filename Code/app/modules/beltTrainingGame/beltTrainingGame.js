@@ -7,8 +7,11 @@
  * State machine:
  *   IDLE → CALIBRATING → READY → COUNTDOWN → TRAINING → COUNTDOWN → TEST → READY → … → DONE
  *                           ↑__________________________________________________|
- *                        (one READY per trial, waits for Space/Next;
- *                         a 3-2-1-GO COUNTDOWN precedes each phase automatically)
+ *                        (one READY per trial, waits for Space/Next — the fish is
+ *                         live breath-driven here too, so the child can see the
+ *                         connection before the trial starts; skipped entirely if
+ *                         "auto-proceed" is on. A 3-2-1-GO COUNTDOWN precedes each
+ *                         phase automatically.)
  *
  * Each trial reuses the same random target y-position for both its training
  * and test phases. In both phases the fish travels left→right through three
