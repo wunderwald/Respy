@@ -53,6 +53,7 @@ def summarize_xdf(path):
         return
 
     log.info("=" * 70)
+    log.info("Folder: %s", path.parent.name)
     log.info("%s  (%d stream%s)", path, len(streams), "" if len(streams) == 1 else "s")
 
     for stream in streams:
