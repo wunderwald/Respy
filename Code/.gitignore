@@ -2,7 +2,8 @@
 
 app/output_data
 
-
+*.xdf
+*.adicht
 
 !app/lib/webgazer.js
 
