@@ -23,7 +23,12 @@ Client -> server (JSON, {"type": ...}):
   {"type": "stop"}        Stop recording (no-op if not recording).
   {"type": "status"}      Request an immediate status snapshot.
   {"type": "shutdown"}    Stop recording, transfer the EDF file, disconnect
-                           the tracker, and exit the process.
+                           the tracker, and exit the process. Aborts a
+                           running calibration (setup mode) first.
+
+Client disconnects never affect the bridge: a calibration in progress keeps
+running (the operator finishes it on the Host PC). Ctrl+C in the bridge
+console shuts it down cleanly, also during calibration.
 
 Server -> client (JSON):
   {"type": "status", "state": "idle"|"connecting"|"connected"|"setup"|"calibrating"|"calibrated"|
@@ -54,6 +59,7 @@ import asyncio
 import json
 import logging
 import queue
+import signal
 import sys
 import threading
 from pathlib import Path
@@ -82,6 +88,7 @@ class ControlState:
         self.stop_event: asyncio.Event | None = None   # created on the server loop
         self.commands: "queue.Queue[str]" = queue.Queue()
         self.server_ready = threading.Event()
+        self.shutdown_requested = threading.Event()
 
 
 def _status_payload(state: ControlState, bridge: EyeLinkLSLBridge) -> dict:
@@ -160,7 +167,10 @@ async def _handle_command(
     cmd = msg.get("type")
     if cmd == "status":
         await websocket.send(json.dumps(_status_payload(state, bridge)))
-    elif cmd in ("calibrate", "start", "stop", "shutdown"):
+    elif cmd == "shutdown":
+        log.info("Command received: shutdown")
+        _request_shutdown(state, bridge)
+    elif cmd in ("calibrate", "start", "stop"):
         log.info("Command received: %s", cmd)
         state.commands.put(cmd)
     else:
@@ -188,6 +198,16 @@ async def _control_handler(
         log.info("Control client disconnected: %s (total: %d)", remote, len(state.clients))
 
 
+def _request_shutdown(state: ControlState, bridge: "EyeLinkLSLBridge | None") -> None:
+    """
+    Thread-safe. The main thread may be blocked inside doTrackerSetup(),
+    where it can't see queued commands — so also abort setup mode.
+    """
+    state.shutdown_requested.set()
+    if bridge is not None:
+        bridge.abort_setup()
+
+
 # ── Setup + main loop ────────────────────────────────────────────────────────
 
 def _make_bridge(args, state: ControlState) -> EyeLinkLSLBridge:
@@ -205,7 +225,7 @@ def _make_bridge(args, state: ControlState) -> EyeLinkLSLBridge:
     return bridge
 
 
-def _startup(args, bridge: EyeLinkLSLBridge) -> None:
+def _startup(args, bridge: EyeLinkLSLBridge, state: ControlState) -> None:
     """
     Connect to the EyeLink Host and (per CLI flags) run the initial
     calibration and start recording. Main thread only (see module docstring).
@@ -213,9 +233,9 @@ def _startup(args, bridge: EyeLinkLSLBridge) -> None:
     'setup' / 'calibrating' instead of nothing while the operator calibrates.
     """
     bridge.connect()
-    if args.auto_calibrate:
+    if args.auto_calibrate and not state.shutdown_requested.is_set():
         bridge.calibrate(start_calibration=args.startup_skip_camera_setup)
-    if args.auto_start:
+    if args.auto_start and not state.shutdown_requested.is_set():
         bridge.start()
 
 
@@ -284,9 +304,6 @@ def _execute(cmd: str, bridge: EyeLinkLSLBridge, args) -> bool:
         elif cmd == "stop":
             if bridge.is_recording:
                 bridge.stop()
-        elif cmd == "shutdown":
-            log.info("Shutdown requested by client.")
-            return False
     except Exception:
         log.exception("Command %r failed.", cmd)
     return True
@@ -320,25 +337,44 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
+def _install_signal_handlers(state: ControlState, get_bridge) -> None:
+    """
+    Ctrl+C (and Ctrl+Break on Windows) → clean shutdown, even while blocked
+    in EyeLink setup mode: Python runs the handler during pylink's
+    get_input_key() callbacks, and the handler aborts setup. A second press
+    forces an immediate KeyboardInterrupt.
+    """
+    def handler(signum, _frame):
+        if state.shutdown_requested.is_set():
+            raise KeyboardInterrupt
+        log.info("Signal %s — shutting down (press again to force).", signum)
+        _request_shutdown(state, get_bridge())
+
+    signal.signal(signal.SIGINT, handler)
+    if hasattr(signal, "SIGBREAK"):
+        signal.signal(signal.SIGBREAK, handler)
+
+
 def main() -> None:
     args = parse_args()
     state = ControlState()
     bridge: EyeLinkLSLBridge | None = None
     server_thread: threading.Thread | None = None
+    _install_signal_handlers(state, lambda: bridge)
 
     try:
         bridge = _make_bridge(args, state)    # main thread: owns the window
         server_thread = _run_server_thread(args, state, bridge)
         state.server_ready.wait()
         try:
-            _startup(args, bridge)            # main thread: connect + calibration
+            _startup(args, bridge, state)     # main thread: connect + calibration
         except Exception as exc:
             log.exception("Startup failed.")
             _broadcast_error(state, f"EyeLink startup failed: {exc}")
             raise
 
         # Main-thread command loop. The short timeout keeps Ctrl+C responsive.
-        while server_thread.is_alive():
+        while server_thread.is_alive() and not state.shutdown_requested.is_set():
             try:
                 cmd = state.commands.get(timeout=0.1)
             except queue.Empty:
