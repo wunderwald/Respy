@@ -15,8 +15,7 @@ Control WebSocket (default ws://localhost:9002)
 -------------------------------------------------
 Client -> server (JSON, {"type": ...}):
   {"type": "calibrate"}   Recalibrate. If recording, pauses/resumes around
-                           it automatically (see request_calibrate() in
-                           eyelink_to_lsl.py); otherwise calibrates inline.
+                           it automatically (EyeLinkLSLBridge.recalibrate()).
   {"type": "start"}       Start recording (no-op if already recording).
   {"type": "stop"}        Stop recording (no-op if not recording).
   {"type": "status"}      Request an immediate status snapshot.
@@ -31,7 +30,17 @@ Server -> client (JSON):
   {"type": "error", "message": str}
 
 A status snapshot is sent to every client on connect and broadcast to all
-connected clients whenever the bridge's lifecycle state changes.
+connected clients whenever the bridge's lifecycle state changes (and once
+after every handled command).
+
+Threading
+---------
+Everything that touches pylink or the PsychoPy window (connect, calibrate,
+start/stop, disconnect) runs on the MAIN thread, which created the window:
+on Windows the OpenGL context and the window's message queue belong to that
+thread, so calibration drawn from any other thread shows nothing / receives
+no key presses. The WebSocket server therefore runs in a background thread
+and only enqueues commands; the main thread executes them.
 
 Run via start_bridge.bat (Windows) or directly:
   .venv/bin/python run_bridge.py --edf-filename sub01
@@ -41,7 +50,9 @@ import argparse
 import asyncio
 import json
 import logging
+import queue
 import sys
+import threading
 from pathlib import Path
 
 import websockets
@@ -65,6 +76,9 @@ class ControlState:
         self.clients: set = set()
         self.last_state: str = "idle"
         self.loop: asyncio.AbstractEventLoop | None = None
+        self.stop_event: asyncio.Event | None = None   # created on the server loop
+        self.commands: "queue.Queue[str]" = queue.Queue()
+        self.server_ready = threading.Event()
 
 
 def _status_payload(state: ControlState, bridge: EyeLinkLSLBridge) -> dict:
@@ -99,8 +113,17 @@ def _on_bridge_state(state: ControlState, bridge: EyeLinkLSLBridge, new_state: s
     """
     state.last_state = new_state
     log.info("Bridge state -> %s", new_state)
-    if state.loop is not None:
-        asyncio.run_coroutine_threadsafe(_broadcast_status(state, bridge), state.loop)
+    _schedule_broadcast(state, bridge)
+
+
+def _schedule_broadcast(state: ControlState, bridge: EyeLinkLSLBridge) -> None:
+    """Thread-safe: queue a status broadcast on the server loop, if running."""
+    loop = state.loop
+    if loop is not None and not loop.is_closed():
+        try:
+            asyncio.run_coroutine_threadsafe(_broadcast_status(state, bridge), loop)
+        except RuntimeError:
+            pass  # loop shutting down
 
 
 # ── PsychoPy window ──────────────────────────────────────────────────────────
@@ -123,10 +146,8 @@ async def _handle_command(
     websocket,
     state: ControlState,
     bridge: EyeLinkLSLBridge,
-    stop_event: asyncio.Event,
 ) -> None:
-    loop = asyncio.get_running_loop()
-
+    """Runs on the server thread: validate, then hand off to the main thread."""
     try:
         msg = json.loads(raw)
     except json.JSONDecodeError:
@@ -134,45 +155,19 @@ async def _handle_command(
         return
 
     cmd = msg.get("type")
-
-    if cmd == "calibrate":
-        if bridge.is_recording:
-            bridge.request_calibrate()  # thread-safe; picked up by the pump thread
-        else:
-            # No pump thread running to service it — calibrate inline. This
-            # blocks the control server until the operator accepts on the
-            # Host PC, same as the initial startup calibration.
-            await loop.run_in_executor(None, bridge.calibrate)
-
-    elif cmd == "start":
-        if not bridge.is_recording:
-            await loop.run_in_executor(None, bridge.start)
-
-    elif cmd == "stop":
-        if bridge.is_recording:
-            await loop.run_in_executor(None, bridge.stop)
-
-    elif cmd == "status":
+    if cmd == "status":
         await websocket.send(json.dumps(_status_payload(state, bridge)))
-        return
-
-    elif cmd == "shutdown":
-        log.info("Shutdown requested by client.")
-        stop_event.set()
-        return
-
+    elif cmd in ("calibrate", "start", "stop", "shutdown"):
+        log.info("Command received: %s", cmd)
+        state.commands.put(cmd)
     else:
         await websocket.send(json.dumps({"type": "error", "message": f"unknown command: {cmd!r}"}))
-        return
-
-    await websocket.send(json.dumps(_status_payload(state, bridge)))
 
 
 async def _control_handler(
     websocket,
     state: ControlState,
     bridge: EyeLinkLSLBridge,
-    stop_event: asyncio.Event,
 ) -> None:
     state.clients.add(websocket)
     remote = websocket.remote_address
@@ -182,7 +177,7 @@ async def _control_handler(
 
     try:
         async for raw in websocket:
-            await _handle_command(raw, websocket, state, bridge, stop_event)
+            await _handle_command(raw, websocket, state, bridge)
     except websockets.exceptions.ConnectionClosed:
         pass
     finally:
@@ -221,19 +216,60 @@ def _setup_bridge(args, state: ControlState) -> EyeLinkLSLBridge:
 
 async def _serve(args, state: ControlState, bridge: EyeLinkLSLBridge) -> None:
     state.loop = asyncio.get_running_loop()
-    stop_event = asyncio.Event()
+    state.stop_event = asyncio.Event()
 
     async def handler(websocket):
-        await _control_handler(websocket, state, bridge, stop_event)
+        await _control_handler(websocket, state, bridge)
 
     server = await websockets.serve(handler, args.control_host, args.control_port)
     log.info("Control API: ws://%s:%s", args.control_host, args.control_port)
+    state.server_ready.set()
 
     try:
-        await stop_event.wait()
+        await state.stop_event.wait()
     finally:
         server.close()
         await server.wait_closed()
+
+
+def _run_server_thread(args, state: ControlState, bridge: EyeLinkLSLBridge) -> threading.Thread:
+    def target():
+        try:
+            asyncio.run(_serve(args, state, bridge))
+        except Exception:
+            log.exception("Control server crashed.")
+        finally:
+            state.loop = None
+            state.server_ready.set()  # unblock main even on failure
+
+    t = threading.Thread(target=target, name="ControlWS", daemon=True)
+    t.start()
+    return t
+
+
+def _stop_server(state: ControlState) -> None:
+    loop, ev = state.loop, state.stop_event
+    if loop is not None and ev is not None and not loop.is_closed():
+        loop.call_soon_threadsafe(ev.set)
+
+
+def _execute(cmd: str, bridge: EyeLinkLSLBridge) -> bool:
+    """Runs on the main thread. Returns False when the process should exit."""
+    try:
+        if cmd == "calibrate":
+            bridge.recalibrate()
+        elif cmd == "start":
+            if not bridge.is_recording:
+                bridge.start()
+        elif cmd == "stop":
+            if bridge.is_recording:
+                bridge.stop()
+        elif cmd == "shutdown":
+            log.info("Shutdown requested by client.")
+            return False
+    except Exception:
+        log.exception("Command %r failed.", cmd)
+    return True
 
 
 def parse_args() -> argparse.Namespace:
@@ -262,16 +298,30 @@ def main() -> None:
     args = parse_args()
     state = ControlState()
     bridge: EyeLinkLSLBridge | None = None
+    server_thread: threading.Thread | None = None
 
     try:
-        bridge = _setup_bridge(args, state)
-        asyncio.run(_serve(args, state, bridge))
+        bridge = _setup_bridge(args, state)   # main thread: window + calibration
+        server_thread = _run_server_thread(args, state, bridge)
+        state.server_ready.wait()
+
+        # Main-thread command loop. The short timeout keeps Ctrl+C responsive.
+        while server_thread.is_alive():
+            try:
+                cmd = state.commands.get(timeout=0.1)
+            except queue.Empty:
+                continue
+            if not _execute(cmd, bridge):
+                break
+            _schedule_broadcast(state, bridge)
     except KeyboardInterrupt:
         log.info("Interrupted.")
     finally:
-        # The event loop is closed once asyncio.run() returns; clear the
-        # reference so any further on_state callbacks (from stop/disconnect
-        # below) don't try to broadcast into a dead loop.
+        _stop_server(state)
+        if server_thread is not None:
+            server_thread.join(timeout=2.0)
+        # Clear the loop reference so the on_state callbacks fired by
+        # stop/disconnect below don't try to broadcast into a dead loop.
         state.loop = None
         if bridge is not None:
             if bridge.is_recording:

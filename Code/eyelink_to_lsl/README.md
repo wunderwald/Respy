@@ -85,13 +85,15 @@ bridge.disconnect()     # transfers EDF file to PC 1 and closes connection
 
 ## Recalibration mid-experiment
 
-Call `request_calibrate()` from any thread — your WebSocket handler, a keypress callback, wherever:
+Call `recalibrate()` **from the thread that created the PsychoPy window** (normally the main thread):
 
 ```python
-bridge.request_calibrate()
+bridge.recalibrate()
 ```
 
-The pump thread will finish its current sample, stop recording, run a full calibration on Screen 2 (blocking until the operator accepts on PC 3), then resume recording automatically. The LSL stream continues; the gap during calibration will appear as missing samples (`-1.0, -1.0`).
+It stops the pump, runs a full calibration on Screen 2 (blocking until the operator accepts on PC 3), then resumes recording. The LSL outlet stays open; no samples are pushed during calibration, so it shows up as a gap in the stream.
+
+Don't call it from a background thread (a WebSocket handler, the pump thread, an executor): on Windows the window's OpenGL context and message queue belong to the thread that created it, so a calibration driven from elsewhere draws nothing and receives no key presses. If commands arrive on another thread, queue them and run them on the main thread — that's what `run_bridge.py` does.
 
 ---
 
@@ -117,7 +119,7 @@ On startup it opens the PsychoPy window, connects to the EyeLink Host, runs an i
 
 | Command | Effect |
 |---|---|
-| `calibrate` | Recalibrate. Non-blocking (via `request_calibrate()`) if already recording; otherwise calibrates inline. |
+| `calibrate` | Recalibrate (`recalibrate()`): pauses and resumes recording around it if it was recording. |
 | `start` | Start recording (no-op if already recording). |
 | `stop` | Stop recording (no-op if not recording). |
 | `status` | Request an immediate status snapshot. |
@@ -159,9 +161,9 @@ The EyeLink records a full-fidelity `.edf` file on PC 3 throughout the session. 
 
 ## Key design notes
 
-**Threading model.** The LSL pump runs in a background daemon thread. All pylink and display calls during recalibration are made from that same thread — this avoids the OpenGL context issues that arise when PsychoPy draw calls cross thread boundaries.
+**Threading model.** The LSL pump runs in a background daemon thread and only reads samples. Everything that touches the PsychoPy window — `connect()`, `calibrate()`, `recalibrate()` — must run on the thread that created the window. `run_bridge.py` keeps all of that on the main thread and runs its WebSocket server in a background thread that just enqueues commands.
 
-**`getNewestSample()` vs. event queue.** The pump uses `getNewestSample()` for simplicity. Under heavy CPU load this can drop frames. If you need every sample (e.g. for microsaccade analysis), replace the inner loop with the event-queue approach:
+**`getNewestSample()` vs. event queue.** The pump polls `getNewestSample()` and pushes a sample only when its tracker timestamp changes. (`getNewestSample()` keeps returning the last sample until a new one arrives, so without that check each sample gets pushed thousands of times.) Under heavy CPU load polling can still miss the odd sample. If you need every sample (e.g. for microsaccade analysis), use the event queue instead:
 
 ```python
 dt = self._tracker.getNextData()
@@ -169,6 +171,6 @@ if dt == pylink.SAMPLE_TYPE:
     sample = self._tracker.getData()
 ```
 
-**Binocular averaging.** When both eyes are tracked, `x_norm`/`y_norm` are the average of left and right gaze. If one eye is missing the valid eye is used. If you need per-eye channels, add four channels (`lx`, `ly`, `rx`, `ry`) and skip the averaging in `_extract_gaze`.
+**Eye selection / binocular averaging.** Which eye(s) to track is configured on the Host PC; the bridge doesn't override `binocular_enabled`. Each sample is handled based on the eye data it actually carries (`isLeftSample()` / `isRightSample()`): when both eyes are present, `x_norm`/`y_norm` are their average; if one eye is missing, the valid one is used. If you need per-eye channels, add four channels (`lx`, `ly`, `rx`, `ry`) and skip the averaging in `_extract_gaze`.
 
-**The calibration window stays backgrounded outside calibration.** `window` (Screen 2) is the same fullscreen display the experiment app (e.g. [`../app/`](../app/)) uses for its own window, so `PsychopyCalibrationDisplay` minimizes it as soon as `setup()` registers the display, and again as soon as `exit_cal_display()` fires at the end of a calibration/validation pass. It's only raised back to the foreground while `setup_cal_display()` has it (i.e. while pylink is actively drawing targets for the operator). This relies on the pyglet window handle PsychoPy's default backend exposes (`win.winHandle.minimize()` / `.set_visible(True)` / `.activate()`); on a backend without that handle it degrades silently to "window stays visible" rather than erroring.
+**The calibration window stays backgrounded outside calibration.** `window` (Screen 2) is the same fullscreen display the experiment app (e.g. [`../app/`](../app/)) uses for its own window, so `PsychopyCalibrationDisplay` hides it as soon as `setup()` registers the display, and again as soon as `exit_cal_display()` fires at the end of a calibration/validation pass. It's only raised back to the foreground while `setup_cal_display()` has it (i.e. while pylink is actively drawing targets for the operator). This relies on the pyglet window handle PsychoPy's default backend exposes (`win.winHandle.set_visible(False)` / `.set_visible(True)` / `.activate()`). It hides the window rather than minimizing it, because on Windows pyglet's `set_visible(True)` doesn't restore a minimized window; on a backend without that handle it degrades silently to "window stays visible" rather than erroring.

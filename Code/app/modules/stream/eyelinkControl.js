@@ -55,6 +55,9 @@ export class EyeLinkControl {
       else if (msg.type === 'error') console.warn('[EyeLinkControl] error:', msg.message);
     };
     this.#ws.onclose = () => {
+      // Tell the app the bridge is gone (e.g. run_bridge.py crashed or was
+      // closed) instead of leaving the last 'recording' status up forever.
+      if (this.#connected) this.#onStatus({ type: 'status', state: 'disconnected', recording: false });
       this.#connected = false;
       setTimeout(() => this.#open(), 2000);
     };

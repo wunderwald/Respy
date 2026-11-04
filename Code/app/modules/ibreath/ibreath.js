@@ -37,6 +37,7 @@ export default class IBreath {
   #streamReady = false;
   #respStatusText = 'waiting for stream…';
   #eyelinkReady = false;
+  #eyelinkCalSeen = false;   // EYETRACK_CAL: has the bridge reported 'calibrating' yet?
   #useEyeTracking = false;   // off by default; toggled via the experimenter's "use eye tracking" checkbox
 
   // ── experiment data ────────────────────────────────────────────────────
@@ -159,8 +160,13 @@ export default class IBreath {
     if (!channels) {
       this.#gazeEnabled = false;
     } else {
-      this.#gazeX = channels[0] ?? null;
-      this.#gazeY = channels[1] ?? null;
+      // eyelink_to_lsl sends normalised [0,1] coords, and [-1, -1] for
+      // blinks / lost tracking — store those as "no gaze" (empty CSV cell,
+      // no debug dot) rather than as a bogus off-screen position.
+      const [x, y] = channels;
+      const valid = Number.isFinite(x) && Number.isFinite(y) && x >= 0 && y >= 0;
+      this.#gazeX = valid ? x : null;
+      this.#gazeY = valid ? y : null;
       this.#gazeEnabled = true;
     }
     if (this.#gazeEnabled !== wasEnabled) this.#hud.gazeActive = this.#gazeEnabled;
@@ -263,7 +269,9 @@ export default class IBreath {
     this.#hud.pauseVisible = false;
     this.#hud.stateText    = 'calibrating…';
 
-    this.#csv = new IBreathCSV(this.#subjectCode, this.#gazeEnabled, (msg) => this.#csvWarn(msg));
+    // Gaze columns follow the "use eye tracking" setting, not whether a gaze
+    // sample happened to have arrived by the time Start was pressed.
+    this.#csv = new IBreathCSV(this.#subjectCode, this.#useEyeTracking || this.#gazeEnabled, (msg) => this.#csvWarn(msg));
     this.#csv.init();
     this.#markers.send('calibration_start');
   }
@@ -588,12 +596,19 @@ export default class IBreath {
 
   #onEyelinkStatus(status) {
     this.#hud.eyelinkState = status.state;
-    if (status.state === 'calibrated' || status.state === 'recording') {
-      this.#eyelinkReady = true;
-    }
+    this.#eyelinkReady = status.state === 'calibrated' || status.state === 'recording';
     this.#updateIdleReadiness();
 
-    if (this.#state === STATE.EYETRACK_CAL && status.state === 'recording') {
+    if (this.#state !== STATE.EYETRACK_CAL) return;
+    if (status.state === 'calibrating') {
+      this.#eyelinkCalSeen = true;
+    } else if (status.state === 'disconnected') {
+      // Bridge went away mid-calibration — don't leave the scene minimized forever.
+      this.#finishEyeCalibration();
+    } else if (this.#eyelinkCalSeen && (status.state === 'calibrated' || status.state === 'recording')) {
+      // Only finish once *this* calibration has actually run: a status
+      // snapshot of the pre-calibration state ('recording') can arrive
+      // right after the command was sent.
       this.#finishEyeCalibration();
     }
   }
@@ -623,6 +638,7 @@ export default class IBreath {
     this.#hud.stateText       = 'recalibrating eye tracker — please wait…';
 
     this.#markers.send('gaze_recalibration_start');
+    this.#eyelinkCalSeen = false;
     window.api.window.minimize();
     this.#eyelinkControl.calibrate();
   }

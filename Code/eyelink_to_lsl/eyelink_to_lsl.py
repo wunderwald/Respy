@@ -21,7 +21,9 @@ Calibration
 Calibration visuals are drawn on the experiment display via
 PsychopyCalibrationDisplay (or any CalibrationDisplay you provide).
 Pass the PsychoPy window to the bridge at construction time.
-Trigger recalibration at any point via bridge.request_calibrate().
+Recalibrate mid-session via bridge.recalibrate() — call it from the thread
+that created the window (normally the main thread); OpenGL contexts and the
+Win32 message queue are bound to that thread.
 """
 
 import logging
@@ -152,6 +154,36 @@ class PsychopyCalibrationDisplay(pylink.EyeLinkCustomDisplay):
                 mapped.append(pylink.KeyInput(keycode, 0))
         return mapped
 
+    # Camera-image / misc callbacks the EyeLink core may invoke (e.g. when
+    # Enter is pressed during setup). Explicit no-ops so a call never lands
+    # on an unimplemented base-class method.
+    def setup_image_display(self, width, height):
+        return 1
+
+    def exit_image_display(self):
+        pass
+
+    def image_title(self, text):
+        pass
+
+    def draw_image_line(self, width, line, totlines, buff):
+        pass
+
+    def set_image_palette(self, r, g, b):
+        pass
+
+    def draw_lozenge(self, x, y, width, height, colorindex):
+        pass
+
+    def get_mouse_state(self):
+        return ((0, 0), 0)
+
+    def record_abort_hide(self):
+        pass
+
+    def alert_printf(self, msg):
+        log.warning("EyeLink alert: %s", msg)
+
     def setup(self, tracker: pylink.EyeLink) -> None:
         pylink.openGraphicsEx(self)
         # Not calibrating yet — keep the window out of the way until the
@@ -165,7 +197,12 @@ class PsychopyCalibrationDisplay(pylink.EyeLinkCustomDisplay):
 
     def _set_window_visible(self, visible: bool) -> None:
         """
-        Show/raise or minimize the fullscreen calibration window.
+        Show/raise or hide the fullscreen calibration window.
+
+        Hides (SW_HIDE) rather than minimizes: pyglet's set_visible(True)
+        uses SetWindowPos(SWP_SHOWWINDOW), which does not restore an
+        *iconified* window on Windows — a minimized calibration window
+        would stay minimized while pylink draws targets into it.
 
         This window lives on the same display as the experiment app's own
         fullscreen window (Screen 2). It only needs to be on screen while
@@ -186,7 +223,7 @@ class PsychopyCalibrationDisplay(pylink.EyeLinkCustomDisplay):
                 handle.set_visible(True)
                 handle.activate()
             else:
-                handle.minimize()
+                handle.set_visible(False)
         except Exception:
             log.exception("Could not change calibration window visibility (visible=%s).", visible)
 
@@ -279,11 +316,7 @@ class EyeLinkLSLBridge:
         self._outlet: StreamOutlet | None = None
         self._thread: threading.Thread | None = None
         self._running = False
-        self._eye = RIGHT_EYE  # updated after connect()
         self._on_state = on_state
-
-        # Set by request_calibrate(); consumed inside the pump loop.
-        self._calib_requested = threading.Event()
 
     # ------------------------------------------------------------------ #
     #  Public API                                                          #
@@ -308,24 +341,33 @@ class EyeLinkLSLBridge:
         )
         self._tracker.sendCommand(f"sample_rate {int(self.sample_rate)}")
         self._tracker.sendCommand("recording_parse_type = GAZE")
-
-        eye = self._tracker.eyeAvailable()
-        self._eye = eye
+        # Make sure gaze is actually sent over the link / written to the EDF,
+        # instead of relying on whatever the Host's INI defaults are.
         self._tracker.sendCommand(
-            f"binocular_enabled = {'YES' if eye == BINOCULAR else 'NO'}"
+            "file_sample_data = LEFT,RIGHT,GAZE,HREF,RAW,AREA,GAZERES,BUTTON,STATUS,INPUT"
         )
+        self._tracker.sendCommand(
+            "file_event_filter = LEFT,RIGHT,FIXATION,SACCADE,BLINK,MESSAGE,BUTTON,INPUT"
+        )
+        self._tracker.sendCommand("link_sample_data = LEFT,RIGHT,GAZE,GAZERES,AREA,STATUS,INPUT")
+        self._tracker.sendCommand(
+            "link_event_filter = LEFT,RIGHT,FIXATION,SACCADE,BLINK,BUTTON,FIXUPDATE,INPUT"
+        )
+        # NB: monocular/binocular mode is left as configured on the Host.
+        # eyeAvailable() is only meaningful while recording, so it can't be
+        # used here to decide binocular_enabled (it returns -1 before
+        # startRecording(), which used to force the tracker into monocular).
 
         # Register custom display with pylink before any calibration call.
         self._display.setup(self._tracker)
         self._setup_lsl_outlet()
-        log.info("Connected. Eye(s) available: %s", eye)
+        log.info("Connected.")
         self._emit_state("connected")
 
     def calibrate(self) -> None:
         """
         Run a full calibration + validation sequence (blocking).
-        Call once before start(), or let request_calibrate() call it
-        mid-experiment from the pump thread.
+        Must be called from the thread that created the calibration window.
         The experiment display will show calibration targets.
         """
         log.info("Starting calibration ...")
@@ -334,14 +376,18 @@ class EyeLinkLSLBridge:
         log.info("Calibration complete.")
         self._emit_state("calibrated")
 
-    def request_calibrate(self) -> None:
+    def recalibrate(self) -> None:
         """
-        Signal the pump thread to pause recording and run calibration.
-        Returns immediately; calibration runs asynchronously in the pump
-        thread so that all display and tracker calls stay on one thread.
+        Pause recording (if running), calibrate, and resume recording.
+        Blocking. Like calibrate(), must be called from the thread that
+        created the calibration window — never from the pump thread.
         """
-        log.info("Calibration requested.")
-        self._calib_requested.set()
+        was_recording = self._running
+        if was_recording:
+            self.stop()
+        self.calibrate()
+        if was_recording:
+            self.start()
 
     def start(self) -> None:
         """Start EyeLink recording and launch the background LSL pump thread."""
@@ -360,9 +406,9 @@ class EyeLinkLSLBridge:
     def stop(self) -> None:
         """Stop the pump thread and end EyeLink recording."""
         self._running = False
-        self._calib_requested.clear()
         if self._thread:
             self._thread.join(timeout=2.0)
+            self._thread = None
         pylink.endRealTimeMode()
         self._tracker.stopRecording()
         log.info("EyeLink -> LSL pump stopped.")
@@ -401,36 +447,34 @@ class EyeLinkLSLBridge:
     def _start_recording(self) -> None:
         # startRecording(samples_to_file, events_to_file,
         #                samples_over_link, events_over_link)
-        self._tracker.startRecording(1, 1, 1, 1)
+        err = self._tracker.startRecording(1, 1, 1, 1)
+        if err:
+            raise RuntimeError(f"EyeLink startRecording() failed with code {err}")
         time.sleep(0.1)             # let the tracker spin up
         pylink.beginRealTimeMode(100)
+        # Only valid once recording: which eye(s) the Host is actually tracking.
+        eye = self._tracker.eyeAvailable()
+        names = {LEFT_EYE: "left", RIGHT_EYE: "right", BINOCULAR: "binocular"}
+        if eye in names:
+            log.info("Recording eye: %s", names[eye])
+        else:
+            log.warning("eyeAvailable() returned %r — no eye tracked? Check the Host PC camera setup.", eye)
 
     def _pump(self) -> None:
-        """Tight loop: pull latest sample, push to LSL, service recalibration."""
+        """Poll for new samples and push each one to LSL exactly once."""
+        last_time = None
         while self._running:
-
-            if self._calib_requested.is_set():
-                self._calib_requested.clear()
-                self._do_recalibrate()
-
             sample = self._tracker.getNewestSample()
-            if sample is None:
+            # getNewestSample() keeps returning the same sample until the
+            # tracker produces a new one; without this check the loop pushes
+            # each sample thousands of times and floods the LSL outlet.
+            if sample is None or sample.getTime() == last_time:
+                time.sleep(0.0005)
                 continue
+            last_time = sample.getTime()
 
             x, y = self._extract_gaze(sample)
             self._outlet.push_sample([x, y], local_clock())
-
-    def _do_recalibrate(self) -> None:
-        """Pause recording, run calibration on the experiment display, resume."""
-        log.info("Pausing recording for recalibration ...")
-        pylink.endRealTimeMode()
-        self._tracker.stopRecording()
-
-        self.calibrate()            # blocks until operator accepts on Host PC
-
-        self._start_recording()
-        log.info("Recording resumed after recalibration.")
-        self._emit_state("recording")
 
     def _setup_lsl_outlet(self) -> None:
         info = StreamInfo(
@@ -455,31 +499,21 @@ class EyeLinkLSLBridge:
         """
         Return normalised (x, y) from a pylink sample.
 
-        Binocular: averages both eyes, falls back to whichever is valid.
-        Monocular: uses the tracked eye directly.
+        Decided per sample from the eye data the sample actually carries, so
+        it works for left, right or binocular recording without relying on
+        eyeAvailable(). Binocular: averages both eyes, falls back to
+        whichever is valid.
         """
-        if self._eye == BINOCULAR:
-            lx, ly = sample.getLeftEye().getGaze()
-            rx, ry = sample.getRightEye().getGaze()
-            l_ok = lx != MISSING_DATA
-            r_ok = rx != MISSING_DATA
+        points = []
+        if sample.isLeftSample():
+            points.append(sample.getLeftEye().getGaze())
+        if sample.isRightSample():
+            points.append(sample.getRightEye().getGaze())
+        points = [(x, y) for x, y in points
+                  if x != MISSING_DATA and y != MISSING_DATA]
+        if not points:
+            return MISSING_VAL, MISSING_VAL
 
-            if l_ok and r_ok:
-                px, py = (lx + rx) / 2.0, (ly + ry) / 2.0
-            elif l_ok:
-                px, py = lx, ly
-            elif r_ok:
-                px, py = rx, ry
-            else:
-                return MISSING_VAL, MISSING_VAL
-        else:
-            eye_data = (
-                sample.getLeftEye()
-                if self._eye == LEFT_EYE
-                else sample.getRightEye()
-            )
-            px, py = eye_data.getGaze()
-            if px == MISSING_DATA:
-                return MISSING_VAL, MISSING_VAL
-
+        px = sum(p[0] for p in points) / len(points)
+        py = sum(p[1] for p in points) / len(points)
         return px / self.screen_w, py / self.screen_h
