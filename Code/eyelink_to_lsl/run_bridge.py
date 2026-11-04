@@ -6,10 +6,11 @@ session and exposes experimenter control over WebSocket, mirroring the
 JSON-over-WebSocket convention used by ../lsl_ws_bridge/ so apps in ../app/
 can talk to it the same way they already talk to that bridge.
 
-On startup this script opens the PsychoPy window, connects to the EyeLink
-Host, runs an initial calibration, and starts the LSL pump — then serves a
-control WebSocket for the rest of the session (recalibrate, stop/start
-recording, status, shutdown).
+On startup this script opens the PsychoPy window and the control WebSocket,
+then connects to the EyeLink Host, runs an initial calibration, and starts
+the LSL pump. The control socket is up from the start, so clients see
+'connecting' / 'calibrating' during startup; it stays up for the rest of the
+session (recalibrate, stop/start recording, status, shutdown).
 
 Control WebSocket (default ws://localhost:9002)
 -------------------------------------------------
@@ -23,7 +24,7 @@ Client -> server (JSON, {"type": ...}):
                            the tracker, and exit the process.
 
 Server -> client (JSON):
-  {"type": "status", "state": "connected"|"calibrating"|"calibrated"|
+  {"type": "status", "state": "idle"|"connecting"|"connected"|"calibrating"|"calibrated"|
                                "recording"|"stopped"|"disconnected",
    "recording": bool, "host_ip": str, "edf_filename": str,
    "sample_rate": float, "screen_w": int, "screen_h": int}
@@ -187,13 +188,8 @@ async def _control_handler(
 
 # ── Setup + main loop ────────────────────────────────────────────────────────
 
-def _setup_bridge(args, state: ControlState) -> EyeLinkLSLBridge:
-    """
-    Opens the PsychoPy window, connects to the EyeLink Host, and (per CLI
-    flags) runs the initial calibration and starts recording. Runs entirely
-    on the main thread, matching the thread affinity PsychopyCalibrationDisplay
-    needs for its OpenGL calls.
-    """
+def _make_bridge(args, state: ControlState) -> EyeLinkLSLBridge:
+    """Open the PsychoPy window and construct the bridge (no tracker I/O yet)."""
     window = _make_window(args)
     bridge = EyeLinkLSLBridge(
         host_ip=args.host_ip,
@@ -204,14 +200,36 @@ def _setup_bridge(args, state: ControlState) -> EyeLinkLSLBridge:
         edf_filename=args.edf_filename,
         on_state=lambda s: _on_bridge_state(state, bridge, s),
     )
+    return bridge
 
+
+def _startup(args, bridge: EyeLinkLSLBridge) -> None:
+    """
+    Connect to the EyeLink Host and (per CLI flags) run the initial
+    calibration and start recording. Main thread only (see module docstring).
+    Runs *after* the control server is up, so clients see 'connecting' /
+    'calibrating' instead of nothing while the operator calibrates.
+    """
     bridge.connect()
     if args.auto_calibrate:
         bridge.calibrate()
     if args.auto_start:
         bridge.start()
 
-    return bridge
+
+def _broadcast_error(state: ControlState, message: str) -> None:
+    loop = state.loop
+    if loop is None or loop.is_closed() or not state.clients:
+        return
+    payload = json.dumps({"type": "error", "message": message})
+
+    async def send():
+        await asyncio.gather(*[ws.send(payload) for ws in state.clients], return_exceptions=True)
+
+    try:
+        asyncio.run_coroutine_threadsafe(send(), loop).result(timeout=1.0)
+    except Exception:
+        pass
 
 
 async def _serve(args, state: ControlState, bridge: EyeLinkLSLBridge) -> None:
@@ -301,9 +319,15 @@ def main() -> None:
     server_thread: threading.Thread | None = None
 
     try:
-        bridge = _setup_bridge(args, state)   # main thread: window + calibration
+        bridge = _make_bridge(args, state)    # main thread: owns the window
         server_thread = _run_server_thread(args, state, bridge)
         state.server_ready.wait()
+        try:
+            _startup(args, bridge)            # main thread: connect + calibration
+        except Exception as exc:
+            log.exception("Startup failed.")
+            _broadcast_error(state, f"EyeLink startup failed: {exc}")
+            raise
 
         # Main-thread command loop. The short timeout keeps Ctrl+C responsive.
         while server_thread.is_alive():

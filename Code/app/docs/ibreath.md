@@ -282,7 +282,14 @@ The `iBeat_*` presets' `configOverrides` carry today's default `PEAK_SWELL_MS`/`
 
 ## Eye tracking (EyeLink)
 
-Checking **Use eye tracking** reveals a shared group in the experimenter controls with everything eye-tracking-related: the **show gaze position** checkbox, the **Recalibrate gaze** button, and a live **eye tracker** status readout (the EyeLink bridge's own lifecycle state — `connected`, `calibrating`, `calibrated`, `recording`, `stopped`, or `disconnected`). The group stays hidden while eye tracking is off.
+Checking **Use eye tracking** reveals a shared group in the experimenter controls with everything eye-tracking-related (hidden while eye tracking is off):
+
+- **eye tracker** status pill: the bridge's own lifecycle state (`connecting`, `connected`, `calibrating`, `calibrated`, `recording`, `stopped`, `disconnected`), or **`offline`** while the bridge's control socket can't be reached (`run_bridge.py` not running, crashed, or closed). This is separate from the **gaze stream** selector: `GazeXY` can be visible on LSL while the control socket is down. Bridge startup errors appear next to it as a warning.
+- **Calibrate**: runs an EyeLink calibration on the participant screen (scene window minimized meanwhile). Works before the experiment (IDLE — Start is held until it finishes), between or during trials (a running trial is aborted, then the experiment waits in READY), and after it (DONE). It's ignored during the breathing calibration. Sends `gaze_recalibration_start` / `gaze_recalibration_end` markers.
+- **Start recording / Stop recording**: toggles EyeLink recording (and with it the `GazeXY` samples). Sends `eyetracker_recording_start` / `eyetracker_recording_stop` markers.
+- **show gaze position** checkbox and the **gaze stream** selector.
+
+Both buttons are disabled while the bridge is offline or busy connecting or calibrating. Commands aren't queued while offline, so a click can't fire later by surprise. With eye tracking on, **Start** stays disabled until the bridge reports `calibrated` or `recording`.
 
 iBreath talks to the EyeLink tracker via the [`eyelink_to_lsl`](../../eyelink_to_lsl/README.md) bridge, over two separate connections:
 

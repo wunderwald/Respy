@@ -281,7 +281,7 @@ class EyeLinkLSLBridge:
         is constructed automatically from `window`.
     on_state : callable, optional
         Called with a single state-name string whenever the bridge's
-        lifecycle state changes: "connected", "calibrating", "calibrated",
+        lifecycle state changes: "connecting", "connected", "calibrating", "calibrated",
         "recording", "stopped", "disconnected". Useful for driving a
         control API (e.g. broadcasting status over WebSocket) without
         polling. May be called from the pump thread; keep it fast and
@@ -317,6 +317,7 @@ class EyeLinkLSLBridge:
         self._thread: threading.Thread | None = None
         self._running = False
         self._on_state = on_state
+        self._display_open = False
 
     # ------------------------------------------------------------------ #
     #  Public API                                                          #
@@ -330,6 +331,7 @@ class EyeLinkLSLBridge:
     def connect(self) -> None:
         """Open connection to the EyeLink Host and configure the tracker."""
         log.info("Connecting to EyeLink Host at %s", self.host_ip)
+        self._emit_state("connecting")
         self._tracker = pylink.EyeLink(self.host_ip)
         self._tracker.openDataFile(self.edf_filename + ".edf")
 
@@ -360,6 +362,7 @@ class EyeLinkLSLBridge:
 
         # Register custom display with pylink before any calibration call.
         self._display.setup(self._tracker)
+        self._display_open = True
         self._setup_lsl_outlet()
         log.info("Connected.")
         self._emit_state("connected")
@@ -428,7 +431,9 @@ class EyeLinkLSLBridge:
             self._tracker.close()
             self._tracker = None
 
-        self._display.teardown()
+        if self._display_open:
+            self._display.teardown()
+            self._display_open = False
         log.info("EyeLink disconnected.")
         self._emit_state("disconnected")
 

@@ -25,12 +25,15 @@ export class RemoteHud {
     stateTimer:          null,   // { startedAt: Date.now(), duration: seconds | null }
     gazeActive:          false,
     gazeCalibrating:     false,
-    eyelinkState:        '—',
+    eyelinkState:        'offline',   // run_bridge.py status, or 'offline' while its control socket is closed
+    eyelinkRecording:    false,
+    eyelinkError:        '',
   };
   #subjectCode = 'TEST';
 
   constructor({ onStart, onNext, onAbort, onResponse, onPause, onPlay, onRecalibrateGaze,
-                onRetryCalibration, onUseDefaultCalibration, onSetUseEyeTracking }) {
+                onRetryCalibration, onUseDefaultCalibration, onSetUseEyeTracking,
+                onEyelinkStartRecording, onEyelinkStopRecording }) {
     window.api.hud.onAction(({ type, subjectCode, value,
                                debugGaze, inputSignalType, calibrationSecs, questions, configOverrides }) => {
       if (subjectCode !== undefined) this.#subjectCode = subjectCode;
@@ -45,6 +48,8 @@ export class RemoteHud {
         case 'retryCalibration':      onRetryCalibration?.(); break;
         case 'useDefaultCalibration': onUseDefaultCalibration?.(); break;
         case 'setUseEyeTracking':     onSetUseEyeTracking?.(value); break;
+        case 'eyelinkStartRecording': onEyelinkStartRecording?.(); break;
+        case 'eyelinkStopRecording':  onEyelinkStopRecording?.(); break;
         case 'ready':           this.#push(); break;
       }
     });
@@ -66,6 +71,8 @@ export class RemoteHud {
   set gazeActive(v)   { this.#snap.gazeActive    = v;   this.#push(); }
   set gazeCalibrating(v) { this.#snap.gazeCalibrating = v; this.#push(); }
   set eyelinkState(v)    { this.#snap.eyelinkState    = v; this.#push(); }
+  set eyelinkRecording(v) { this.#snap.eyelinkRecording = v; this.#push(); }
+  set eyelinkError(v)     { this.#snap.eyelinkError     = v; this.#push(); }
   set experimentStartedAt(v) { this.#snap.experimentStartedAt = v; this.#push(); }
   set stateTimer(v)          { this.#snap.stateTimer = v;          this.#push(); }
   get subjectCode()          { return this.#subjectCode; }

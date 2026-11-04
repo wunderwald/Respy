@@ -105,10 +105,13 @@ if (frontend === 'ibreath') {
     </span>
     <span id="ib-space-hint" class="space-hint" style="display:none">Press SPACE to continue</span>
     <span id="ib-eyetrack-group" class="eyetrack-group" style="display:none">
-      <label id="debug-gaze-label"><input type="checkbox" id="s-debug-gaze" ${CONFIG.DEBUG_GAZE ? 'checked' : ''}> show gaze position</label>
-      <button id="ib-gaze-btn" style="display:none">Recalibrate gaze</button>
       <span class="label">eye tracker</span>
-      <span id="ib-eyelink-state">—</span>
+      <span id="ib-eyelink-state" class="eyelink-state" data-state="offline"
+            title="run_bridge.py control connection (${CONFIG.EYELINK_CONTROL_URL})">offline</span>
+      <button id="ib-gaze-btn" disabled title="Run an EyeLink calibration on the participant screen">Calibrate</button>
+      <button id="ib-eyelink-rec-btn" disabled>Start recording</button>
+      <label id="debug-gaze-label"><input type="checkbox" id="s-debug-gaze" ${CONFIG.DEBUG_GAZE ? 'checked' : ''}> show gaze position</label>
+      <span id="ib-eyelink-error" class="preset-warning" style="display:none"></span>
     </span>
   `;
 
@@ -159,6 +162,8 @@ if (frontend === 'ibreath') {
   const useEyeTrackingBox  = document.getElementById('s-use-eye-tracking');
   const eyetrackGroupEl    = document.getElementById('ib-eyetrack-group');
   const eyelinkStateEl     = document.getElementById('ib-eyelink-state');
+  const eyelinkRecBtn      = document.getElementById('ib-eyelink-rec-btn');
+  const eyelinkErrorEl     = document.getElementById('ib-eyelink-error');
   const gazeBarEl          = document.getElementById('gaze-bar');
   eyetrackGroupEl.appendChild(gazeBarEl);   // fold the existing gaze-stream status pill into the shared group
 
@@ -183,13 +188,27 @@ if (frontend === 'ibreath') {
 
   // ── Receive state from scene window ─────────────────────────────────────────
 
-  let gazeActive      = false;
-  let gazeCalibrating = false;
+  let gazeCalibrating  = false;
+  let eyelinkState     = 'offline';
+  let eyelinkRecording = false;
+
+  // Eye-tracker buttons only make sense while the bridge's control socket is
+  // up and it isn't busy connecting / calibrating.
+  function updateEyelinkControls() {
+    const online = eyelinkState !== 'offline' && eyelinkState !== 'disconnected';
+    const busy   = gazeCalibrating || eyelinkState === 'connecting' || eyelinkState === 'calibrating';
+    eyelinkStateEl.textContent   = eyelinkRecording && eyelinkState !== 'recording'
+      ? `${eyelinkState} (recording)` : eyelinkState;
+    eyelinkStateEl.dataset.state = eyelinkState;
+    gazeBtn.disabled             = !online || busy;
+    eyelinkRecBtn.disabled       = !online || busy;
+    eyelinkRecBtn.textContent    = eyelinkRecording ? 'Stop recording' : 'Start recording';
+  }
 
   window.api.hud.onState(({ stateText, stateColor, trialText, delayText, trialType,
                              startEnabled, nextVisible, abortVisible, pauseVisible, playVisible, inputsLocked,
-                             experimentStartedAt: esa, stateTimer: st, gazeActive: ga, gazeCalibrating: gc, calFailed,
-                             eyelinkState }) => {
+                             experimentStartedAt: esa, stateTimer: st, gazeCalibrating: gc, calFailed,
+                             eyelinkState: es, eyelinkRecording: er, eyelinkError: ee }) => {
     if (esa !== undefined) experimentStartedAt = esa;
     if (st  !== undefined) stateTimer          = st;
     if (stateText    !== undefined) stateEl.textContent        = stateText;
@@ -208,13 +227,14 @@ if (frontend === 'ibreath') {
     if (abortVisible !== undefined) abortBtn.style.display     = abortVisible ? '' : 'none';
     if (pauseVisible !== undefined) pauseBtn.style.display     = pauseVisible ? '' : 'none';
     if (playVisible  !== undefined) playBtn.style.display      = playVisible  ? '' : 'none';
-    if (ga !== undefined) gazeActive      = ga;
-    if (gc !== undefined) gazeCalibrating = gc;
-    if (ga !== undefined || gc !== undefined) {
-      gazeBtn.style.display = gazeActive ? '' : 'none';
-      gazeBtn.disabled      = !gazeActive || gazeCalibrating;
+    if (gc !== undefined) gazeCalibrating  = gc;
+    if (es !== undefined) eyelinkState     = es;
+    if (er !== undefined) eyelinkRecording = er;
+    if (gc !== undefined || es !== undefined || er !== undefined) updateEyelinkControls();
+    if (ee !== undefined) {
+      eyelinkErrorEl.textContent   = ee ? `⚠ ${ee}` : '';
+      eyelinkErrorEl.style.display = ee ? '' : 'none';
     }
-    if (eyelinkState !== undefined) eyelinkStateEl.textContent = eyelinkState;
     if (calFailed    !== undefined) {
       calRetryBtn.style.display   = calFailed ? '' : 'none';
       calDefaultBtn.style.display = calFailed ? '' : 'none';
@@ -249,6 +269,9 @@ if (frontend === 'ibreath') {
   pauseBtn.addEventListener('click', () => window.api.hud.sendAction({ type: 'pause' }));
   playBtn.addEventListener('click',  () => window.api.hud.sendAction({ type: 'play' }));
   gazeBtn.addEventListener('click',  () => window.api.hud.sendAction({ type: 'recalibrateGaze' }));
+  eyelinkRecBtn.addEventListener('click', () => window.api.hud.sendAction({
+    type: eyelinkRecording ? 'eyelinkStopRecording' : 'eyelinkStartRecording',
+  }));
   calRetryBtn.addEventListener('click',   () => window.api.hud.sendAction({ type: 'retryCalibration' }));
   calDefaultBtn.addEventListener('click', () => window.api.hud.sendAction({ type: 'useDefaultCalibration' }));
 
@@ -256,7 +279,6 @@ if (frontend === 'ibreath') {
 
   function applyEyeTrackingVisibility(enabled) {
     eyetrackGroupEl.style.display = enabled ? '' : 'none';
-    if (!enabled) gazeBtn.style.display = 'none';
   }
   applyEyeTrackingVisibility(useEyeTrackingBox.checked);
 

@@ -27,7 +27,7 @@ import { LocalHud } from './hud.js';
 import { IBreathRenderer } from './ibreath_renderer.js';
 import { IBreathCSV } from './csv.js';
 import { MarkerStream } from '../stream/markerStream.js';
-import { EyeLinkControl } from '../stream/eyelinkControl.js';
+import { EyeLinkControl, EYELINK_OFFLINE } from '../stream/eyelinkControl.js';
 
 export { CONFIG };
 
@@ -37,7 +37,9 @@ export default class IBreath {
   #streamReady = false;
   #respStatusText = 'waiting for stream…';
   #eyelinkReady = false;
+  #eyelinkState = EYELINK_OFFLINE;
   #eyelinkCalSeen = false;   // EYETRACK_CAL: has the bridge reported 'calibrating' yet?
+  #eyeCalReturn = null;      // { state, stateText } when an eye calibration was started from IDLE/DONE
   #useEyeTracking = false;   // off by default; toggled via the experimenter's "use eye tracking" checkbox
 
   // ── experiment data ────────────────────────────────────────────────────
@@ -117,6 +119,8 @@ export default class IBreath {
       onRetryCalibration:      () => this.#retryCalibration(),
       onUseDefaultCalibration: () => this.#useDefaultCalibration(),
       onSetUseEyeTracking:     (v) => this.#setUseEyeTracking(v),
+      onEyelinkStartRecording: () => this.#setEyelinkRecording(true),
+      onEyelinkStopRecording:  () => this.#setEyelinkRecording(false),
     };
     this.#hud = hudFactory
       ? hudFactory(callbacks)
@@ -129,6 +133,7 @@ export default class IBreath {
       : { send() {} };
     this.#eyelinkControl = new EyeLinkControl(CONFIG.EYELINK_CONTROL_URL, {
       onStatus: (status) => this.#onEyelinkStatus(status),
+      onError:  (message) => { this.#hud.eyelinkError = message; },
     });
     this.#sound = new IBreathSound();
     this.#sound.init().catch((e) => console.warn('[IBreath] sound init failed:', e));
@@ -590,19 +595,25 @@ export default class IBreath {
     this.#hud.stateText = !this.#streamReady
       ? this.#respStatusText
       : !eyelinkOk
-        ? 'waiting for eye tracker calibration…'
+        ? (this.#eyelinkState === EYELINK_OFFLINE
+            ? 'waiting for eye tracker bridge (run_bridge.py)…'
+            : 'waiting for eye tracker calibration…')
         : 'stream ready';
   }
 
   #onEyelinkStatus(status) {
-    this.#hud.eyelinkState = status.state;
+    this.#eyelinkState         = status.state;
+    this.#hud.eyelinkState     = status.state;
+    this.#hud.eyelinkRecording = !!status.recording;
+    // A fresh, working status clears any stale startup error.
+    if (status.state !== EYELINK_OFFLINE && status.state !== 'disconnected') this.#hud.eyelinkError = '';
     this.#eyelinkReady = status.state === 'calibrated' || status.state === 'recording';
     this.#updateIdleReadiness();
 
     if (this.#state !== STATE.EYETRACK_CAL) return;
     if (status.state === 'calibrating') {
       this.#eyelinkCalSeen = true;
-    } else if (status.state === 'disconnected') {
+    } else if (status.state === 'disconnected' || status.state === EYELINK_OFFLINE) {
       // Bridge went away mid-calibration — don't leave the scene minimized forever.
       this.#finishEyeCalibration();
     } else if (this.#eyelinkCalSeen && (status.state === 'calibrated' || status.state === 'recording')) {
@@ -613,20 +624,36 @@ export default class IBreath {
     }
   }
 
-  #beginEyeCalibration() {
+  #setEyelinkRecording(on) {
     if (!this.#useEyeTracking) return;
-    const blocked = [STATE.IDLE, STATE.CALIBRATING, STATE.DONE, STATE.EYETRACK_CAL];
-    if (blocked.includes(this.#state)) return;
+    const sent = on ? this.#eyelinkControl.start() : this.#eyelinkControl.stop();
+    if (sent) this.#markers.send(on ? 'eyetracker_recording_start' : 'eyetracker_recording_stop');
+  }
 
-    if (this.#state === STATE.TRIAL) {
-      this.#abortTrial();               // flushes + marks the running trial aborted
-    } else if (this.#state === STATE.DISPLAY) {
-      this.#sound.stopDisplay();
-    } else if (this.#state === STATE.RESPONSE) {
-      this.#onResponse('timeout');      // records the pending response, flushes trial data
+  // Runs an EyeLink calibration on the participant screen. Allowed before
+  // the experiment (IDLE), between/during trials, and after it (DONE) — but
+  // not during the breathing calibration, which it would disrupt.
+  #beginEyeCalibration() {
+    if (!this.#useEyeTracking || !this.#eyelinkControl.connected) return;
+    if ([STATE.CALIBRATING, STATE.EYETRACK_CAL].includes(this.#state)) return;
+
+    const standalone = this.#state === STATE.IDLE || this.#state === STATE.DONE;
+    if (standalone) {
+      // Nothing running — come back to exactly this state afterwards.
+      this.#eyeCalReturn = { state: this.#state, stateText: this.#hud.stateText };
+      this.#hud.startEnabled = false;
+    } else {
+      this.#eyeCalReturn = null;
+      if (this.#state === STATE.TRIAL) {
+        this.#abortTrial();               // flushes + marks the running trial aborted
+      } else if (this.#state === STATE.DISPLAY) {
+        this.#sound.stopDisplay();
+      } else if (this.#state === STATE.RESPONSE) {
+        this.#onResponse('timeout');      // records the pending response, flushes trial data
+      }
+      // ITI / READY / PAUSED: nothing pending to clean up.
+      this.#pausedFromState = null;
     }
-    // ITI / READY / PAUSED: nothing pending to clean up.
-    this.#pausedFromState = null;
 
     this.#state = STATE.EYETRACK_CAL;
     this.#hud.stateTimer      = { startedAt: Date.now(), duration: null };
@@ -635,7 +662,7 @@ export default class IBreath {
     this.#hud.pauseVisible    = false;
     this.#hud.playVisible     = false;
     this.#hud.gazeCalibrating = true;
-    this.#hud.stateText       = 'recalibrating eye tracker — please wait…';
+    this.#hud.stateText       = 'calibrating eye tracker — please wait…';
 
     this.#markers.send('gaze_recalibration_start');
     this.#eyelinkCalSeen = false;
@@ -647,6 +674,19 @@ export default class IBreath {
     this.#markers.send('gaze_recalibration_end');
     this.#hud.gazeCalibrating = false;
     window.api.window.restore();
+
+    const ret = this.#eyeCalReturn;
+    this.#eyeCalReturn = null;
+    if (ret) {
+      this.#state = ret.state;
+      this.#hud.stateTimer = { startedAt: Date.now(), duration: null };
+      if (ret.state === STATE.IDLE) {
+        this.#updateIdleReadiness();      // re-enables Start, refreshes the status text
+      } else {
+        this.#hud.stateText = ret.stateText;
+      }
+      return;
+    }
 
     if (this.#trialIndex >= this.#trials.length) {
       this.#endExperiment();

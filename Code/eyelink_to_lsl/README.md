@@ -113,7 +113,7 @@ Or directly:
 .venv/bin/python run_bridge.py --edf-filename sub01
 ```
 
-On startup it opens the PsychoPy window, connects to the EyeLink Host, runs an initial calibration, and starts recording — then serves the control WebSocket (default `ws://localhost:9002`) for the rest of the session. Defaults (host IP, screen size, ports, auto-calibrate/auto-start) live in `config.py`; see `--help` for the full list of overrides.
+On startup it opens the PsychoPy window and the control WebSocket (default `ws://localhost:9002`), then connects to the EyeLink Host, runs an initial calibration, and starts recording. Because the control socket is up first, clients see `connecting` / `calibrating` during startup instead of nothing. If startup fails, connected clients get an `error` message before the process exits. Defaults (host IP, screen size, ports, auto-calibrate/auto-start) live in `config.py`; see `--help` for the full list of overrides.
 
 **Protocol** — client sends `{"type": "..."}`, server replies/broadcasts `{"type": "status", "state": ..., "recording": bool, ...}`:
 
@@ -125,7 +125,7 @@ On startup it opens the PsychoPy window, connects to the EyeLink Host, runs an i
 | `status` | Request an immediate status snapshot. |
 | `shutdown` | Stop recording, transfer the EDF file, disconnect the tracker, and exit. |
 
-A status snapshot (`state` ∈ `connected`, `calibrating`, `calibrated`, `recording`, `stopped`, `disconnected`) is sent to every client on connect and broadcast to all connected clients whenever the bridge's lifecycle state changes — so a client doesn't need to poll to know when a recalibration it triggered has finished.
+A status snapshot (`state` ∈ `idle`, `connecting`, `connected`, `calibrating`, `calibrated`, `recording`, `stopped`, `disconnected`) is sent to every client on connect and broadcast to all connected clients whenever the bridge's lifecycle state changes — so a client doesn't need to poll to know when a recalibration it triggered has finished.
 
 ---
 

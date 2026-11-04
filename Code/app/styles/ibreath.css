@@ -155,8 +155,36 @@
 .eyetrack-group {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
 }
+
+/* Eye-tracker (run_bridge.py) status pill — coloured by bridge state. */
+.eyelink-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+.eyelink-state::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.eyelink-state[data-state="offline"],
+.eyelink-state[data-state="disconnected"] { color: #e09898; border-color: rgba(224, 120, 120, 0.5); }
+.eyelink-state[data-state="connecting"],
+.eyelink-state[data-state="calibrating"]  { color: #e8c88a; border-color: rgba(232, 200, 138, 0.5); }
+.eyelink-state[data-state="connected"],
+.eyelink-state[data-state="calibrated"],
+.eyelink-state[data-state="stopped"]      { color: #aed4ed; border-color: rgba(174, 212, 237, 0.5); }
+.eyelink-state[data-state="recording"]    { color: #9fd6a8; border-color: rgba(159, 214, 168, 0.5); }
 
 /* Abort buttons — distinct colour so they're easy to find in a hurry */
 #ib-abort-btn,
