@@ -616,7 +616,7 @@ export default class IBreath {
     } else if (status.state === 'disconnected' || status.state === EYELINK_OFFLINE) {
       // Bridge went away mid-calibration — don't leave the scene minimized forever.
       this.#finishEyeCalibration();
-    } else if (this.#eyelinkCalSeen && (status.state === 'calibrated' || status.state === 'recording')) {
+    } else if (this.#eyelinkCalSeen && ['calibrated', 'recording', 'aborted'].includes(status.state)) {
       // Only finish once *this* calibration has actually run: a status
       // snapshot of the pre-calibration state ('recording') can arrive
       // right after the command was sent.

@@ -178,6 +178,7 @@
   background: currentColor;
 }
 .eyelink-state[data-state="offline"],
+.eyelink-state[data-state="aborted"],
 .eyelink-state[data-state="disconnected"] { color: #e09898; border-color: rgba(224, 120, 120, 0.5); }
 .eyelink-state[data-state="connecting"],
 .eyelink-state[data-state="setup"],

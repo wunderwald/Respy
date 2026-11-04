@@ -109,6 +109,8 @@ The keys work on the Host PC, or on this PC while the calibration window has foc
 
 Either way, the operator still has to accept and exit setup (Esc) on the Host PC.
 
+**Ending a calibration without the operator.** Disconnecting the app doesn't affect a running calibration: the calibration window is part of the bridge and stays up until the operator exits setup. To stop the bridge in the middle of a calibration, send `shutdown` or press **Ctrl+C** in its console (press twice to force). Either one aborts setup mode via `abort_setup()`, which calls `exitCalibration()` and falls back to Esc key presses, then shuts down cleanly with the EDF transfer. An aborted calibration is reported as state `aborted`, and the tracker keeps its previous calibration.
+
 ## Recalibration mid-experiment
 
 Call `recalibrate()` **from the thread that created the PsychoPy window** (normally the main thread):
@@ -149,7 +151,7 @@ On startup it opens the PsychoPy window and the control WebSocket (default `ws:/
 | `start` | Start recording (no-op if already recording). |
 | `stop` | Stop recording (no-op if not recording). |
 | `status` | Request an immediate status snapshot. |
-| `shutdown` | Stop recording, transfer the EDF file, disconnect the tracker, and exit. |
+| `shutdown` | Stop recording, transfer the EDF file, disconnect the tracker, and exit. If a calibration is running, it's cut short first. |
 
 A status snapshot (`state` ∈ `idle`, `connecting`, `connected`, `setup`, `calibrating`, `calibrated`, `recording`, `stopped`, `disconnected`) is sent to every client on connect and broadcast to all connected clients whenever the bridge's lifecycle state changes — so a client doesn't need to poll to know when a recalibration it triggered has finished.
 
