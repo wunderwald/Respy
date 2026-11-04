@@ -181,9 +181,16 @@ ipcMain.handle("pick-file", async (event, { title, extensions } = {}) => {
 // ── Experimenter control window ───────────────────────────────────────────────
 
 function createControlWindow(frontend) {
+  // Full width of the display it opens on (the primary one — the scene window
+  // takes the secondary), vertically centred like before. workArea excludes
+  // the taskbar / menu bar.
+  const { workArea } = screen.getPrimaryDisplay();
+  const height = 260;
   controlWindow = new BrowserWindow({
-    width: 1100,
-    height: 260,
+    x: workArea.x,
+    y: workArea.y + Math.round((workArea.height - height) / 2),
+    width: workArea.width,
+    height,
     minWidth: 700,
     minHeight: 200,
     title: "Experimenter Controls",
