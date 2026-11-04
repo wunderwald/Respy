@@ -86,6 +86,13 @@ class PsychopyCalibrationDisplay(pylink.EyeLinkCustomDisplay):
         self._win = window
         self._w, self._h = window.size  # pixel dimensions
 
+        # Set by the bridge: called once per doTrackerSetup() when the first
+        # calibration/validation target is drawn (i.e. the operator has
+        # actually started calibrating, not just entered camera setup).
+        self.on_first_target = None
+        self._target_drawn = False
+        self._pending_keys: list[int] = []   # synthetic key presses for get_input_key()
+
         # Import here so the rest of the module works without PsychoPy.
         from psychopy import visual, event
         self._event = event
@@ -121,6 +128,10 @@ class PsychopyCalibrationDisplay(pylink.EyeLinkCustomDisplay):
 
     def draw_cal_target(self, x, y):
         """Draw calibration target at tracker pixel coords (x, y)."""
+        if not self._target_drawn:
+            self._target_drawn = True
+            if self.on_first_target is not None:
+                self.on_first_target()
         pos = self._tracker_to_psychopy(x, y)
         self._outer.pos = pos
         self._inner.pos = pos
@@ -147,7 +158,8 @@ class PsychopyCalibrationDisplay(pylink.EyeLinkCustomDisplay):
         Returns a list of pylink.KeyInput objects, or an empty list.
         """
         keys = self._event.getKeys(keyList=None, modifiers=False)
-        mapped = []
+        mapped = [pylink.KeyInput(code, 0) for code in self._pending_keys]
+        self._pending_keys.clear()
         for k in keys:
             keycode = self._key_to_eyelink(k)
             if keycode is not None:
@@ -183,6 +195,18 @@ class PsychopyCalibrationDisplay(pylink.EyeLinkCustomDisplay):
 
     def alert_printf(self, msg):
         log.warning("EyeLink alert: %s", msg)
+
+    def begin_setup(self, start_calibration: bool = False) -> None:
+        """
+        Called by the bridge right before doTrackerSetup(). Resets the
+        first-target detection and, if `start_calibration`, queues a 'c'
+        key press — exactly as if the operator pressed C on this PC — so the
+        tracker leaves camera setup and starts calibrating right away.
+        """
+        self._target_drawn = False
+        self._pending_keys.clear()
+        if start_calibration:
+            self._pending_keys.append(ord("c"))
 
     def setup(self, tracker: pylink.EyeLink) -> None:
         pylink.openGraphicsEx(self)
@@ -281,7 +305,7 @@ class EyeLinkLSLBridge:
         is constructed automatically from `window`.
     on_state : callable, optional
         Called with a single state-name string whenever the bridge's
-        lifecycle state changes: "connecting", "connected", "calibrating", "calibrated",
+        lifecycle state changes: "connecting", "connected", "setup", "calibrating", "calibrated",
         "recording", "stopped", "disconnected". Useful for driving a
         control API (e.g. broadcasting status over WebSocket) without
         polling. May be called from the pump thread; keep it fast and
@@ -367,28 +391,46 @@ class EyeLinkLSLBridge:
         log.info("Connected.")
         self._emit_state("connected")
 
-    def calibrate(self) -> None:
+    def calibrate(self, start_calibration: bool = False) -> None:
         """
-        Run a full calibration + validation sequence (blocking).
+        Enter EyeLink setup mode and block until the operator leaves it.
+
+        doTrackerSetup() first shows *camera setup*; calibration only starts
+        when C is pressed (Host PC or this PC), validation on V, and the call
+        returns only once the operator exits setup (Esc). States emitted:
+          "setup"        — in setup mode, waiting for the operator
+          "calibrating"  — first calibration/validation target drawn
+          "calibrated"   — setup mode exited
+        With `start_calibration=True` a C key press is injected so targets
+        appear immediately (skips camera setup — the operator can still press
+        Esc to go back to it).
+
         Must be called from the thread that created the calibration window.
-        The experiment display will show calibration targets.
         """
-        log.info("Starting calibration ...")
-        self._emit_state("calibrating")
+        log.info("Entering EyeLink setup (start_calibration=%s) ...", start_calibration)
+        begin = getattr(self._display, "begin_setup", None)
+        if begin is not None:
+            begin(start_calibration)
+        elif start_calibration:
+            log.warning("Custom display has no begin_setup(); can't auto-start calibration.")
+        if hasattr(self._display, "on_first_target"):
+            self._display.on_first_target = lambda: self._emit_state("calibrating")
+        self._emit_state("setup")
         self._tracker.doTrackerSetup()
-        log.info("Calibration complete.")
+        log.info("Setup exited — calibration complete.")
         self._emit_state("calibrated")
 
-    def recalibrate(self) -> None:
+    def recalibrate(self, start_calibration: bool = True) -> None:
         """
         Pause recording (if running), calibrate, and resume recording.
         Blocking. Like calibrate(), must be called from the thread that
         created the calibration window — never from the pump thread.
+        By default skips camera setup and goes straight to the targets.
         """
         was_recording = self._running
         if was_recording:
             self.stop()
-        self.calibrate()
+        self.calibrate(start_calibration)
         if was_recording:
             self.start()
 

@@ -17,6 +17,8 @@ Control WebSocket (default ws://localhost:9002)
 Client -> server (JSON, {"type": ...}):
   {"type": "calibrate"}   Recalibrate. If recording, pauses/resumes around
                            it automatically (EyeLinkLSLBridge.recalibrate()).
+                           Goes straight to the targets unless
+                           --recal-camera-setup is given.
   {"type": "start"}       Start recording (no-op if already recording).
   {"type": "stop"}        Stop recording (no-op if not recording).
   {"type": "status"}      Request an immediate status snapshot.
@@ -24,7 +26,7 @@ Client -> server (JSON, {"type": ...}):
                            the tracker, and exit the process.
 
 Server -> client (JSON):
-  {"type": "status", "state": "idle"|"connecting"|"connected"|"calibrating"|"calibrated"|
+  {"type": "status", "state": "idle"|"connecting"|"connected"|"setup"|"calibrating"|"calibrated"|
                                "recording"|"stopped"|"disconnected",
    "recording": bool, "host_ip": str, "edf_filename": str,
    "sample_rate": float, "screen_w": int, "screen_h": int}
@@ -208,11 +210,11 @@ def _startup(args, bridge: EyeLinkLSLBridge) -> None:
     Connect to the EyeLink Host and (per CLI flags) run the initial
     calibration and start recording. Main thread only (see module docstring).
     Runs *after* the control server is up, so clients see 'connecting' /
-    'calibrating' instead of nothing while the operator calibrates.
+    'setup' / 'calibrating' instead of nothing while the operator calibrates.
     """
     bridge.connect()
     if args.auto_calibrate:
-        bridge.calibrate()
+        bridge.calibrate(start_calibration=args.startup_skip_camera_setup)
     if args.auto_start:
         bridge.start()
 
@@ -271,11 +273,11 @@ def _stop_server(state: ControlState) -> None:
         loop.call_soon_threadsafe(ev.set)
 
 
-def _execute(cmd: str, bridge: EyeLinkLSLBridge) -> bool:
+def _execute(cmd: str, bridge: EyeLinkLSLBridge, args) -> bool:
     """Runs on the main thread. Returns False when the process should exit."""
     try:
         if cmd == "calibrate":
-            bridge.recalibrate()
+            bridge.recalibrate(start_calibration=args.recal_skip_camera_setup)
         elif cmd == "start":
             if not bridge.is_recording:
                 bridge.start()
@@ -309,6 +311,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--no-auto-start", dest="auto_start", action="store_false",
                     default=config.AUTO_START,
                     help="Don't start recording automatically; trigger it later via a 'start' control command.")
+    p.add_argument("--startup-skip-camera-setup", dest="startup_skip_camera_setup", action="store_true",
+                    default=config.STARTUP_SKIP_CAMERA_SETUP,
+                    help="Start the initial calibration immediately (inject 'C') instead of opening on camera setup.")
+    p.add_argument("--recal-camera-setup", dest="recal_skip_camera_setup", action="store_false",
+                    default=config.RECAL_SKIP_CAMERA_SETUP,
+                    help="Open recalibrations on camera setup (operator presses C) instead of going straight to targets.")
     return p.parse_args()
 
 
@@ -335,7 +343,7 @@ def main() -> None:
                 cmd = state.commands.get(timeout=0.1)
             except queue.Empty:
                 continue
-            if not _execute(cmd, bridge):
+            if not _execute(cmd, bridge, args):
                 break
             _schedule_broadcast(state, bridge)
     except KeyboardInterrupt:

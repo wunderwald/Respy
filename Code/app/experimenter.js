@@ -111,6 +111,8 @@ if (frontend === 'ibreath') {
       <button id="ib-gaze-btn" disabled title="Run an EyeLink calibration on the participant screen">Calibrate</button>
       <button id="ib-eyelink-rec-btn" disabled>Start recording</button>
       <label id="debug-gaze-label"><input type="checkbox" id="s-debug-gaze" ${CONFIG.DEBUG_GAZE ? 'checked' : ''}> show gaze position</label>
+      <span id="ib-eyelink-hint" class="eyelink-hint" style="display:none"
+            title="EyeLink setup mode only ends when the operator exits it">Host PC: C calibrate · V validate · Enter accept · Esc exit setup</span>
       <span id="ib-eyelink-error" class="preset-warning" style="display:none"></span>
     </span>
   `;
@@ -164,6 +166,7 @@ if (frontend === 'ibreath') {
   const eyelinkStateEl     = document.getElementById('ib-eyelink-state');
   const eyelinkRecBtn      = document.getElementById('ib-eyelink-rec-btn');
   const eyelinkErrorEl     = document.getElementById('ib-eyelink-error');
+  const eyelinkHintEl      = document.getElementById('ib-eyelink-hint');
   const gazeBarEl          = document.getElementById('gaze-bar');
   eyetrackGroupEl.appendChild(gazeBarEl);   // fold the existing gaze-stream status pill into the shared group
 
@@ -196,9 +199,14 @@ if (frontend === 'ibreath') {
   // up and it isn't busy connecting / calibrating.
   function updateEyelinkControls() {
     const online = eyelinkState !== 'offline' && eyelinkState !== 'disconnected';
-    const busy   = gazeCalibrating || eyelinkState === 'connecting' || eyelinkState === 'calibrating';
+    // 'setup' = EyeLink setup mode, waiting for the operator (C/V/Esc on the
+    // Host PC); 'calibrating' = targets are on screen.
+    const inSetup = eyelinkState === 'setup' || eyelinkState === 'calibrating';
+    const busy    = gazeCalibrating || inSetup || eyelinkState === 'connecting';
+    const label   = eyelinkState === 'setup' ? 'setup — waiting for operator' : eyelinkState;
     eyelinkStateEl.textContent   = eyelinkRecording && eyelinkState !== 'recording'
-      ? `${eyelinkState} (recording)` : eyelinkState;
+      ? `${label} (recording)` : label;
+    eyelinkHintEl.style.display  = inSetup ? '' : 'none';
     eyelinkStateEl.dataset.state = eyelinkState;
     gazeBtn.disabled             = !online || busy;
     eyelinkRecBtn.disabled       = !online || busy;

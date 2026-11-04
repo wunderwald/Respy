@@ -611,7 +611,7 @@ export default class IBreath {
     this.#updateIdleReadiness();
 
     if (this.#state !== STATE.EYETRACK_CAL) return;
-    if (status.state === 'calibrating') {
+    if (status.state === 'setup' || status.state === 'calibrating') {
       this.#eyelinkCalSeen = true;
     } else if (status.state === 'disconnected' || status.state === EYELINK_OFFLINE) {
       // Bridge went away mid-calibration — don't leave the scene minimized forever.

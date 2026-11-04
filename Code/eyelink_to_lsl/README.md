@@ -83,6 +83,32 @@ bridge.disconnect()     # transfers EDF file to PC 1 and closes connection
 
 ---
 
+## Setup mode, and skipping camera setup
+
+`calibrate()` calls pylink's `doTrackerSetup()`, which puts the tracker into **setup mode** and blocks until the operator leaves it. Setup mode opens on the camera-setup screen. The operator then:
+
+- presses **C** to show calibration targets,
+- presses **V** to validate,
+- presses **Enter** to accept,
+- presses **Esc** to exit setup, which is when `calibrate()` returns.
+
+The keys work on the Host PC, or on this PC while the calibration window has focus. The bridge reports these phases as states:
+
+| State | Meaning |
+|---|---|
+| `setup` | In setup mode, waiting for the operator (camera setup) |
+| `calibrating` | The first calibration/validation target has been drawn |
+| `calibrated` | Setup mode exited |
+
+`calibrate(start_calibration=True)` injects a **C** key press, exactly as if the operator pressed C on this PC, so the targets appear right away. The operator can still press Esc to get back to camera setup. `run_bridge.py` uses it as configured in `config.py`:
+
+| Setting | Default | CLI override |
+|---|---|---|
+| `STARTUP_SKIP_CAMERA_SETUP` | `False`: the first calibration opens on camera setup, to adjust focus and thresholds | `--startup-skip-camera-setup` |
+| `RECAL_SKIP_CAMERA_SETUP` | `True`: recalibrations from the app go straight to the targets | `--recal-camera-setup` |
+
+Either way, the operator still has to accept and exit setup (Esc) on the Host PC.
+
 ## Recalibration mid-experiment
 
 Call `recalibrate()` **from the thread that created the PsychoPy window** (normally the main thread):
@@ -91,7 +117,7 @@ Call `recalibrate()` **from the thread that created the PsychoPy window** (norma
 bridge.recalibrate()
 ```
 
-It stops the pump, runs a full calibration on Screen 2 (blocking until the operator accepts on PC 3), then resumes recording. The LSL outlet stays open; no samples are pushed during calibration, so it shows up as a gap in the stream.
+It stops the pump, runs a calibration on Screen 2 (straight to targets by default; pass `start_calibration=False` to open on camera setup) (blocking until the operator accepts on PC 3), then resumes recording. The LSL outlet stays open; no samples are pushed during calibration, so it shows up as a gap in the stream.
 
 Don't call it from a background thread (a WebSocket handler, the pump thread, an executor): on Windows the window's OpenGL context and message queue belong to the thread that created it, so a calibration driven from elsewhere draws nothing and receives no key presses. If commands arrive on another thread, queue them and run them on the main thread — that's what `run_bridge.py` does.
 
@@ -119,13 +145,13 @@ On startup it opens the PsychoPy window and the control WebSocket (default `ws:/
 
 | Command | Effect |
 |---|---|
-| `calibrate` | Recalibrate (`recalibrate()`): pauses and resumes recording around it if it was recording. |
+| `calibrate` | Recalibrate (`recalibrate()`): pauses and resumes recording around it if it was recording. Goes straight to the targets by default (see below). |
 | `start` | Start recording (no-op if already recording). |
 | `stop` | Stop recording (no-op if not recording). |
 | `status` | Request an immediate status snapshot. |
 | `shutdown` | Stop recording, transfer the EDF file, disconnect the tracker, and exit. |
 
-A status snapshot (`state` ∈ `idle`, `connecting`, `connected`, `calibrating`, `calibrated`, `recording`, `stopped`, `disconnected`) is sent to every client on connect and broadcast to all connected clients whenever the bridge's lifecycle state changes — so a client doesn't need to poll to know when a recalibration it triggered has finished.
+A status snapshot (`state` ∈ `idle`, `connecting`, `connected`, `setup`, `calibrating`, `calibrated`, `recording`, `stopped`, `disconnected`) is sent to every client on connect and broadcast to all connected clients whenever the bridge's lifecycle state changes — so a client doesn't need to poll to know when a recalibration it triggered has finished.
 
 ---
 
