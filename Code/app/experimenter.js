@@ -6,8 +6,9 @@ import { CONFIG }        from './modules/ibreath/config.js';
 import { CONFIG as BG }  from './modules/bioGame/bioGame_config.js';
 import { CONFIG as BTG } from './modules/beltTrainingGame/beltTrainingGame_config.js';
 import { CONFIG as BL }  from './modules/baseline/baseline_config.js';
-import { loadNaturalBpm, RESTING } from './modules/baseline/baselineFiles.js';
+import { loadNaturalBpm, RESTING, baselineFileStem } from './modules/baseline/baselineFiles.js';
 import { SMOOTH_WINDOW_OPTIONS } from './modules/signal/signalUtils.js';
+import { attachSubjectCheck } from './modules/subjectCheck.js';
 
 // ── Frontend detection ────────────────────────────────────────────────────────
 
@@ -174,6 +175,8 @@ if (frontend === 'ibreath') {
   const delayEl            = document.getElementById('ib-delay');
   const trialTypeEl        = document.getElementById('ib-trial-type');
   const subjectInput       = document.getElementById('ib-subject');
+  const subjectCheck       = attachSubjectCheck(subjectInput, document.getElementById('ib-start-btn'),
+    (code) => `${CONFIG.DATA_DIR}/${code}/trialData.csv`);
   const startBtn           = document.getElementById('ib-start-btn');
   const nextBtn            = document.getElementById('ib-next-btn');
   const spaceHintEl        = document.getElementById('ib-space-hint');
@@ -254,7 +257,7 @@ if (frontend === 'ibreath') {
       trialTypeEl.textContent  = trialType ? trialType.toUpperCase() : '—';
       trialTypeEl.dataset.type = trialType ?? '';
     }
-    if (startEnabled !== undefined) startBtn.disabled          = !startEnabled;
+    if (startEnabled !== undefined) subjectCheck.setStartEnabled(startEnabled);
     if (nextVisible  !== undefined) {
       nextBtn.style.display     = nextVisible ? '' : 'none';
       spaceHintEl.style.display = nextVisible ? '' : 'none';
@@ -276,6 +279,7 @@ if (frontend === 'ibreath') {
     }
     if (inputsLocked !== undefined) {
       subjectInput.disabled       = inputsLocked;
+      if (inputsLocked) subjectCheck.lock();
       if (inputsLocked) {
         // Stream selection stays live even once everything else locks, so the
         // experimenter can recover from a dropped stream mid-session.
@@ -289,6 +293,7 @@ if (frontend === 'ibreath') {
   // ── Send actions to scene window ─────────────────────────────────────────────
 
   startBtn.addEventListener('click', () => {
+    if (!subjectCheck.isValid()) return;   // the hint under the subject field says why
     const numTrials = parseTrialCount(numTrialsInput.value);
     if (numTrials == null) {   // the field is editable then; the warning next to it says why
       updateTrialsWarning();
@@ -297,7 +302,9 @@ if (frontend === 'ibreath') {
     }
     window.api.hud.sendAction({
       type:            'start',
-      subjectCode:     subjectInput.value.trim() || 'TEST',
+      subjectCode:     subjectCheck.code(),
+      // Recorded in trialData.csv (`preset`); commas would break the column.
+      presetName:      (activePreset?.name ?? '').replace(/[,\r\n]/g, ' '),
       debugGaze:       document.getElementById('s-debug-gaze').checked,
       inputSignalType: signalTypeSelect.value,
       calibrationSecs: parseInt(document.getElementById('s-cal-secs').value) || CONFIG.CALIBRATION_SECS,
@@ -432,7 +439,9 @@ if (frontend === 'ibreath') {
         const result = await window.api.readFile(path);
         if (!result.ok) throw new Error(result.error);
         const preset = JSON.parse(result.content);
-        presetStatusEl.textContent = `loaded: ${path.split(/[\\/]/).pop()}`;
+        const fileName = path.split(/[\\/]/).pop();
+        preset.name ??= fileName.replace(/\.json$/i, '');   // recorded as the preset's name
+        presetStatusEl.textContent = `loaded: ${fileName}`;
         applyPreset(preset);   // may append a warning to the status
       } catch (err) {
         console.error('[Preset] failed to load:', err);
@@ -547,6 +556,8 @@ if (frontend === 'ibreath') {
 
   const bgStatusEl   = document.getElementById('bg-status');
   const bgSubjectEl  = document.getElementById('bg-subject');
+  const bgSubjectCheck = attachSubjectCheck(bgSubjectEl, document.getElementById('bg-start-btn'),
+    (code) => `${BG.DATA_DIR}/${code}/eventData.csv`);
   const bgGroupEl    = document.getElementById('bg-group');
   const bgNatBpmWrap = document.getElementById('bg-natural-bpm-wrap');
   const bgNatBpmEl   = document.getElementById('bg-natural-bpm');
@@ -606,7 +617,7 @@ if (frontend === 'ibreath') {
                                   nextVisible, abortVisible, calFailed, inputsLocked, warning }) => {
     if (stateText    !== undefined) bgStatusEl.textContent      = stateText;
     if (score        != null)       bgScoreEl.textContent       = score;
-    if (startEnabled !== undefined) bgStartBtn.disabled         = !startEnabled;
+    if (startEnabled !== undefined) bgSubjectCheck.setStartEnabled(startEnabled);
     if (startText    !== undefined) bgStartBtn.textContent      = startText;
     if (nextText     !== undefined) bgNextBtn.textContent       = nextText;
     if (warning      !== undefined) {
@@ -624,6 +635,7 @@ if (frontend === 'ibreath') {
     }
     if (inputsLocked !== undefined && inputsLocked) {
       bgSubjectEl.disabled = true;
+      bgSubjectCheck.lock();
       bgGroupEl.disabled   = true;
       bgNatBpmEl.disabled  = true;
       // Stream selection stays live even once everything else locks, so the
@@ -637,9 +649,10 @@ if (frontend === 'ibreath') {
   // ── Send actions to scene window ─────────────────────────────────────────────
 
   bgStartBtn.addEventListener('click', () => {
+    if (!bgSubjectCheck.isValid()) return;   // the hint under the subject field says why
     window.api.frontend.sendAction({
       type:            'start',
-      subjectCode:     bgSubjectEl.value.trim() || 'TEST',
+      subjectCode:     bgSubjectCheck.code(),
       group:           bgGroupEl.value,
       naturalBpm:      parseFloat(bgNatBpmEl.value) || BG.NATURAL_BPM,
       showCurve:       document.getElementById('bg-show-curve').checked,
@@ -704,6 +717,12 @@ if (frontend === 'ibreath') {
 
   const blStatusEl    = document.getElementById('bl-status');
   const blSubjectEl   = document.getElementById('bl-subject');
+  // File name depends on the baseline name too (see refresh on name change below).
+  const blSubjectCheck = attachSubjectCheck(blSubjectEl, document.getElementById('bl-start-btn'),
+    (code) => {
+      const name = BL.NAMES.find((n) => n.label === document.getElementById('bl-name')?.value) ?? BL.NAMES[0];
+      return `${baselineFileStem(code, name.slug)}.csv`;
+    });
   const blNameEl      = document.getElementById('bl-name');
   const blStartBtn    = document.getElementById('bl-start-btn');
   const blAbortBtn    = document.getElementById('bl-abort-btn');
@@ -784,7 +803,7 @@ if (frontend === 'ibreath') {
         blRemainingEl.textContent = '—';
       }
     }
-    if (startEnabled !== undefined) blStartBtn.disabled      = !startEnabled;
+    if (startEnabled !== undefined) blSubjectCheck.setStartEnabled(startEnabled);
     if (abortVisible !== undefined) blAbortBtn.style.display = abortVisible ? '' : 'none';
     if (nextVisible  !== undefined) {
       blNextBtn.style.display     = nextVisible ? '' : 'none';
@@ -797,6 +816,7 @@ if (frontend === 'ibreath') {
     if (inputsLocked) {
       blLocked = true;
       blSubjectEl.disabled   = true;
+      blSubjectCheck.lock();
       blNameEl.disabled      = true;
       blFullVideoEl.disabled = true;
       updateDurationControls();
@@ -805,7 +825,10 @@ if (frontend === 'ibreath') {
     }
   });
 
+  blNameEl.addEventListener('change', () => blSubjectCheck.refresh());
+
   blStartBtn.addEventListener('click', () => {
+    if (!blSubjectCheck.isValid()) return;   // the hint under the subject field says why
     const fullVideo = blFullVideoEl.checked;
     const custom    = blCustomSecs();
     if (!fullVideo && custom == null) {   // the hint already says why
@@ -814,7 +837,7 @@ if (frontend === 'ibreath') {
     }
     window.api.frontend.sendAction({
       type:         'start',
-      subjectCode:  blSubjectEl.value.trim() || 'TEST',
+      subjectCode:  blSubjectCheck.code(),
       name:         blNameEl.value,
       fullVideo,
       durationSecs: fullVideo ? undefined : custom,
@@ -871,6 +894,8 @@ if (frontend === 'ibreath') {
 
   const btgStatusEl      = document.getElementById('btg-status');
   const btgSubjectEl     = document.getElementById('btg-subject');
+  const btgSubjectCheck  = attachSubjectCheck(btgSubjectEl, document.getElementById('btg-start-btn'),
+    (code) => `${BTG.DATA_DIR}/${code}/eventData.csv`);
   const btgAutoProceedEl = document.getElementById('btg-auto-proceed');
   const btgStartBtn      = document.getElementById('btg-start-btn');
   const btgNextBtn       = document.getElementById('btg-next-btn');
@@ -882,7 +907,7 @@ if (frontend === 'ibreath') {
   window.api.frontend.onState(({ stateText, startEnabled, startText,
                                   nextVisible, abortVisible, calFailed, inputsLocked }) => {
     if (stateText    !== undefined) btgStatusEl.textContent = stateText;
-    if (startEnabled !== undefined) btgStartBtn.disabled    = !startEnabled;
+    if (startEnabled !== undefined) btgSubjectCheck.setStartEnabled(startEnabled);
     if (startText    !== undefined) btgStartBtn.textContent = startText;
     if (nextVisible  !== undefined) {
       btgNextBtn.style.display     = nextVisible ? '' : 'none';
@@ -895,6 +920,7 @@ if (frontend === 'ibreath') {
     }
     if (inputsLocked !== undefined && inputsLocked) {
       btgSubjectEl.disabled = true;
+      btgSubjectCheck.lock();
       // Stream selection stays live even once everything else locks, so the
       // experimenter can recover from a dropped stream mid-session.
       for (const el of settingsBar.querySelectorAll('input, button, select')) {
@@ -904,9 +930,10 @@ if (frontend === 'ibreath') {
   });
 
   btgStartBtn.addEventListener('click', () => {
+    if (!btgSubjectCheck.isValid()) return;   // the hint under the subject field says why
     window.api.frontend.sendAction({
       type:            'start',
-      subjectCode:     btgSubjectEl.value.trim() || 'TEST',
+      subjectCode:     btgSubjectCheck.code(),
       calibrationSecs: parseInt(document.getElementById('btg-cal-secs').value) || BTG.CALIBRATION_SECS,
       smoothWindow:    Number(document.getElementById('btg-smooth-window').value),
       autoProceed:     btgAutoProceedEl.checked,
