@@ -25,6 +25,7 @@ Two windows open:
 | **Natural BPM** | Only visible in the natural condition. Sets the target curve frequency. Filled in automatically from the subject's **Resting** baseline (the average of the methods in `output_data/baseline/<subject>_baseline_resting_estimates.csv` within 4–25 BPM; older recordings without a name: `<subject>_baseline_estimates.csv`), re-checked whenever the subject code changes. Other baselines (Post slow, …) are never used. Without a Resting baseline, enter it manually. |
 | **Show target curve** | Overlays the sinusoidal target curve on screen (for debugging / operator monitoring). |
 | **Cal secs** | How many seconds to calibrate the breath signal (default 10 s). Calibration captures the participant's breathing range. |
+| **Smoothing** | Breath-smoothing window in samples: 64 (default), 128, 256, 512 or 1024. Locked once the session starts; recorded in the data. Larger = smoother fish but more delay — about half the window, so its length in seconds depends on the stream's sample rate (e.g. 1024 at 100 Hz ≈ 10 s window, ≈ 5 s delay). |
 | **Retry calibration** | Appears only if calibration fails (no signal received, or the signal was flat). Restarts the calibration recording. |
 | **Use default calibration** | Appears only if calibration fails. Skips to the ready state using `CONFIG.DEFAULT_CAL_RANGE` instead of a measured range. |
 | **Data dir** | Folder where CSV files are saved. Click **…** to pick a different folder. Default: `bioGameData/` inside the app folder. |
@@ -123,6 +124,7 @@ One row per simulation frame (`SIM_FPS`, 60 per second) during game N.
 | `avatarY` | Avatar vertical position `[0 = bottom, 1 = top]` |
 | `targetY` | Target curve value at this frame |
 | `itemCount` | Items currently on screen (not yet passed the avatar) |
+| `smoothWindow` | Breath-smoothing window (samples) used in this session — the **Smoothing** control |
 
 ### Events — `eventData.csv`
 

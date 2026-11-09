@@ -18,7 +18,7 @@
  *   csv.js         — file output
  */
 
-import { GaussianSmoother, SignalDelayLine, PeakEnvelopeFollower, mapRange } from '../signal/signalUtils.js';
+import { GaussianSmoother, SignalDelayLine, PeakEnvelopeFollower, mapRange, validSmoothWindow } from '../signal/signalUtils.js';
 import { RespCalibration, AdaptiveRange } from '../calibration/calibration.js';
 import { IBreathSound } from './ibreath_sound.js';
 import { CONFIG, CONFIG_DEFAULTS, STATE } from './config.js';
@@ -111,7 +111,8 @@ export default class IBreath {
 
   constructor({ statsContainer, sceneContainer, hudFactory }) {
     const callbacks = {
-      onStart:           (settings) => this.#beginCalibration(settings),
+      // Start only from IDLE: settings sent later must not restart or alter a session.
+      onStart:           (settings) => { if (this.#state === STATE.IDLE) this.#beginCalibration(settings); },
       // Space / Next in the experimenter window arrive here in any state;
       // only READY may advance (mid-trial it would discard the trial's data).
       onNext:            () => { if (this.#state === STATE.READY) this.#advanceTrial(); },
@@ -266,7 +267,7 @@ export default class IBreath {
 
   // ── State machine ──────────────────────────────────────────────────────
 
-  #beginCalibration({ debugGaze, inputSignalType, calibrationSecs, numTrials, questions, configOverrides } = {}) {
+  #beginCalibration({ debugGaze, inputSignalType, calibrationSecs, numTrials, smoothWindow, questions, configOverrides } = {}) {
     // Reset to the hardcoded defaults first so a previous session's preset
     // (configOverrides) never silently lingers into a session that loads no
     // preset, or a different one that doesn't mention the same keys.
@@ -281,6 +282,10 @@ export default class IBreath {
     // numTrials, or the experimenter's own value). Takes precedence over a
     // configOverrides MAX_NUM_TRIALS; invalid values keep the default.
     if (Number.isInteger(numTrials) && numTrials >= 1) CONFIG.MAX_NUM_TRIALS = numTrials;
+    // Smoothing window from the experimenter's "smoothing" control — set
+    // before #buildSignalPipeline() below, which builds the smoother with it.
+    // (Physiological signal only; peaksOnly uses the peak envelope instead.)
+    if (smoothWindow !== undefined) CONFIG.SMOOTH_WINDOW = validSmoothWindow(smoothWindow, CONFIG.SMOOTH_WINDOW);
 
     this.#subjectCode = this.#hud.subjectCode;
     this.#trials = makeTrialParams(CONFIG.MAX_NUM_TRIALS);

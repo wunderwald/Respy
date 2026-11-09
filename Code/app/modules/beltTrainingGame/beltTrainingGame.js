@@ -37,7 +37,7 @@
  *   setStatus({ type, text })  → void
  */
 
-import { GaussianSmoother } from '../signal/signalUtils.js';
+import { GaussianSmoother, validSmoothWindow } from '../signal/signalUtils.js';
 import { RespCalibration, AdaptiveRange } from '../calibration/calibration.js';
 import { MarkerStream } from '../stream/markerStream.js';
 import { CONFIG, STATE } from './beltTrainingGame_config.js';
@@ -64,6 +64,7 @@ export default class BeltTrainingGame {
   // ── Experiment settings (overridden by experimenter on start) ─────────────
   #subjectCode     = CONFIG.SUBJECT_CODE;
   #calibrationSecs = CONFIG.CALIBRATION_SECS;
+  #smoothWindow    = CONFIG.SMOOTH_WINDOW;   // samples; experimenter's "smoothing" control
   #autoProceed     = false;  // when true, READY screens are skipped — trials chain automatically
 
   // ── Signal processing ─────────────────────────────────────────────────────
@@ -163,13 +164,17 @@ export default class BeltTrainingGame {
 
   // ── Action handler ────────────────────────────────────────────────────────
 
-  #onAction({ type, subjectCode, calibrationSecs, autoProceed }) {
+  #onAction({ type, subjectCode, calibrationSecs, smoothWindow, autoProceed }) {
     switch (type) {
       case 'start':
+        // Settings only count for a session that actually starts now, so the
+        // recorded values (e.g. smoothWindow) always match what's in use.
+        if (this.#state !== STATE.IDLE || !this.#streamReady) break;
         if (subjectCode     !== undefined) this.#subjectCode     = subjectCode;
         if (calibrationSecs !== undefined) this.#calibrationSecs = calibrationSecs;
+        if (smoothWindow    !== undefined) this.#smoothWindow    = validSmoothWindow(smoothWindow, CONFIG.SMOOTH_WINDOW);
         if (autoProceed     !== undefined) this.#autoProceed     = autoProceed;
-        if (this.#state === STATE.IDLE && this.#streamReady) this.#beginCalibration();
+        this.#beginCalibration();
         break;
 
       case 'setAutoProceed':
@@ -218,7 +223,7 @@ export default class BeltTrainingGame {
           minSpanFraction:  CONFIG.RANGE_MIN_SPAN_FRACTION,
         })
       : null;
-    this.#smoother.reset();
+    this.#smoother = new GaussianSmoother(this.#smoothWindow);   // fresh, with the chosen window
     this.#inputsLocked = true;
     this.#trialIndex   = 0;
 
@@ -566,6 +571,7 @@ export default class BeltTrainingGame {
       fishX:    this.#fishXRatio,
       fishY:    this.#avatarNormY,
       targetY:  this.#targetNormY,
+      smoothWindow: this.#smoothWindow,
     });
   }
 

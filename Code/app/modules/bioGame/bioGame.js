@@ -21,7 +21,7 @@
  *   setStatus({ type, text })  → void
  */
 
-import { GaussianSmoother } from '../signal/signalUtils.js';
+import { GaussianSmoother, validSmoothWindow } from '../signal/signalUtils.js';
 import { RespCalibration, AdaptiveRange } from '../calibration/calibration.js';
 import { MarkerStream }     from '../stream/markerStream.js';
 import { CONFIG, STATE }    from './bioGame_config.js';
@@ -60,6 +60,7 @@ export default class BioGame {
   #naturalBpm       = CONFIG.NATURAL_BPM;
   #showCurve        = CONFIG.SHOW_CURVE;
   #calibrationSecs  = CONFIG.CALIBRATION_SECS;
+  #smoothWindow     = CONFIG.SMOOTH_WINDOW;   // samples; experimenter's "smoothing" control
 
   // ── Block management ──────────────────────────────────────────────────────
   #blockIndex       = 0;
@@ -192,15 +193,19 @@ export default class BioGame {
 
   // ── Action handler ────────────────────────────────────────────────────────
 
-  #onAction({ type, subjectCode, group, naturalBpm, showCurve, calibrationSecs }) {
+  #onAction({ type, subjectCode, group, naturalBpm, showCurve, calibrationSecs, smoothWindow }) {
     switch (type) {
       case 'start':
+        // Settings only count for a session that actually starts now, so the
+        // recorded values (e.g. smoothWindow) always match what's in use.
+        if (this.#state !== STATE.IDLE || !this.#streamReady) break;
         if (subjectCode     !== undefined) this.#subjectCode     = subjectCode;
         if (group           !== undefined) this.#group           = group;
         if (naturalBpm      !== undefined) this.#naturalBpm      = naturalBpm;
         if (showCurve       !== undefined) this.#showCurve       = showCurve;
         if (calibrationSecs !== undefined) this.#calibrationSecs = calibrationSecs;
-        if (this.#state === STATE.IDLE && this.#streamReady) this.#beginCalibration();
+        if (smoothWindow    !== undefined) this.#smoothWindow    = validSmoothWindow(smoothWindow, CONFIG.SMOOTH_WINDOW);
+        this.#beginCalibration();
         break;
 
       case 'next':
@@ -240,7 +245,7 @@ export default class BioGame {
           minSpanFraction:  CONFIG.RANGE_MIN_SPAN_FRACTION,
         })
       : null;
-    this.#smoother.reset();
+    this.#smoother = new GaussianSmoother(this.#smoothWindow);   // fresh, with the chosen window
     this.#inputsLocked = true;
     this.#blockIndex   = 0;
     this.#scoreBlock   = new Array(CONFIG.NUM_BLOCKS).fill(0);
@@ -654,6 +659,7 @@ export default class BioGame {
       avatarY:   this.#avatarNormY,
       targetY:   targetCurveY(blockTime, this.#activeBpm),
       itemCount: this.#items.filter(s => !s.checked).length,
+      smoothWindow: this.#smoothWindow,
     };
     this.#csv.bufferFrame(this.#lastFrameRow);
   }

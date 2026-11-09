@@ -18,7 +18,7 @@ export class BeltTrainingGameCSV {
   #currentTrialIndex = 0;
 
   #frameHeader = 'timestamp,trialIndex,phase,segment,breathRaw,breathSmoothed,breathNorm,' +
-                 'normMin,normMax,fishX,fishY,targetY\n';
+                 'normMin,normMax,fishX,fishY,targetY,smoothWindow\n';
   #eventHeader = 'timestamp,trialIndex,phase,event,value1,value2\n';
 
   constructor(subjectCode, scene, onWarn) {
@@ -103,7 +103,7 @@ export class BeltTrainingGameCSV {
     return buf.map(r =>
       `${r.t},${r.trialIndex},${r.phase},${r.segment},${r.raw.toFixed(4)},${r.smoothed.toFixed(4)},` +
       `${r.norm.toFixed(4)},${r.normMin.toFixed(6)},${r.normMax.toFixed(6)},` +
-      `${r.fishX.toFixed(4)},${r.fishY.toFixed(4)},${r.targetY.toFixed(4)}`
+      `${r.fishX.toFixed(4)},${r.fishY.toFixed(4)},${r.targetY.toFixed(4)},${r.smoothWindow}`
     ).join('\n') + '\n';
   }
 

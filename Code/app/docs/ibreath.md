@@ -24,6 +24,7 @@ Two windows open:
 |---|---|
 | **Subject** | Subject code written to the CSV filename. Locked once calibration begins. |
 | **Cal secs** | Calibration recording duration (default 10 s). |
+| **Smoothing** | Breath-smoothing window in samples: 64 (default), 128, 256, 512 or 1024. Locked once the session starts; recorded in the data. Larger = smoother fish but more delay — about half the window, so its length in seconds depends on the stream's sample rate (e.g. 1024 at 100 Hz ≈ 10 s window, ≈ 5 s delay). Only used for the *Physiological* signal type (*Peaks only* uses the peak envelope). Overrides a preset's `SMOOTH_WINDOW` config override. |
 | **Trials** | Number of trials in the session (default `MAX_NUM_TRIALS`, 80). Pre-filled and locked when the loaded preset defines `numTrials`; otherwise editable (whole number ≥ 1). Locked once calibration begins. A warning appears next to it if the number isn't a multiple of 4: left/right and pufferfish/starfish are balanced in blocks of 4, so other counts aren't exactly balanced (the session still runs). |
 | **Retry calibration** | Appears only if calibration fails (no signal received, or the signal was flat). Restarts the calibration recording. |
 | **Use default calibration** | Appears only if calibration fails. Skips ahead using `CONFIG.DEFAULT_CAL_RANGE` instead of a measured range. |
@@ -164,6 +165,7 @@ One row per trial, appended after each trial ends (or after the response screen)
 | `stimX1`, `stimY1` | Cloud end position (normalised 0–1) |
 | `delayMs` | Async delay applied to this trial (ms), or empty (sync trials) — see [Async delay staircase](#async-delay-staircase) |
 | `rangeMin`, `rangeMax` | Signal range (native units) mapped to stimulus `[0, 1]` for this trial — see [Signal range](#signal-range) |
+| `smoothWindow` | Breath-smoothing window (samples) used in this session — the **Smoothing** control (not used with *Peaks only*) |
 | `ITI` | Inter-trial interval in ms |
 | `startTime` | ISO-8601 trial start time |
 | `endTime` | ISO-8601 trial end time |
@@ -232,7 +234,7 @@ An optional second gaze stream is read from `GAZE_STREAM_URL` (`ws://localhost:8
 
 The experimenter's **Signal type** control selects how the raw stream is turned into the real-time value that calibration, the sync display, and the async delay line all read — everything *after* that point (calibration, trial logic, CSV columns, markers) is identical for both types.
 
-- **Physiological** (default) — a continuous breath-like signal, Gaussian-smoothed over `SMOOTH_WINDOW` samples, same as always.
+- **Physiological** (default) — a continuous breath-like signal, Gaussian-smoothed over the **Smoothing** window (default `SMOOTH_WINDOW`, 64 samples).
 - **Peaks only** — for a sparse signal that's a constant baseline with brief, distinct spikes (e.g. AD Instruments' fast-response/peak-detect ECG output from LabChart, streamed to LSL). Every detected peak triggers a short swell-then-fade pulse instead of running the raw signal through the Gaussian smoother, so it reads as one plucky "heartbeat" per peak:
   - **Peak detection** is an adaptive rising-edge threshold: it tracks the lowest and highest raw values seen so far and fires on every upward crossing of the point `PEAK_CROSS_FRACTION` of the way between them — no fixed voltage/unit threshold needed, and no refractory period. Assumes a genuinely clean signal (constant baseline, distinct peaks); if that doesn't hold in practice, the detector needs rework, not just retuning.
   - **The pulse shape**: `PEAK_SWELL_MS` (default 80 ms) to rise to full level, then `PEAK_FADE_MS` (default 260 ms) to decay back to 0. A peak that arrives before the previous pulse has fully faded simply restarts the swell from the envelope's current level — no special-casing, since the signal is assumed clean enough that this shouldn't normally happen.

@@ -71,6 +71,7 @@ The photo starts blank and "develops" in over `PHOTO_DEVELOP_MS` (default 2000ms
 | Subject code | Text field, locked once calibration starts |
 | Auto-proceed | Checkbox, toggleable any time (never locked). When on, READY screens are skipped and trials chain automatically — no Space/Next trial needed between them |
 | Cal secs | Calibration duration in seconds (settings bar) |
+| Smoothing | Breath-smoothing window in samples: 64 (default), 128, 256, 512 or 1024. Locked once the session starts; recorded in the data. Larger = smoother fish but more delay — about half the window, so its length in seconds depends on the stream's sample rate (e.g. 1024 at 100 Hz ≈ 10 s window, ≈ 5 s delay). (settings bar) |
 | Start | Begins calibration (enabled once the resp stream is connected) |
 | Retry calibration / Use default calibration | Shown only if calibration fails (flat/no signal) |
 | Next trial | Shown during the READY screen and, if auto-proceed is off, the photo review; same action as pressing **Space** |
@@ -109,7 +110,8 @@ Written to `output_data/belt_training_game/<subjectCode>/`:
   - `target_leave` (value1 = fraction of the target-crossing segment spent inside the green band, `0`–`1`)
   - `trial_end`, `trial_abort`
   - `session_closed` (value1 = state the window was closed in, e.g. `training`; the `phase` column says which pass)
-- **`frameData_trial<N>.csv`** — one file per trial, one row per drawn animation frame, `timestamp,trialIndex,phase,segment,breathRaw,breathSmoothed,breathNorm,normMin,normMax,fishX,fishY,targetY`
+- **`frameData_trial<N>.csv`** — one file per trial, one row per drawn animation frame, `timestamp,trialIndex,phase,segment,breathRaw,breathSmoothed,breathNorm,normMin,normMax,fishX,fishY,targetY,smoothWindow`
+  - `smoothWindow` is the breath-smoothing window (samples) used in this session — the **Smoothing** control
   - `phase` is `training1`, `training2` or `test` (also in `eventData.csv`'s `phase` column); `segment` is `approach`, `target`, or `exit`
   - `fishX`/`fishY` and `targetY` are normalized canvas fractions (`targetY` is the trial's fixed target centre, repeated on every row for convenience)
 

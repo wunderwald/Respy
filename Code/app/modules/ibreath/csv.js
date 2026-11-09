@@ -26,11 +26,13 @@ export class IBreathCSV {
   #onWarn;
   #frameHeader;
   #trialHeader;
+  #smoothWindow;
 
   constructor(subjectCode, gazeEnabled, onWarn) {
     this.#subjectCode = subjectCode;
     this.#gazeEnabled = gazeEnabled;
     this.#onWarn      = onWarn;
+    this.#smoothWindow = CONFIG.SMOOTH_WINDOW;   // session's value (set before the CSV is created)
 
     this.#frameHeader =
       'trialIndex,timestamp,breathLevel_input,stimulusLevel' +
@@ -39,7 +41,7 @@ export class IBreathCSV {
 
     this.#trialHeader =
       'trialIndex,subject,questionType,synchronous,img,lr,stimX0,stimY0,stimX1,stimY1,delayMs,' +
-      'rangeMin,rangeMax,ITI,startTime,endTime,aborted' +
+      'rangeMin,rangeMax,smoothWindow,ITI,startTime,endTime,aborted' +
       (CONFIG.SHOW_QUESTIONS ? ',response' : '') +
       (CONFIG.FLASHING_IMAGE ? ',flashImage,flashScheduledTime,flashX,flashY,flashShown' : '') + '\n';
   }
@@ -132,6 +134,7 @@ export class IBreathCSV {
       `${trial.stimX0},${trial.stimY0},${trial.stimX1},${trial.stimY1},` +
       `${trial.delayMs ?? ''},` +
       `${trial.rangeMin ?? ''},${trial.rangeMax ?? ''},` +
+      `${this.#smoothWindow},` +
       `${trial.ITI},` +
       `${trial.startTime ?? ''},` +
       `${trial.endTime ?? ''},` +

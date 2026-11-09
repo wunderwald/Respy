@@ -32,6 +32,21 @@ export function mapRange(value, from, to) {
 // ── GaussianSmoother ─────────────────────────────────────────────────────────
 
 /**
+ * Smoothing-window sizes (in samples) the experimenter can choose from —
+ * shared by the experimenter UI and the frontends (iBreath, bioGame,
+ * beltTrainingGame), so both validate against the same list. The first is
+ * the default. Note: the window counts samples, so its length in time (and
+ * the delay it adds, ≈ half the window) depends on the stream's sample rate.
+ */
+export const SMOOTH_WINDOW_OPTIONS = [64, 128, 256, 512, 1024];
+
+/** The chosen window if it's one of SMOOTH_WINDOW_OPTIONS, else `fallback`. */
+export function validSmoothWindow(value, fallback = SMOOTH_WINDOW_OPTIONS[0]) {
+  const n = Number(value);
+  return SMOOTH_WINDOW_OPTIONS.includes(n) ? n : fallback;
+}
+
+/**
  * Real-time Gaussian low-pass filter over a sliding window.
  * Matches the behaviour of applyGaussianLPF.m + smoothBreathRT.m.
  *

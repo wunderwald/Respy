@@ -19,7 +19,7 @@ export class BioGameCSV {
   #currentBlockIndex = 0;
 
   #frameHeader = 'timestamp,blockIndex,frame,blockTime,drawn,breathRaw,breathSmoothed,breathNorm,' +
-                 'normMin,normMax,avatarY,targetY,itemCount\n';
+                 'normMin,normMax,avatarY,targetY,itemCount,smoothWindow\n';
   #eventHeader = 'timestamp,blockIndex,event,value1,value2\n';
 
   constructor(subjectCode, group, scene, onWarn) {
@@ -109,7 +109,7 @@ export class BioGameCSV {
     return buf.map(r =>
       `${r.t},${r.block},${r.frame},${r.blockTime.toFixed(4)},${r.drawn ? 1 : 0},` +
       `${r.raw.toFixed(4)},${r.smoothed.toFixed(4)},` +
-      `${r.norm.toFixed(4)},${r.normMin.toFixed(6)},${r.normMax.toFixed(6)},${r.avatarY.toFixed(4)},${r.targetY.toFixed(4)},${r.itemCount}`
+      `${r.norm.toFixed(4)},${r.normMin.toFixed(6)},${r.normMax.toFixed(6)},${r.avatarY.toFixed(4)},${r.targetY.toFixed(4)},${r.itemCount},${r.smoothWindow}`
     ).join('\n') + '\n';
   }
 
