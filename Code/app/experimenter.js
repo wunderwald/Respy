@@ -392,8 +392,9 @@ if (frontend === 'ibreath') {
     switch (e.code) {
       case 'Space':      e.preventDefault(); window.api.hud.sendAction({ type: 'next' }); break;
       case 'Escape':     window.api.hud.sendAction({ type: 'abort' }); break;
-      case 'ArrowLeft':  window.api.hud.sendAction({ type: 'response', value: true });  break;
-      case 'ArrowRight': window.api.hud.sendAction({ type: 'response', value: false }); break;
+      // iBreath's #onResponse expects the side ('left' = first answer label).
+      case 'ArrowLeft':  window.api.hud.sendAction({ type: 'response', value: 'left' });  break;
+      case 'ArrowRight': window.api.hud.sendAction({ type: 'response', value: 'right' }); break;
     }
   });
 

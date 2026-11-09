@@ -112,9 +112,11 @@ export default class IBreath {
   constructor({ statsContainer, sceneContainer, hudFactory }) {
     const callbacks = {
       onStart:           (settings) => this.#beginCalibration(settings),
-      onNext:            () => this.#advanceTrial(),
+      // Space / Next in the experimenter window arrive here in any state;
+      // only READY may advance (mid-trial it would discard the trial's data).
+      onNext:            () => { if (this.#state === STATE.READY) this.#advanceTrial(); },
       onAbort:           () => this.#abortTrial(),
-      onResponse:        (v) => this.#onResponse(v),
+      onResponse:        (v) => { if (this.#state === STATE.RESPONSE) this.#onResponse(v); },
       onPause:           () => this.#onPause(),
       onPlay:            () => this.#onPlay(),
       onRecalibrateGaze: () => this.#beginEyeCalibration(),
@@ -525,7 +527,11 @@ export default class IBreath {
     this.#hud.stateText = 'inter-trial interval…';
   }
 
+  // Only a running trial can be aborted. Escape in the experimenter window
+  // reaches here in every state, so the guard is needed: otherwise it would
+  // "abort" the next, not-yet-run trial (or crash in IDLE / DONE).
   #abortTrial() {
+    if (this.#state !== STATE.TRIAL) return;
     this.#endTrial(true);
   }
 
