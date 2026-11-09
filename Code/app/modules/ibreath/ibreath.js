@@ -58,23 +58,22 @@ export default class IBreath {
   #rangeTracker = null;  // AdaptiveRange — follows drift after calibration (RANGE_ADAPT)
 
   // ── signal pipeline ────────────────────────────────────────────────────
-  // Exactly one of these two feeds #smoothedValue, chosen by #inputSignalType;
-  // everything downstream of that getter is identical for both signal types.
-  #smoother = new GaussianSmoother(CONFIG.SMOOTH_WINDOW);
-  #peakEnvelope = new PeakEnvelopeFollower({
-    swellMs: CONFIG.PEAK_SWELL_MS,
-    fadeMs: CONFIG.PEAK_FADE_MS,
-    crossFraction: CONFIG.PEAK_CROSS_FRACTION,
-  });
-  #delayLine = new SignalDelayLine({ maxAgeMs: Math.max(...CONFIG.DELAY_VALUES_MS) + 500 });  // async's real-time delay buffer
-  #delayIndex = CONFIG.DELAY_VALUES_MS.indexOf(CONFIG.DEFAULT_DELAY_MS);   // index into DELAY_VALUES_MS — adaptive staircase, see #onResponse
+  // Exactly one of #smoother / #peakEnvelope feeds #smoothedValue, chosen by
+  // #inputSignalType; everything downstream of that getter is identical for
+  // both signal types. All three objects are (re)built by
+  // #buildSignalPipeline() from the *current* CONFIG — in the constructor,
+  // and again at every session start after a preset's configOverrides have
+  // been applied.
+  #smoother = null;
+  #peakEnvelope = null;
+  #delayLine = null;   // async's real-time delay buffer
+  #delayIndex = 0;     // index into DELAY_VALUES_MS — adaptive staircase, see #onResponse
   #stimulusRange = [0.3, 0.4];   // raw native-scale window — used to rescale the live signal into [0,1]; fixed per trial
 
   // ── per-trial state ────────────────────────────────────────────────────
   #trialStartTime = null;
   #stimulusLevel = 0;
   #lastRawSample = 0;
-  #lastScaledSample = 0;
   #frameRows = [];
 
   // ── ITI / display ─────────────────────────────────────────────────────
@@ -138,6 +137,8 @@ export default class IBreath {
       onStatus: (status) => this.#onEyelinkStatus(status),
       onError:  (message) => { this.#hud.eyelinkError = message; },
     });
+    this.#buildSignalPipeline();
+    this.#delayIndex = this.#initialDelayIndex();
     this.#sound = new IBreathSound();
     this.#sound.init().catch((e) => console.warn('[IBreath] sound init failed:', e));
     this.#bindKeys();
@@ -158,6 +159,35 @@ export default class IBreath {
   // Current adaptive-delay value in ms, looked up from CONFIG.DELAY_VALUES_MS.
   get #currentDelayMs() {
     return CONFIG.DELAY_VALUES_MS[this.#delayIndex];
+  }
+
+  // Builds the smoothing / peak-envelope / delay-line objects from the
+  // current CONFIG, so preset overrides of SMOOTH_WINDOW, PEAK_* and
+  // DELAY_VALUES_MS actually take effect. Starts every buffer empty.
+  #buildSignalPipeline() {
+    this.#smoother = new GaussianSmoother(CONFIG.SMOOTH_WINDOW);
+    this.#peakEnvelope = new PeakEnvelopeFollower({
+      swellMs: CONFIG.PEAK_SWELL_MS,
+      fadeMs: CONFIG.PEAK_FADE_MS,
+      crossFraction: CONFIG.PEAK_CROSS_FRACTION,
+    });
+    // +500 ms headroom so the largest delay never reads past the buffer.
+    this.#delayLine = new SignalDelayLine({ maxAgeMs: Math.max(...CONFIG.DELAY_VALUES_MS) + 500 });
+  }
+
+  // Staircase start: DEFAULT_DELAY_MS's position in DELAY_VALUES_MS. If a
+  // preset's default isn't one of its values, start at the closest one
+  // instead of at index -1 (which made every async delay undefined).
+  #initialDelayIndex() {
+    const values = CONFIG.DELAY_VALUES_MS;
+    const idx = values.indexOf(CONFIG.DEFAULT_DELAY_MS);
+    if (idx !== -1) return idx;
+    let best = 0;
+    values.forEach((v, i) => {
+      if (Math.abs(v - CONFIG.DEFAULT_DELAY_MS) < Math.abs(values[best] - CONFIG.DEFAULT_DELAY_MS)) best = i;
+    });
+    this.#showWarning(`DEFAULT_DELAY_MS ${CONFIG.DEFAULT_DELAY_MS} is not in DELAY_VALUES_MS — starting at ${values[best]} ms`);
+    return best;
   }
 
   // ── Public interface ───────────────────────────────────────────────────
@@ -182,7 +212,6 @@ export default class IBreath {
 
   pushSample(rawValue) {
     this.#lastRawSample = rawValue;
-    this.#lastScaledSample = rawValue;
     const now = performance.now();
     if (this.#inputSignalType === 'peaksOnly') {
       this.#peakEnvelope.push(now, rawValue);
@@ -250,9 +279,8 @@ export default class IBreath {
     this.#trials = makeTrialParams(CONFIG.MAX_NUM_TRIALS);
     this.#trialIndex = 0;
     this.#trialData = [];
-    this.#delayIndex = CONFIG.DELAY_VALUES_MS.indexOf(CONFIG.DEFAULT_DELAY_MS);
+    this.#buildSignalPipeline();
     this.#hud.trialType = null;
-    this.#updateDelayHud();
     this.#calibration = new RespCalibration({ durationSecs: CONFIG.CALIBRATION_SECS });
     this.#calibration.start();
     this.#calFailed = false;
@@ -265,9 +293,6 @@ export default class IBreath {
           minSpanFraction:  CONFIG.RANGE_MIN_SPAN_FRACTION,
         })
       : null;
-    this.#smoother.reset();
-    this.#peakEnvelope.reset();
-    this.#delayLine.reset();
 
     this.#state = STATE.CALIBRATING;
     this.#hud.experimentStartedAt = Date.now();
@@ -276,10 +301,14 @@ export default class IBreath {
     this.#hud.inputsLocked = true;
     this.#hud.pauseVisible = false;
     this.#hud.stateText    = 'calibrating…';
+    // After the state text: a preset warning from here must not be
+    // overwritten (and must restore to 'calibrating…', not a stale text).
+    this.#delayIndex = this.#initialDelayIndex();
+    this.#updateDelayHud();
 
     // Gaze columns follow the "use eye tracking" setting, not whether a gaze
     // sample happened to have arrived by the time Start was pressed.
-    this.#csv = new IBreathCSV(this.#subjectCode, this.#useEyeTracking || this.#gazeEnabled, (msg) => this.#csvWarn(msg));
+    this.#csv = new IBreathCSV(this.#subjectCode, this.#useEyeTracking || this.#gazeEnabled, (msg) => this.#showWarning(`CSV: ${msg}`));
     this.#csv.init();
     this.#markers.send('calibration_start');
   }
@@ -352,9 +381,9 @@ export default class IBreath {
 
     if (this.#inputSignalType !== 'peaksOnly') {
       this.#smoother.reset();
-      // Pre-fill smoother with 64 samples (matching MATLAB pre-buffer)
+      // Pre-fill the smoother window (matching the MATLAB pre-buffer)
       for (let i = 0; i < CONFIG.SMOOTH_WINDOW; i++) {
-        this.#smoother.push(this.#lastScaledSample);
+        this.#smoother.push(this.#lastRawSample);
       }
     }
     // peaksOnly: the envelope carries on continuously across trial
@@ -649,14 +678,18 @@ export default class IBreath {
       this.#hud.startEnabled = false;
     } else {
       this.#eyeCalReturn = null;
-      if (this.#state === STATE.TRIAL) {
+      // When paused, clean up what the pause interrupted. (A trial paused
+      // mid-run was already aborted and flushed by #onPause; a paused
+      // display already had its sound stopped.)
+      const interrupted = this.#state === STATE.PAUSED ? this.#pausedFromState : this.#state;
+      if (interrupted === STATE.TRIAL) {
         this.#abortTrial();               // flushes + marks the running trial aborted
-      } else if (this.#state === STATE.DISPLAY) {
+      } else if (interrupted === STATE.DISPLAY && this.#state !== STATE.PAUSED) {
         this.#sound.stopDisplay();
-      } else if (this.#state === STATE.RESPONSE) {
+      } else if (interrupted === STATE.RESPONSE) {
         this.#onResponse('timeout');      // records the pending response, flushes trial data
       }
-      // ITI / READY / PAUSED: nothing pending to clean up.
+      // ITI / READY: nothing pending to clean up.
       this.#pausedFromState = null;
     }
 
@@ -755,12 +788,8 @@ export default class IBreath {
       const trial = this.#trials[this.#trialIndex];
       const tSecs = (now - this.#trialStartTime) / 1000;
 
-      if (!trial.synchronous) {
-        const delayedRaw = this.#delayLine.sample(now, trial.delayMs);
-        this.#stimulusLevel = mapRange(delayedRaw, this.#stimulusRange, [0, 1]);
-      }
-      const stimLevel = Math.max(0, Math.min(1, this.#stimulusLevel));
-      this.#sound.setNoiseLevel(stimLevel);
+      this.#updateAsyncStimulus(now);
+      this.#sound.setNoiseLevel(this.#clampedStimulus);
 
       if (CONFIG.FLASHING_IMAGE && trial.flashImage && !this.#flashShown && tSecs >= trial.flashTime) {
         this.#flashShown = true;
@@ -773,29 +802,38 @@ export default class IBreath {
         this.#markers.send(`flash_end_t${trial.trialIndex}`);
       }
 
-      this.#frameRows.push({
-        t: new Date().toISOString(),
-        raw: this.#lastRawSample,
-        scaled: this.#lastScaledSample,
-        stim: stimLevel,
-        flash: this.#flashActive ? 1 : 0,
-        ...(this.#gazeEnabled ? { gazeX: this.#gazeX ?? '', gazeY: this.#gazeY ?? '' } : {}),
-      });
-
       if (tSecs >= CONFIG.MAX_TRIAL_TIME) {
         this.#endTrial(false);
       }
     }
   }
 
-  // ── Draw loop (requestAnimationFrame, may pause when window loses focus)
+  // Async trials: the stimulus is the delayed signal, read at `now`. (Sync
+  // trials update #stimulusLevel per incoming sample in #onTrialSample.)
+  #updateAsyncStimulus(now) {
+    const trial = this.#trials[this.#trialIndex];
+    if (trial.synchronous) return;
+    const delayed = this.#delayLine.sample(now, trial.delayMs);
+    this.#stimulusLevel = mapRange(delayed, this.#stimulusRange, [0, 1]);
+  }
+
+  get #clampedStimulus() {
+    return Math.max(0, Math.min(1, this.#stimulusLevel));
+  }
+
+  // ── Draw loop (requestAnimationFrame) ─────────────────────────────────
+  //
+  // During a trial, every drawn frame produces exactly one frame-data row
+  // holding the values that frame was drawn with — so frameData_N.csv is a
+  // record of what the participant actually saw.
 
   #drawLoop() {
     const now = performance.now();
     const inTrial = this.#state === STATE.TRIAL;
+    if (inTrial) this.#updateAsyncStimulus(now);
     const trialDrawData = inTrial ? {
       trial:       this.#trials[this.#trialIndex],
-      stimLevel:   Math.max(0, Math.min(1, this.#stimulusLevel)),
+      stimLevel:   this.#clampedStimulus,
       flashActive: this.#flashActive,
     } : null;
 
@@ -818,15 +856,26 @@ export default class IBreath {
       console.error('[IBreath] draw error:', e);
     }
 
+    if (inTrial) {
+      this.#frameRows.push({
+        t:     new Date().toISOString(),
+        raw:   this.#lastRawSample,
+        stim:  trialDrawData.stimLevel,
+        flash: trialDrawData.flashActive ? 1 : 0,
+        ...(this.#gazeEnabled ? { gazeX: this.#gazeX ?? '', gazeY: this.#gazeY ?? '' } : {}),
+      });
+    }
+
     requestAnimationFrame(() => this.#drawLoop());
   }
 
-  // ── CSV error display ──────────────────────────────────────────────────
+  // ── Warning display (CSV errors, preset problems) ──────────────────────
 
-  #csvWarn(msg) {
+  #showWarning(msg) {
+    console.warn('[IBreath]', msg);
     if (!this.#hud) return;
     const prev = this.#hud.stateText;
-    this.#hud.stateText  = `⚠ CSV: ${msg}`;
+    this.#hud.stateText  = `⚠ ${msg}`;
     this.#hud.stateColor = '#e09898';
     setTimeout(() => {
       this.#hud.stateText  = prev;

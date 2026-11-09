@@ -119,7 +119,7 @@ Flags in [app/modules/ibreath/config.js](./modules/ibreath/config.js):
 | `MAX_TRIAL_TIME` | `30` | Trial auto-ends after this many seconds |
 | `CALIBRATION_SECS` | `10` | Duration of the calibration recording |
 | `DELAY_VALUES_MS` | `[200, 500, 800, 1000, 1200, 1600, 2200, 3000]` | The fixed set of values the async delay staircase steps through (see [Async delay staircase](#async-delay-staircase)) |
-| `DEFAULT_DELAY_MS` | `1000` | The value (must be one of `DELAY_VALUES_MS`) the staircase starts at each session |
+| `DEFAULT_DELAY_MS` | `1000` | The value (should be one of `DELAY_VALUES_MS`) the staircase starts at each session. If it isn't, the closest value is used and the experimenter HUD shows a warning. |
 | `RANGE_ADAPT` | `true` | Track drift in the signal range after calibration (see [Signal range](#signal-range)); `false` keeps the calibrated range all session |
 | `RANGE_WINDOW_SECS` | `60` | Rolling window the range percentiles are computed over |
 | `RANGE_TIME_CONSTANT_SECS` | `10` | How quickly the range follows that window |
@@ -159,17 +159,18 @@ One row per trial, appended after each trial ends (or after the response screen)
 
 ### Frame data — `frameData_<N>.csv`
 
-One row per update tick (~16 ms) during trial N.
+One row per drawn animation frame (display refresh rate, e.g. ~16.7 ms at 60 Hz) during trial N, holding the values that frame was drawn with.
 
 | Column | Description |
 |---|---|
 | `trialIndex` | Trial number |
-| `timestamp` | ISO-8601 wall-clock time |
-| `breathLevel_input` | Raw LSL sample |
-| `breathLevel_scaled` | Same as input (scaling pipeline pass-through) |
-| `stimulusLevel` | Stimulus level sent to renderer (0–1) |
+| `timestamp` | ISO-8601 wall-clock time the frame was drawn |
+| `breathLevel_input` | Latest raw LSL sample |
+| `stimulusLevel` | Stimulus level drawn in this frame (0–1) |
 | `flashActive` | `1` while flash is on screen — only when `FLASHING_IMAGE` is on |
-| `gazeX`, `gazeY` | Gaze coordinates in pixels — only when gaze stream is connected |
+| `gazeX`, `gazeY` | Gaze position, normalised 0–1 (empty during blinks) — only when eye tracking is used |
+
+The MATLAB original's `breathLevel_scaled` column has been dropped: it only ever duplicated `breathLevel_input`.
 
 ---
 
@@ -250,7 +251,7 @@ Every field is optional except `questions`' internal shape (if `questions` is pr
 | `inputSignalType` | `'physiological'` or `'peaksOnly'` — pre-fills and locks the **Signal type** control. Omit to leave it to the experimenter. |
 | `useEyeTracking` | `true` or `false` — pre-fills and locks the **Use eye tracking** checkbox (and applies it immediately, same as checking it by hand). Omit (or `null`) to leave it to the experimenter. |
 | `questions` | Replaces `CONFIG.QUESTIONS` wholesale for the session (applied at Start). Omit to keep the built-in default (100% `sync`). |
-| `configOverrides` | Arbitrary `key: value` pairs applied directly onto `CONFIG` at Start (after resetting CONFIG to its hardcoded defaults, so a previous session's preset never silently lingers). Any key in [config.js](./modules/ibreath/config.js) can be overridden this way — this is how the iBeat presets carry their peak-envelope timings. |
+| `configOverrides` | Arbitrary `key: value` pairs applied directly onto `CONFIG` at Start (after resetting CONFIG to its hardcoded defaults, so a previous session's preset never silently lingers). Any key in [config.js](./modules/ibreath/config.js) can be overridden this way — this is how the iBeat presets carry their peak-envelope timings. The signal pipeline (smoother, peak envelope, async delay buffer) is rebuilt after the overrides are applied, so `SMOOTH_WINDOW`, `PEAK_*` and `DELAY_VALUES_MS` overrides take effect too. |
 
 **Question entries** (`questions[i]`):
 

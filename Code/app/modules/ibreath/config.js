@@ -2,10 +2,6 @@ export const CONFIG = {
   // Subject / experiment
   SUBJECT_CODE: "TEST",
 
-  // Signal scaling (matching MATLAB LOG_SCALING_SYNC path)
-  LOG_SCALE_DEPTH: 500,
-  BREATH_SCALE_BASE_LOG: 1.2,
-
   // Smoothing
   SMOOTH_WINDOW: 64,        // samples (matches smoothBreathRT.m windowSize) — physiological signal only
 

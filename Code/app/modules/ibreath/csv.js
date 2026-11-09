@@ -2,9 +2,12 @@
 //
 // Two files per subject, written to CONFIG.DATA_DIR/<subjectCode>/:
 //   trialData.csv   — one row per trial (appended after each trial ends)
-//   frameData_N.csv — one row per animation frame for trial N
+//   frameData_N.csv — one row per drawn animation frame for trial N, with
+//                     the values that frame was drawn with
 //
-// Columns match the MATLAB ibreath_main_v2.m output exactly.
+// Columns follow the MATLAB ibreath_main_v2.m output, minus its
+// breathLevel_scaled column (the JS pipeline has no separate scaling step,
+// so it only ever duplicated breathLevel_input).
 //
 // Strategy:
 //   • Subject directory + trialData.csv header are created at calibration
@@ -30,7 +33,7 @@ export class IBreathCSV {
     this.#onWarn      = onWarn;
 
     this.#frameHeader =
-      'trialIndex,timestamp,breathLevel_input,breathLevel_scaled,stimulusLevel' +
+      'trialIndex,timestamp,breathLevel_input,stimulusLevel' +
       (CONFIG.FLASHING_IMAGE ? ',flashActive' : '') +
       (gazeEnabled ? ',gazeX,gazeY' : '') + '\n';
 
@@ -79,7 +82,7 @@ export class IBreathCSV {
 
     const rows = frameRows.map(r =>
       `${trial.trialIndex},${r.t},` +
-      `${r.raw.toFixed(6)},${r.scaled.toFixed(6)},${r.stim.toFixed(6)}` +
+      `${r.raw.toFixed(6)},${r.stim.toFixed(6)}` +
       (CONFIG.FLASHING_IMAGE ? `,${r.flash}` : '') +
       (this.#gazeEnabled ? `,${r.gazeX ?? ''},${r.gazeY ?? ''}` : '')
     ).join('\n') + '\n';
