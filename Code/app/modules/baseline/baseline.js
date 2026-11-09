@@ -25,6 +25,7 @@
 import { MarkerStream }        from '../stream/markerStream.js';
 import { CONFIG, STATE }       from './baseline_config.js';
 import { estimateBreathRate }  from '../signal/breathRateEstimators.js';
+import { baselineFileStem, estimatesPath } from './baselineFiles.js';
 
 export default class Baseline {
   #state        = STATE.IDLE;
@@ -268,12 +269,8 @@ export default class Baseline {
   // Main processes file IPC in order with synchronous fs calls, so the
   // header written here always lands before the first appended rows.
 
-  get #fileStem() {
-    return `${CONFIG.DATA_DIR}/${this.#subjectCode}_baseline_${this.#name.slug}`;
-  }
-
   #initCSV() {
-    this.#csvPath = `${this.#fileStem}.csv`;
+    this.#csvPath = `${baselineFileStem(this.#subjectCode, this.#name.slug)}.csv`;
     if (!window.api) return;
     window.api.writeCSV(this.#csvPath, 'timestamp,value,name\n').then((res) => {
       if (!res.ok) this.#csvError(`could not create ${this.#csvPath}: ${res.error}`);
@@ -322,7 +319,7 @@ export default class Baseline {
 
     const estimates = estimateBreathRate(values, sampleRate, { windowed: true });
 
-    const path   = `${this.#fileStem}_estimates.csv`;
+    const path   = estimatesPath(this.#subjectCode, this.#name.slug);   // read back by bioGame (Resting)
     const header = 'method,hz,bpm,name\n';
     const rows   = Object.entries(estimates)
       .map(([method, hz]) => {

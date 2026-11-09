@@ -6,6 +6,7 @@ import { CONFIG }        from './modules/ibreath/config.js';
 import { CONFIG as BG }  from './modules/bioGame/bioGame_config.js';
 import { CONFIG as BTG } from './modules/beltTrainingGame/beltTrainingGame_config.js';
 import { CONFIG as BL }  from './modules/baseline/baseline_config.js';
+import { loadNaturalBpm, RESTING } from './modules/baseline/baselineFiles.js';
 
 // ── Frontend detection ────────────────────────────────────────────────────────
 
@@ -498,39 +499,24 @@ if (frontend === 'ibreath') {
 
   // ── Baseline BPM auto-load ────────────────────────────────────────────────────
 
-  // Natural breathing rate = the subject's *Resting* baseline. Falls back to
-  // the pre-name file (<subject>_baseline_estimates.csv) for older data.
+  // Natural breathing rate = the subject's *Resting* baseline estimates (see
+  // modules/baseline/baselineFiles.js — shared with the baseline writer).
   async function tryLoadBaseline(subjectCode) {
-    const resting = BL.NAMES.find((n) => n.slug === 'resting') ?? BL.NAMES[0];
-    let result = await window.api.readFile(
-      `${BL.DATA_DIR}/${subjectCode}_baseline_${resting.slug}_estimates.csv`);
-    if (!result.ok) {
-      result = await window.api.readFile(`${BL.DATA_DIR}/${subjectCode}_baseline_estimates.csv`);
-    }
+    const res = await loadNaturalBpm(subjectCode, window.api.readFile);
 
-    if (!result.ok) {
-      bgBpmSrcEl.textContent = 'enter manually';
+    if (res.status === 'missing') {
+      bgBpmSrcEl.textContent = `no ${RESTING.label} baseline for ${subjectCode} — enter manually`;
       bgBpmSrcEl.style.color = '';
       return;
     }
-
-    // Parse bpm column (index 2), filter to physiologic range
-    const lines  = result.content.trim().split('\n');
-    const values = [];
-    for (let i = 1; i < lines.length; i++) {
-      const bpm = parseFloat(lines[i].split(',')[2]);
-      if (!isNaN(bpm) && bpm >= 4 && bpm <= 25) values.push(bpm);
-    }
-
-    if (values.length === 0) {
+    if (res.status === 'invalid') {
       bgBpmSrcEl.textContent = 'no valid BPM in file — enter manually';
       bgBpmSrcEl.style.color = 'rgba(255,190,60,0.85)';
       return;
     }
 
-    const avg = values.reduce((a, b) => a + b, 0) / values.length;
-    bgNatBpmEl.value       = avg.toFixed(1);
-    bgBpmSrcEl.textContent = `auto (${values.length} estimates, avg ${avg.toFixed(1)} BPM)`;
+    bgNatBpmEl.value       = res.bpm.toFixed(1);
+    bgBpmSrcEl.textContent = `auto from ${RESTING.label} baseline (${res.count} estimates, avg ${res.bpm.toFixed(1)} BPM)`;
     bgBpmSrcEl.style.color = 'rgba(100,220,130,0.9)';
   }
 

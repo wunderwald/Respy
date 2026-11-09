@@ -22,7 +22,7 @@ Two windows open:
 |---|---|
 | **Subject** | Type the subject code before pressing Start. Locked once calibration begins. |
 | **Group** | *Target (slow 6 BPM)* — fish follows a 6 BPM breath curve, starfish appear on that curve. *Control (natural)* — curve uses the participant's natural BPM (set the BPM field). |
-| **Natural BPM** | Only visible in the natural condition. Sets the target curve frequency. |
+| **Natural BPM** | Only visible in the natural condition. Sets the target curve frequency. Filled in automatically from the subject's **Resting** baseline (the average of the methods in `output_data/baseline/<subject>_baseline_resting_estimates.csv` within 4–25 BPM; older recordings without a name: `<subject>_baseline_estimates.csv`), re-checked whenever the subject code changes. Other baselines (Post slow, …) are never used. Without a Resting baseline, enter it manually. |
 | **Show target curve** | Overlays the sinusoidal target curve on screen (for debugging / operator monitoring). |
 | **Cal secs** | How many seconds to calibrate the breath signal (default 10 s). Calibration captures the participant's breathing range. |
 | **Retry calibration** | Appears only if calibration fails (no signal received, or the signal was flat). Restarts the calibration recording. |
