@@ -466,6 +466,7 @@ if (frontend === 'ibreath') {
       <button id="bg-cal-default-btn" style="display:none">Use default calibration</button>
     </span>
     <span id="bg-space-hint" class="space-hint" style="display:none">Press SPACE to continue</span>
+    <span id="bg-warning" style="display:none;color:#e0a838;"></span>
   `;
 
   // ── bioGame settings bar ──────────────────────────────────────────────────────
@@ -493,6 +494,7 @@ if (frontend === 'ibreath') {
   const bgAbortBtn      = document.getElementById('bg-abort-btn');
   const bgCalRetryBtn   = document.getElementById('bg-cal-retry-btn');
   const bgCalDefaultBtn = document.getElementById('bg-cal-default-btn');
+  const bgWarningEl     = document.getElementById('bg-warning');
 
   // Show natural-BPM field only for the natural condition
   bgNatBpmWrap.style.display = BG.GROUP === 'natural' ? '' : 'none';
@@ -545,12 +547,17 @@ if (frontend === 'ibreath') {
 
   // ── Receive state from scene window ─────────────────────────────────────────
 
-  window.api.frontend.onState(({ stateText, score, startEnabled, startText,
-                                  nextVisible, abortVisible, calFailed, inputsLocked }) => {
+  window.api.frontend.onState(({ stateText, score, startEnabled, startText, nextText,
+                                  nextVisible, abortVisible, calFailed, inputsLocked, warning }) => {
     if (stateText    !== undefined) bgStatusEl.textContent      = stateText;
     if (score        != null)       bgScoreEl.textContent       = score;
     if (startEnabled !== undefined) bgStartBtn.disabled         = !startEnabled;
     if (startText    !== undefined) bgStartBtn.textContent      = startText;
+    if (nextText     !== undefined) bgNextBtn.textContent       = nextText;
+    if (warning      !== undefined) {
+      bgWarningEl.textContent   = warning ?? '';
+      bgWarningEl.style.display = warning ? '' : 'none';
+    }
     if (nextVisible  !== undefined) {
       bgNextBtn.style.display     = nextVisible ? '' : 'none';
       bgSpaceHintEl.style.display = nextVisible ? '' : 'none';

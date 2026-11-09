@@ -38,11 +38,19 @@ Two windows open:
 - `Space` — advance (start Game 2 / confirm ready state)
 - `Escape` — abort current game
 
+**Ending a session early:** close the window. Buffered frame rows and a `session_closed` event are written synchronously before it goes away (see [Data output](#data-output)).
+
+**Frame-drop warning:** if the display renders fewer than `FRAME_DROP_WARN_RATIO` (90%) of `SIM_FPS` frames for `FRAME_DROP_WARN_SECS` (3) seconds in a row, a warning appears next to the controls and `frame_drop_warning` is logged; it stays until the next game starts.
+
 ---
 
 ## Timing
 
-Gameplay runs on a **fixed-step simulation** at `SIM_FPS` (60) steps per second: game time is `frame / SIM_FPS`, and item movement, the target curve, `trial_<N>` markers, curve cues and the block end all use that clock. Steps are caught up to the wall clock from both the render loop and a 100 ms timer, so the game stays in real time even if rendering stalls or drops frames, and a game is always exactly `BLOCK_DURATION_SECS × SIM_FPS` steps. Set `SIM_FPS` to the participant display's refresh rate.
+Gameplay runs on a **fixed-step simulation** at `SIM_FPS` (60) steps per second: game time is `frame / SIM_FPS`, and item movement, the target curve, `trial_<N>` markers, curve cues and the block end all use that clock. Steps are caught up to the wall clock from both the render loop and a 100 ms timer, so the game stays in real time even if rendering stalls or drops frames, and a game is always exactly `BLOCK_DURATION_SECS × SIM_FPS` steps.
+
+**Render interpolation:** each drawn frame shows the game blended between the last two steps, by how far that frame falls between them. Motion is smooth on any refresh rate (60, 120, 144 Hz …), and the data rate stays `SIM_FPS` on every machine. The picture runs at most one step (~17 ms) behind the newest state.
+
+**If the display can't keep up**, only the picture suffers: the game, markers and data stay in real time, but fewer steps are shown. The frame CSV's `drawn` column records which steps were on screen, and the frame-drop warning (above) flags sustained drops.
 
 ---
 
@@ -104,6 +112,7 @@ One row per simulation frame (`SIM_FPS`, 60 per second) during game N.
 | `blockIndex` | 0 = Game 1, 1 = Game 2, … |
 | `frame` | Simulation frame number within the game (1, 2, …) |
 | `blockTime` | Game time in seconds, `frame / SIM_FPS` |
+| `drawn` | `1` if a rendered frame showed this step as its newest state, `0` if the display skipped it (slow rendering, a stall, or the game's last step). At display rate ≈ `SIM_FPS`, an occasional `0` from timing jitter is normal. |
 | `breathRaw` | Raw LSL sample |
 | `breathSmoothed` | Gaussian-smoothed sample |
 | `breathNorm` | Normalized to the current signal range, `[0, 1]` |
@@ -118,8 +127,8 @@ One row per simulation frame (`SIM_FPS`, 60 per second) during game N.
 |---|---|
 | `timestamp` | ISO-8601 wall-clock time |
 | `blockIndex` | 0 / 1 / … |
-| `event` | `session_start`, `item_collect`, `item_miss`, `block_end`, `block_abort` |
-| `value1` | Score at collect / block end — group for `session_start` |
+| `event` | `session_start`, `item_collect`, `item_miss`, `block_end`, `block_abort`, `frame_drop_warning`, `frame_drop_recovered`, `session_closed` |
+| `value1` | Score at collect / block end — group for `session_start` — render ratio (0–1) for `frame_drop_*` — state the window was closed in for `session_closed` |
 | `value2` | Block time in seconds at the event — scene for `session_start` |
 
 ---
@@ -146,3 +155,4 @@ MARKER_STREAM_URL: 'ws://localhost:8765',
 | `item_collect_b<N>_s<score>` | item collected |
 | `item_miss_b<N>` | item missed |
 | `experiment_done` | last game finished (or aborted) |
+| `session_closed` | window closed before the session was done (best effort — the marker connection may already be gone) |

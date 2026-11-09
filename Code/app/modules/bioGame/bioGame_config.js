@@ -64,10 +64,16 @@ export const CONFIG = {
 
   // ── Simulation / data recording ──────────────────────────────────────────
   // Gameplay advances in fixed steps of 1/SIM_FPS s, kept in sync with the
-  // wall clock; each step is one frame-data row. Match the participant
-  // display's refresh rate so every drawn frame shows exactly one new step.
+  // wall clock; each step is one frame-data row. Drawn frames are
+  // interpolated between steps, so any display refresh rate looks smooth.
   SIM_FPS:               60,
   FRAME_FLUSH_COUNT:     600,   // flush after this many buffered rows (10 s at 60 fps)
+
+  // Dropped-frame warning: rendered frames ÷ simulated steps (capped at 1)
+  // below FRAME_DROP_WARN_RATIO for FRAME_DROP_WARN_SECS seconds in a row
+  // warns the experimenter and logs 'frame_drop_warning' to eventData.csv.
+  FRAME_DROP_WARN_RATIO: 0.9,
+  FRAME_DROP_WARN_SECS:  3,
 };
 
 export const STATE = {

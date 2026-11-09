@@ -18,7 +18,7 @@ export class BioGameCSV {
   #frameBuffer       = [];
   #currentBlockIndex = 0;
 
-  #frameHeader = 'timestamp,blockIndex,frame,blockTime,breathRaw,breathSmoothed,breathNorm,' +
+  #frameHeader = 'timestamp,blockIndex,frame,blockTime,drawn,breathRaw,breathSmoothed,breathNorm,' +
                  'normMin,normMax,avatarY,targetY,itemCount\n';
   #eventHeader = 'timestamp,blockIndex,event,value1,value2\n';
 
@@ -58,35 +58,67 @@ export class BioGameCSV {
     else console.log(`[CSV] initialised ${path}`);
   }
 
-  // Buffer a frame row. Call flushFrames() at block end to drain the remainder.
+  // Buffer a frame row. The newest row is never flushed from here: the game
+  // may still mark it as drawn when the next frame is rendered. Call
+  // flushFrames() at block end to drain everything.
   bufferFrame(row) {
     this.#frameBuffer.push(row);
-    if (this.#frameBuffer.length >= CONFIG.FRAME_FLUSH_COUNT) {
+    if (this.#frameBuffer.length > CONFIG.FRAME_FLUSH_COUNT) {
+      const newest = this.#frameBuffer.pop();
       this.flushFrames(this.#currentBlockIndex);
+      this.#frameBuffer.push(newest);
     }
   }
 
   async flushFrames(blockIndex) {
-    if (!window.api || this.#frameBuffer.length === 0) return;
-    const buf = this.#frameBuffer;
-    this.#frameBuffer = [];
-
-    const csv = buf.map(r =>
-      `${r.t},${r.block},${r.frame},${r.blockTime.toFixed(4)},${r.raw.toFixed(4)},${r.smoothed.toFixed(4)},` +
-      `${r.norm.toFixed(4)},${r.normMin.toFixed(6)},${r.normMax.toFixed(6)},${r.avatarY.toFixed(4)},${r.targetY.toFixed(4)},${r.itemCount}`
-    ).join('\n') + '\n';
-
+    const csv = this.#takeFrames();
+    if (!csv || !window.api) return;
     const res = await window.api.appendCSV(this.#framePath(blockIndex), csv);
     if (!res.ok) this.#warn(`Could not write frame data: ${res.error}`);
   }
 
   async appendEvent(blockIndex, event, value1 = '', value2 = '') {
     if (!window.api) return;
-    const row = `${new Date().toISOString()},${blockIndex},${event},${value1},${value2}\n`;
-    const res = await window.api.appendCSV(
-      `${CONFIG.DATA_DIR}/${this.#subjectCode}/eventData.csv`, row
-    );
+    const res = await window.api.appendCSV(this.#eventPath, this.#eventRow(blockIndex, event, value1, value2));
     if (!res.ok) this.#warn(`Could not write event '${event}': ${res.error}`);
+  }
+
+  // ── Synchronous variants — only for the 'pagehide' handler (window
+  //    closing), where an async write might never arrive. ────────────────
+
+  flushFramesSync(blockIndex) {
+    const csv = this.#takeFrames();
+    if (!csv || !window.api) return;
+    const res = window.api.appendCSVSync(this.#framePath(blockIndex), csv);
+    if (!res.ok) console.error('[CSV] final frame flush failed:', res.error);
+  }
+
+  appendEventSync(blockIndex, event, value1 = '', value2 = '') {
+    if (!window.api) return;
+    const res = window.api.appendCSVSync(this.#eventPath, this.#eventRow(blockIndex, event, value1, value2));
+    if (!res.ok) console.error(`[CSV] could not write event '${event}':`, res.error);
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  // Empties the buffer and returns its rows as CSV text (null if empty).
+  #takeFrames() {
+    if (this.#frameBuffer.length === 0) return null;
+    const buf = this.#frameBuffer;
+    this.#frameBuffer = [];
+    return buf.map(r =>
+      `${r.t},${r.block},${r.frame},${r.blockTime.toFixed(4)},${r.drawn ? 1 : 0},` +
+      `${r.raw.toFixed(4)},${r.smoothed.toFixed(4)},` +
+      `${r.norm.toFixed(4)},${r.normMin.toFixed(6)},${r.normMax.toFixed(6)},${r.avatarY.toFixed(4)},${r.targetY.toFixed(4)},${r.itemCount}`
+    ).join('\n') + '\n';
+  }
+
+  #eventRow(blockIndex, event, value1, value2) {
+    return `${new Date().toISOString()},${blockIndex},${event},${value1},${value2}\n`;
+  }
+
+  get #eventPath() {
+    return `${CONFIG.DATA_DIR}/${this.#subjectCode}/eventData.csv`;
   }
 
   #framePath(blockIndex) {

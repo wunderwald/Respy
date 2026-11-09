@@ -50,6 +50,8 @@ export default class BioGame {
   #state        = STATE.IDLE;
   #streamReady  = false;
   #inputsLocked = false;
+  #stateText    = 'waiting for stream…';   // last status line sent to the experimenter
+  #warning      = null;                    // persistent experimenter warning (frame drops)
 
   // ── Particles + avatar bump ───────────────────────────────────────────────
   #particles    = [];
@@ -71,6 +73,18 @@ export default class BioGame {
   // ── Fixed-step simulation ─────────────────────────────────────────────────
   #simFrame = 0;   // steps simulated in the current block
   static #STEP = 1 / CONFIG.SIM_FPS;   // seconds per step
+
+  // Previous step's values, for render interpolation (items and particles
+  // carry their own px/py). See #buildRenderData.
+  #prevAvatarTilt = 0;
+  #prevBgScrollX  = 0;
+
+  // ── Dropped-frame detection ───────────────────────────────────────────────
+  #lastFrameRow    = null;   // newest frame row — marked `drawn` when rendered
+  #dropWinStart    = 0;      // start (performance.now) of the current 1 s window
+  #dropWinFrame    = 0;      // #simFrame at window start
+  #dropWinRendered = 0;      // frames rendered in this window
+  #dropLowWindows  = 0;      // consecutive windows below FRAME_DROP_WARN_RATIO
 
   // ── Trial markers ─────────────────────────────────────────────────────────
   #trialIndex    = 0;
@@ -152,6 +166,7 @@ export default class BioGame {
       : { send() {} };
 
     window.api.frontend.onAction((action) => this.#onAction(action));
+    window.addEventListener('pagehide', () => this.#onWindowClose());
 
     setInterval(() => this.#tick(), 100);
     requestAnimationFrame((t) => this.#rafLoop(t));
@@ -306,6 +321,15 @@ export default class BioGame {
     this.#nextSpawnTime   = randBetween(CONFIG.ITEM_SPAWN_MIN_MS, CONFIG.ITEM_SPAWN_MAX_MS) / 1000;
     this.#avatarStressNorm = CONFIG.AVATAR_STRESS_INIT;
     this.#speedNorm        = CONFIG.SCROLL_SPEED_INIT;
+    this.#prevAvatarTilt   = this.#avatarTilt;
+    this.#prevBgScrollX    = this.#bgScrollX;
+
+    this.#lastFrameRow   = null;
+    this.#dropWinStart   = this.#blockStartTime;
+    this.#dropWinFrame   = 0;
+    this.#dropWinRendered = 0;
+    this.#dropLowWindows = 0;
+    this.#warning        = null;   // a previous game's frame-drop warning
 
     this.#csv.initBlockCSV(this.#blockIndex);
     this.#nextTrialTime = (60 / this.#activeBpm) * 0.75;
@@ -346,6 +370,19 @@ export default class BioGame {
     });
   }
 
+  // Closing the window is how a session is ended early: write the buffered
+  // frame rows and a 'session_closed' event (value1 = state it was closed
+  // in, value2 = game time if playing) synchronously — an async write might
+  // never arrive.
+  #onWindowClose() {
+    if (!this.#csv || this.#state === STATE.DONE) return;   // no session running
+    const playing = this.#state === STATE.PLAYING;
+    this.#csv.flushFramesSync(this.#blockIndex);
+    this.#csv.appendEventSync(this.#blockIndex, 'session_closed', this.#state,
+      playing ? this.#blockTime.toFixed(2) : '');
+    this.#markers.send('session_closed');   // best effort — the socket may already be gone
+  }
+
   #endExperiment() {
     this.#state = STATE.DONE;
     this.#markers.send('experiment_done');
@@ -372,6 +409,45 @@ export default class BioGame {
 
     // Keeps the simulation (and block end) on time even while rAF stalls.
     this.#advanceSim(now);
+    this.#checkFrameDrops(now);
+  }
+
+  // ── Dropped-frame detection ───────────────────────────────────────────────
+  //
+  // Every second, compares the frames rendered with the steps simulated
+  // (capped at 1 — a faster display is fine). If it stays below
+  // FRAME_DROP_WARN_RATIO for FRAME_DROP_WARN_SECS seconds in a row, the
+  // experimenter gets a warning and eventData.csv a 'frame_drop_warning'
+  // event; recovery logs 'frame_drop_recovered'. The warning stays visible
+  // until the next game starts. (Frame counts rather than the per-step
+  // `drawn` flags: with display rate ≈ SIM_FPS, timing jitter near a step
+  // boundary occasionally skips a step without rendering being slow.)
+
+  #checkFrameDrops(now) {
+    if (this.#state !== STATE.PLAYING || now - this.#dropWinStart < 1000) return;
+    const steps = this.#simFrame - this.#dropWinFrame;
+    const ratio = steps > 0 ? Math.min(1, this.#dropWinRendered / steps) : 1;
+    this.#dropWinStart    = now;
+    this.#dropWinFrame    = this.#simFrame;
+    this.#dropWinRendered = 0;
+
+    const wasLow = this.#dropLowWindows >= CONFIG.FRAME_DROP_WARN_SECS;
+    this.#dropLowWindows = ratio < CONFIG.FRAME_DROP_WARN_RATIO ? this.#dropLowWindows + 1 : 0;
+    const isLow = this.#dropLowWindows >= CONFIG.FRAME_DROP_WARN_SECS;
+    const pct = Math.round(ratio * 100);
+
+    if (isLow) {
+      if (!wasLow) {
+        this.#csv.appendEvent(this.#blockIndex, 'frame_drop_warning', ratio.toFixed(2), this.#blockTime.toFixed(2));
+        console.warn(`[BioGame] display dropping frames: rendering at ${pct}% of ${CONFIG.SIM_FPS} fps`);
+      }
+      this.#warning = `⚠ display dropping frames — rendering at ${pct}% of ${CONFIG.SIM_FPS} fps (game ${this.#blockIndex + 1})`;
+      this.#pushState();
+    } else if (wasLow) {
+      this.#csv.appendEvent(this.#blockIndex, 'frame_drop_recovered', ratio.toFixed(2), this.#blockTime.toFixed(2));
+      this.#warning = `⚠ display dropped frames earlier in game ${this.#blockIndex + 1} (see eventData.csv)`;
+      this.#pushState();
+    }
   }
 
   // ── Fixed-step simulation ─────────────────────────────────────────────────
@@ -397,6 +473,13 @@ export default class BioGame {
   #stepSim() {
     const dt = BioGame.#STEP;
     const t  = this.#blockTime;
+    // Keep this step's starting values for render interpolation.
+    // (#updateSignal keeps #prevAvatarNormY itself.)
+    this.#prevAvatarTilt = this.#avatarTilt;
+    this.#prevBgScrollX  = this.#bgScrollX;
+    for (const it of this.#items)     { it.px = it.xRatio; it.py = it.normY; }
+    for (const p  of this.#particles) { p.px  = p.x;       p.py  = p.y; }
+
     this.#updateSignal(dt);
     this.#bgScrollX += this.#scrollSpeed * CONFIG.BG_SCROLL_FACTOR * dt;
     this.#updateItems(t, dt);
@@ -419,6 +502,12 @@ export default class BioGame {
     // Calibration preview: no sim, the avatar just follows the signal.
     if (this.#state === STATE.CALIBRATING) this.#updateSignal(dt);
     this.#advanceSim(now);
+
+    if (this.#state === STATE.PLAYING) {
+      this.#dropWinRendered++;
+      // The newest step is (the target of) what this frame shows.
+      if (this.#lastFrameRow) this.#lastFrameRow.drawn = true;
+    }
 
     try {
       this.#renderer.draw(this.#buildRenderData(now));
@@ -555,13 +644,16 @@ export default class BioGame {
 
   // ── Frame data recording ──────────────────────────────────────────────────
 
-  // One row per simulation step (= game frame) at a fixed SIM_FPS.
+  // One row per simulation step (= game frame) at a fixed SIM_FPS. `drawn`
+  // is set later by #rafLoop if a rendered frame showed this step as its
+  // newest state.
   #recordFrame(blockTime) {
-    this.#csv.bufferFrame({
+    this.#lastFrameRow = {
       t:         new Date().toISOString(),
       block:     this.#blockIndex,
       frame:     this.#simFrame,
       blockTime,
+      drawn:     false,
       raw:       this.#lastRaw,
       smoothed:  this.#smoother.value,
       norm:      this.#avatarNormY,
@@ -570,13 +662,42 @@ export default class BioGame {
       avatarY:   this.#avatarNormY,
       targetY:   targetCurveY(blockTime, this.#activeBpm),
       itemCount: this.#items.filter(s => !s.checked).length,
-    });
+    };
+    this.#csv.bufferFrame(this.#lastFrameRow);
   }
 
   // ── Render data builder ───────────────────────────────────────────────────
+  //
+  // Render interpolation: while playing, a drawn frame falls somewhere
+  // between the last two simulation steps. Moving things are drawn blended
+  // between those two steps by that fraction (`alpha`), and timers are
+  // drawn `lag` seconds behind the newest step — so motion is smooth on any
+  // refresh rate, at the cost of showing the game at most one step late.
+
+  #interpolation(now) {
+    if (this.#state !== STATE.PLAYING) return { alpha: 1, lag: 0 };
+    const step  = BioGame.#STEP;
+    const alpha = clamp(((now - this.#blockStartTime) / 1000 - this.#blockTime) / step, 0, 1);
+    return { alpha, lag: (1 - alpha) * step };
+  }
 
   #buildRenderData(now) {
-    const blockTime = this.#blockStartTime != null ? this.#blockTime : 0;
+    const { alpha, lag } = this.#interpolation(now);
+    const blockTime = this.#blockStartTime != null ? Math.max(0, this.#blockTime - lag) : 0;
+    const back = (timer) => timer != null ? Math.max(0, timer - lag) : timer;
+
+    const items = alpha === 1 ? this.#items : this.#items.map(it => ({
+      ...it,
+      xRatio:   lerp(it.px ?? it.xRatio, it.xRatio, alpha),
+      normY:    lerp(it.py ?? it.normY,  it.normY,  alpha),
+      collectT: back(it.collectT),
+      missT:    back(it.missT),
+    }));
+    const particles = alpha === 1 ? this.#particles : this.#particles.map(p => ({
+      ...p,
+      x: lerp(p.px ?? p.x, p.x, alpha),
+      y: lerp(p.py ?? p.y, p.y, alpha),
+    }));
 
     let countdownValue = 3, countdownProgress = 0;
     if (this.#countdownStartTime != null) {
@@ -590,15 +711,15 @@ export default class BioGame {
     return {
       state:             this.#state,
       now,
-      bgScrollX:         this.#bgScrollX,
+      bgScrollX:         lerp(this.#prevBgScrollX, this.#bgScrollX, alpha),
       blockTime,
       bpm:               this.#activeBpm,
-      avatarNormY:       this.#avatarNormY,
+      avatarNormY:       lerp(this.#prevAvatarNormY, this.#avatarNormY, alpha),
       avatarStressNorm:  this.#avatarStressNorm,
-      avatarTilt:        this.#avatarTilt,
-      avatarBumpT:       this.#avatarBumpT,
-      items:             this.#items,
-      particles:         this.#particles,
+      avatarTilt:        lerp(this.#prevAvatarTilt, this.#avatarTilt, alpha),
+      avatarBumpT:       back(this.#avatarBumpT),
+      items,
+      particles,
       score:             this.#scoreBlock[this.#blockIndex],
       blockIndex:        this.#blockIndex,
       scoreBlocks:       this.#scoreBlock,
@@ -614,17 +735,23 @@ export default class BioGame {
 
   // ── Experimenter state push ───────────────────────────────────────────────
 
+  // Every push is a full snapshot. Button visibility is derived from the
+  // state, so a partial update (e.g. just the score) can't hide them; the
+  // status line repeats the last one sent unless overridden.
   #pushState(overrides = {}) {
+    if (overrides.stateText !== undefined) this.#stateText = overrides.stateText;
     window.api.frontend.sendState({
-      stateText:    `game ${this.#blockIndex + 1} / ${CONFIG.NUM_BLOCKS}`,
       score:        this.#scoreBlock[this.#blockIndex] ?? 0,
       startEnabled: this.#streamReady && this.#state === STATE.IDLE,
       startText:    'Start',
-      nextVisible:  false,
-      abortVisible: false,
-      calFailed:    false,
+      nextText:     `Start game ${this.#blockIndex + 1}`,
+      nextVisible:  this.#state === STATE.READY || this.#state === STATE.INTERMISSION,
+      abortVisible: this.#state === STATE.PLAYING,
+      calFailed:    this.#state === STATE.CALIBRATING && this.#calFailed,
       inputsLocked: this.#inputsLocked,
+      warning:      this.#warning,
       ...overrides,
+      stateText:    this.#stateText,
     });
   }
 
