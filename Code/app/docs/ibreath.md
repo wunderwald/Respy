@@ -117,7 +117,7 @@ Configured in [ibreath_sound_config.js](../modules/ibreath/ibreath_sound_config.
 | Sound | When | Details |
 |---|---|---|
 | Jingle (`sounds/jingle.wav`) | Pre-trial animation | Played `JINGLE_LOOPS` (4) times at `JINGLE_VOLUME`; stops when the trial starts |
-| Stimulus noise | During each trial | Generated **white noise** (`NOISE: 'white'`, a 10 s loop), its volume following the stimulus level: `NOISE_VOLUME_MIN` (0) at level 0 → `NOISE_VOLUME_MAX` (0.06, ≈ −29 dBFS) at level 1. In async trials it follows the delayed signal, like the animation. Set `NOISE` to a file path (e.g. `'sounds/breath.wav'`) to use a sample instead. |
+| Stimulus noise | During each trial | Generated **white noise** (`NOISE: 'white'`, a 10 s loop), its volume following the stimulus level: `NOISE_VOLUME_MIN` (0) at level 0 → `NOISE_VOLUME_MAX` (0.015, ≈ −41 dBFS) at level 1. In async trials it follows the delayed signal, like the animation. Set `NOISE` to a file path (e.g. `'sounds/breath.wav'`) to use a sample instead. |
 | Ambience (`sounds/ambience.wav`) | — | **Muted** (`AMBIENCE_VOLUME: 0`, not loaded); set a volume > 0 to bring it back as a steady background loop during trials |
 
 The trial sounds fade in and out over `FADE_SECS` (1 s). Calibration, ITI, the post-trial question and the flash image are silent.
