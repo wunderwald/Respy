@@ -24,6 +24,8 @@ Or select **Baseline Video** from the start screen (`npm start`).
 | **Start** | Begins the recording. Requires a connected resp stream. Sends the `baseline_start` marker. |
 | **Abort** | Stops early and sends `baseline_abort`. Also triggered by `Escape`. |
 
+Closing the window mid-recording also keeps the data: the pending rows are written before it goes away, and a best-effort `session_closed` marker is sent. Only the estimates file is skipped (see [Data output](#data-output)).
+
 ---
 
 ## Session flow

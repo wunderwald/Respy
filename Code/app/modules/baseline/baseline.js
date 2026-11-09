@@ -218,6 +218,7 @@ export default class Baseline {
 
   #flushRowsSync() {
     if (this.#state !== STATE.PLAYING) return;
+    this.#markers.send('session_closed');   // best effort — the socket may already be gone
     const content = this.#takePendingRows();
     if (!content || !window.api) return;
     const res = window.api.appendCSVSync(this.#csvPath, content);
