@@ -149,60 +149,130 @@ export class IBreathRenderer {
     ctx.stroke();
   }
 
+  // Post-trial question, made for children: a big question line and two
+  // big answer cards (← left / right →), each with a fat drawn arrow and
+  // the answer in large bold text — or, for the 'img' question, the picture.
+  // Both cards look identical (same colours) so neither answer is visually
+  // favoured. Everything scales with the screen via `u` (1 u = 1 % of the
+  // height on a 16:9 screen; narrower windows scale down by width).
   #drawResponse(ctx, w, h, now, responseStartTime, questionType) {
     const elapsed   = now - responseStartTime;
     const timeout   = CONFIG.RESPONSE_TIMEOUT_SECS * 1000;
     const progress  = Math.min(elapsed / timeout, 1);
     const remaining = Math.max(0, Math.ceil(CONFIG.RESPONSE_TIMEOUT_SECS - elapsed / 1000));
-    const cx = w / 2, cy = h / 2;
-    const r  = 40;
+    const u  = Math.min(h, w * 9 / 16) / 100;
+    const cx = w / 2;
 
     const questionDef = CONFIG.QUESTIONS.find(q => q.id === questionType) ?? CONFIG.QUESTIONS[0];
-    this.#centerText(ctx, cx, cy - 80, questionDef.text,
-                     'rgba(255,255,255,0.85)', 22);
 
-    // For 'flash': small pinkfish image between question and arc
-    if (questionType === 'flash') {
-      const img = this.#images['pinkfish'];
-      if (img?.complete && img.naturalWidth > 0) {
-        const s = 22;
-        ctx.drawImage(img, cx - s, cy - 56 - s, s * 2, s * 2);
+    // ── Question ──
+    this.#fitText(ctx, cx, 15 * u, questionDef.text, '#ffffff', 7 * u, w * 0.92, '700');
+
+    // ── Answer cards ──
+    const cardW  = Math.min(62 * u, w * 0.38);
+    const cardH  = 54 * u;
+    const cardY  = 61 * u;                         // card centre
+    const cardDx = Math.min(46 * u, w * 0.27);     // card centre offset from screen centre
+    // Gentle, symmetric "come press me" nudge of both arrows outward.
+    const nudge  = (0.5 + 0.5 * Math.sin(now / 1000 * Math.PI * 1.6)) * 1.6 * u;
+    const [leftLabel, rightLabel] = questionDef.answers ?? ['yes', 'no'];
+
+    for (const side of [-1, 1]) {
+      const x = cx + side * cardDx;
+      this.#roundRect(ctx, x - cardW / 2, cardY - cardH / 2, cardW, cardH, 5 * u,
+                      'rgba(255,255,255,0.09)', 'rgba(255,255,255,0.55)', 0.5 * u);
+
+      if (questionType === 'img') {
+        // Arrow on top, the picture as the "label"
+        this.#drawArrow(ctx, x + side * nudge, cardY - 15 * u, 26 * u, side, '#ffd166');
+        const img = this.#images[side < 0 ? 'pufferfish' : 'starfish'];
+        const s   = Math.min(30 * u, cardW * 0.62);
+        if (img?.complete && img.naturalWidth > 0) {
+          const ar = img.naturalWidth / img.naturalHeight;
+          const iw = ar >= 1 ? s : s * ar, ih = ar >= 1 ? s / ar : s;
+          ctx.drawImage(img, x - iw / 2, cardY + 10 * u - ih / 2, iw, ih);
+        }
+      } else {
+        this.#drawArrow(ctx, x + side * nudge, cardY - 9 * u, 32 * u, side, '#ffd166');
+        this.#fitText(ctx, x, cardY + 15 * u, side < 0 ? leftLabel : rightLabel,
+                      '#ffffff', 12 * u, cardW * 0.86, '800');
       }
     }
 
-    // Countdown arc
+    // ── Centre column: pinkfish reminder ('flash') + countdown ──
+    if (questionType === 'flash') {
+      const img = this.#images['pinkfish'];
+      if (img?.complete && img.naturalWidth > 0) {
+        const s = 7 * u;
+        ctx.drawImage(img, cx - s, cardY - 17 * u - s, s * 2, s * 2);
+      }
+    }
+
+    const r = 6.5 * u;
     ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-    ctx.lineWidth   = 4;
+    ctx.arc(cx, cardY + 4 * u, r, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth   = 1.2 * u;
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
-    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-    ctx.lineWidth   = 4;
+    ctx.arc(cx, cardY + 4 * u, r, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+    ctx.lineWidth   = 1.2 * u;
     ctx.lineCap     = 'round';
     ctx.stroke();
 
-    this.#centerText(ctx, cx, cy, String(remaining), 'rgba(255,255,255,0.7)', 36, '200');
+    this.#centerText(ctx, cx, cardY + 4 * u, String(remaining), 'rgba(255,255,255,0.85)', 5.5 * u, '700');
+  }
 
-    // Answer prompt — text or images depending on question type
-    if (questionType === 'img') {
-      const pf   = this.#images['pufferfish'];
-      const sf   = this.#images['starfish'];
-      const s    = 40;
-      const gap  = Math.min(w, h) * 0.22;
-      const imgY = cy + 90;
-      if (pf?.complete && pf.naturalWidth > 0)
-        ctx.drawImage(pf, cx - gap - s, imgY - s, s * 2, s * 2);
-      if (sf?.complete && sf.naturalWidth > 0)
-        ctx.drawImage(sf, cx + gap - s, imgY - s, s * 2, s * 2);
-      this.#centerText(ctx, cx - gap, imgY + s + 10, '←', 'rgba(255,255,255,0.4)', 18);
-      this.#centerText(ctx, cx + gap, imgY + s + 10, '→', 'rgba(255,255,255,0.4)', 18);
-    } else {
-      const [leftLabel, rightLabel] = questionDef.answers ?? ['yes', 'no'];
-      this.#centerText(ctx, cx, cy + 80, `← ${leftLabel}          ${rightLabel} →`, 'rgba(255,255,255,0.4)', 16);
-    }
+  // Fat block arrow centred at (x, y), `len` long, pointing left (dir -1) or
+  // right (dir 1). Filled and stroked in the same colour with round joins,
+  // so the corners come out soft.
+  #drawArrow(ctx, x, y, len, dir, color) {
+    const half  = len / 2;
+    const shaft = len * 0.15;   // half-thickness of the shaft
+    const head  = len * 0.36;   // half-height of the head
+    const neck  = half - len * 0.42;
+    const pts = [
+      [-half, -shaft], [neck, -shaft], [neck, -head], [half, 0],
+      [neck,  head],   [neck,  shaft], [-half, shaft],
+    ];
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir, 1);
+    ctx.beginPath();
+    pts.forEach(([px, py], i) => (i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
+    ctx.closePath();
+    ctx.fillStyle   = color;
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = len * 0.07;
+    ctx.lineJoin    = 'round';
+    // Shadow only on the (outer) stroke; the fill on top then covers the
+    // stroke's inner shadow, so no dark outline shows inside the arrow.
+    ctx.shadowColor = 'rgba(0,0,0,0.35)';
+    ctx.shadowBlur  = len * 0.08;
+    ctx.stroke();
+    ctx.shadowColor = 'transparent';
+    ctx.fill();
+    ctx.restore();
+  }
+
+  #roundRect(ctx, x, y, w, h, r, fill, stroke, lineWidth) {
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, r);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth   = lineWidth;
+    ctx.stroke();
+  }
+
+  // Like #centerText, but shrinks the font until `text` fits `maxWidth`.
+  #fitText(ctx, x, y, text, color, size, maxWidth, weight = '300') {
+    ctx.font = `${weight} ${size}px Nunito, sans-serif`;
+    const width = ctx.measureText(text).width;
+    if (width > maxWidth) size *= maxWidth / width;
+    this.#centerText(ctx, x, y, text, color, size, weight);
   }
 
   #drawITI(ctx, w, h, now, itiStartTime, itiDuration) {
