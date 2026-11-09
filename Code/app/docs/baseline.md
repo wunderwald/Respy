@@ -35,7 +35,7 @@ Closing the window mid-recording also keeps the data: the pending rows are writt
 ## Session flow
 
 ```
-stream ready → [Start] → explanation ("Time to relax") → [Space / Start video] → video until it ends (or for the set secs; countdown if no video) → baseline_end marker → Done
+stream ready → [Start] → explanation ("Wir zeigen dir jetzt ein Video …") → [Space / Start video] → video until it ends (or for the set secs; countdown if no video) → baseline_end marker → Done
 ```
 
 ---

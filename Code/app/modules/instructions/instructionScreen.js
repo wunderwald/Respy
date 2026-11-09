@@ -9,10 +9,12 @@ export function drawInstructions(ctx, w, h, instructions) {
   const { title, lines = [] } = instructions;
   const u        = Math.min(h, w * 9 / 16) / 100;
   const maxW     = Math.min(w * 0.84, 150 * u);
-  const titleSz  = 8 * u;
+  // No title (empty / missing) → no title row and no gap: the panel only
+  // holds the lines.
+  const titleSz  = title ? 8 * u : 0;
   const lineSz   = 5 * u;
   const lineH    = lineSz * 1.35;
-  const gapAfterTitle = 4 * u;
+  const gapAfterTitle = title ? 4 * u : 0;
   const paraGap  = 1.6 * u;     // extra space between the separate lines
 
   // Wrap every line to the available width.
@@ -40,9 +42,11 @@ export function drawInstructions(ctx, w, h, instructions) {
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'middle';
   let y = py + padY + titleSz / 2;
-  ctx.fillStyle = '#ffd166';
-  ctx.font = `800 ${fit(ctx, title, titleSz, maxW, '800')}px Nunito, sans-serif`;
-  ctx.fillText(title, w / 2, y);
+  if (title) {
+    ctx.fillStyle = '#ffd166';
+    ctx.font = `800 ${fit(ctx, title, titleSz, maxW, '800')}px Nunito, sans-serif`;
+    ctx.fillText(title, w / 2, y);
+  }
 
   y += titleSz / 2 + gapAfterTitle + lineH / 2;
   ctx.fillStyle = '#ffffff';

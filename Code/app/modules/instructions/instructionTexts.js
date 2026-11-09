@@ -1,16 +1,9 @@
 // Explanation screens shown to the child before calibration and before the
 // task, in every experiment. All wording lives here (one place to translate).
-// Language: German (being translated experiment by experiment).
+// Language: German.
 // Each function returns { title, lines } for drawInstructions().
 //
 // Keep it simple: short sentences, everyday words.
-
-/** "about 30 seconds" / "about 7 minutes" */
-function about(secs) {
-  if (!(secs > 0)) return '';
-  if (secs < 90) return `about ${Math.round(secs)} seconds`;
-  return `about ${Math.round(secs / 60)} minutes`;
-}
 
 export const INSTRUCTIONS = {
   // Before the breathing calibration (iBreath, bioGame, beltTrainingGame).
@@ -60,13 +53,13 @@ export const INSTRUCTIONS = {
     return { title: 'Schau genau auf den Fisch!', lines };
   },
 
-  baseline({ durationSecs } = {}) {
-    const lines = [
-      'You will watch a calm video.',
-      'Sit back and breathe normally.',
-      'Try to sit still until the video ends.',
-    ];
-    if (durationSecs) lines.push(`It takes ${about(durationSecs)}.`);
-    return { title: 'Time to relax', lines };
+  baseline() {
+    return {
+      title: '',   // no title — just the two lines
+      lines: [
+        'Wir zeigen dir jetzt ein Video.',
+        'Lehn dich zurück, entspann dich und genieß es!',
+      ],
+    };
   },
 };

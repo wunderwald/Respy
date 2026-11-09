@@ -28,6 +28,7 @@ import { estimateBreathRate }  from '../signal/breathRateEstimators.js';
 import { baselineFileStem, estimatesPath } from './baselineFiles.js';
 import { INSTRUCTIONS }       from '../instructions/instructionTexts.js';
 import { drawInstructions }   from '../instructions/instructionScreen.js';
+import { TEXTS }              from './baseline_texts.js';
 
 export default class Baseline {
   #state        = STATE.IDLE;
@@ -190,14 +191,6 @@ export default class Baseline {
     this.#state = STATE.INSTRUCTIONS;
     this.#markers.send('instructions_start');
     this.#pushState({ stateText: 'explaining — press Space or Next', inputsLocked: true });
-  }
-
-  // Expected length for the explanation text: the video's own length when
-  // playing it in full (unknown until its metadata has loaded), else the
-  // set duration (or the fallback without a video).
-  get #expectedSecs() {
-    if (!this.#fullVideo) return this.#customSecs;
-    return this.#videoAvailable ? this.#videoDurationSecs : CONFIG.DURATION_SECS;
   }
 
   #begin() {
@@ -384,12 +377,12 @@ export default class Baseline {
     ctx.textBaseline = 'middle';
 
     if (this.#state === STATE.INSTRUCTIONS) {
-      drawInstructions(ctx, w, h, INSTRUCTIONS.baseline({ durationSecs: this.#expectedSecs }));
+      drawInstructions(ctx, w, h, INSTRUCTIONS.baseline());
 
     } else if (this.#state === STATE.IDLE) {
       ctx.font      = '200 28px Nunito, sans-serif';
       ctx.fillStyle = 'rgba(255,255,255,0.15)';
-      ctx.fillText('Standby', w / 2, h / 2);
+      ctx.fillText(TEXTS.waiting, w / 2, h / 2);
 
     } else if (this.#state === STATE.PLAYING) {
       // Only drawn without a playing video, i.e. always on a timer.
@@ -403,7 +396,7 @@ export default class Baseline {
     } else if (this.#state === STATE.DONE) {
       ctx.font      = '200 28px Nunito, sans-serif';
       ctx.fillStyle = 'rgba(255,255,255,0.25)';
-      ctx.fillText('Done', w / 2, h / 2);
+      ctx.fillText(TEXTS.done, w / 2, h / 2);
     }
   }
 
