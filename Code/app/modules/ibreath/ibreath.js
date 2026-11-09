@@ -884,8 +884,6 @@ export default class IBreath {
       this.#renderer.draw(this.#state, now, {
         calProgress:       this.#calibration?.progress ?? 0,
         calRemaining:      Math.ceil(this.#calibration?.remainingSecs ?? CONFIG.CALIBRATION_SECS),
-        itiStartTime:      this.#itiStartTime,
-        itiDuration:       this.#itiDuration,
         displayElapsed:    this.#displayStartTime != null ? (now - this.#displayStartTime) / 1000 : 0,
         responseStartTime: this.#responseStartTime,
         questionType:      this.#pendingTrial?.questionType ?? '',
