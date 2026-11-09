@@ -61,9 +61,11 @@ Gameplay runs on a **fixed-step simulation** at `SIM_FPS` (60) steps per second:
 ## Session flow
 
 ```
-stream ready → [Start] → Calibration (10 s)
+stream ready → [Start] → Explanation: "Let's get ready!"  → [Space / Next]
                               ↓
-                         READY screen  → [Space / Start]
+                         Calibration
+                              ↓
+                         Explanation: "Catch the stars!"  → [Space / Next]
                               ↓
                          Countdown (3-2-1-GO)
                               ↓
@@ -75,6 +77,8 @@ stream ready → [Start] → Calibration (10 s)
                               ↓
                           Done screen
 ```
+
+Explanation screens for the child (large text, simple words) come before the calibration and before the task. They always wait for the experimenter (**Space** / **Next**), so the text can be read aloud. All wording is in [instructionTexts.js](../modules/instructions/instructionTexts.js) (one place, for translation later).
 
 ---
 
@@ -149,6 +153,7 @@ MARKER_STREAM_URL: 'ws://localhost:8765',
 
 | Marker | Event |
 |---|---|
+| `instructions_cal_start` / `instructions_task_start` | explanation screen before calibration / before game 1 shown |
 | `calibration_start` / `calibration_end` | calibration phase (re-sent for each retry attempt) |
 | `calibration_failed` | calibration recorded no samples — experimenter is prompted to retry or use defaults |
 | `calibration_default_used` | experimenter chose to skip to `CONFIG.DEFAULT_CAL_RANGE` after a failed calibration |

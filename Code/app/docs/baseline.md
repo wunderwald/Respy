@@ -22,7 +22,8 @@ Or select **Baseline Video** from the start screen (`npm start`).
 | **Subject** | Subject code — first part of the file names. Locked once recording begins. |
 | **Name** | *Resting*, *Post natural*, *Post slow*, *Post stressor* or *Post slow post stressor* (`NAMES` in `baseline_config.js`). Written to both CSVs' `name` column, into the file names and as a `baseline_name_<slug>` marker. Locked once recording begins. |
 | **Play full video** (settings bar) | On by default: the recording ends when the video ends. Off: the **secs** field becomes editable and the recording ends after that many seconds (the video is paused then). The hint next to it shows the video's length, and warns if the entered time is longer than the video — its last frame then stays on screen until the time is up. Locked once recording begins. |
-| **Start** | Begins the recording. Requires a connected resp stream (and a duration > 0 when "play full video" is off). Sends `baseline_start` and `baseline_name_<slug>`. |
+| **Start** | Locks the settings and shows the explanation screen to the child (`instructions_start` marker). Requires a connected resp stream (and a duration > 0 when "play full video" is off). |
+| **Start video** | Shown on the explanation screen (also **Space**): begins the recording. Sends `baseline_start` and `baseline_name_<slug>`. |
 | **Abort** | Stops early and sends `baseline_abort`. Also triggered by `Escape`. |
 
 Without a playable video, "play full video" means a `DURATION_SECS` (7 min) countdown. If the video fails mid-recording, the recording continues on a timer (the video's length, if known, else `DURATION_SECS`) with a countdown on screen and a warning for the experimenter.
@@ -34,7 +35,7 @@ Closing the window mid-recording also keeps the data: the pending rows are writt
 ## Session flow
 
 ```
-stream ready → [Start] → video until it ends (or for the set secs; countdown if no video) → baseline_end marker → Done
+stream ready → [Start] → explanation ("Time to relax") → [Space / Start video] → video until it ends (or for the set secs; countdown if no video) → baseline_end marker → Done
 ```
 
 ---
@@ -84,6 +85,7 @@ MARKER_STREAM_URL: 'ws://localhost:9001',
 
 | Marker | Event |
 |---|---|
+| `instructions_start` | Explanation screen shown (Start pressed) |
 | `baseline_start` | Recording begins |
 | `baseline_name_<slug>` | Sent right after `baseline_start`: which baseline this is (e.g. `baseline_name_post_slow`) |
 | `baseline_end` | Recording complete (video ended, or the set duration elapsed) |

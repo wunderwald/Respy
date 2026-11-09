@@ -7,7 +7,8 @@
  *   pushSample(value: number) → void
  *   setStatus({ type, text })  → void
  *
- * State machine:  IDLE → CALIBRATING → READY → TRIAL → [RESPONSE →] ITI → DONE
+ * State machine:  IDLE → INSTRUCTIONS_CAL → CALIBRATING → INSTRUCTIONS_TASK →
+ *                 [DISPLAY →] TRIAL → [RESPONSE →] ITI → … → DONE
  *
  * Sub-modules:
  *   config.js      — CONFIG and STATE constants
@@ -27,6 +28,7 @@ import { LocalHud } from './hud.js';
 import { IBreathRenderer } from './ibreath_renderer.js';
 import { IBreathCSV } from './csv.js';
 import { MarkerStream } from '../stream/markerStream.js';
+import { INSTRUCTIONS } from '../instructions/instructionTexts.js';
 import {
   EyeLinkControl, EYELINK_OFFLINE,
   EYELINK_UNAVAILABLE_STATES, EYELINK_SETUP_STATES, EYELINK_CALIBRATED_STATES,
@@ -115,7 +117,7 @@ export default class IBreath {
       onStart:           (settings) => { if (this.#state === STATE.IDLE) this.#beginCalibration(settings); },
       // Space / Next in the experimenter window arrive here in any state;
       // only READY may advance (mid-trial it would discard the trial's data).
-      onNext:            () => { if (this.#state === STATE.READY) this.#advanceTrial(); },
+      onNext:            () => this.#onNext(),
       onAbort:           () => this.#abortTrial(),
       onResponse:        (v) => { if (this.#state === STATE.RESPONSE) this.#onResponse(v); },
       onPause:           () => this.#onPause(),
@@ -250,7 +252,7 @@ export default class IBreath {
       switch (e.code) {
         case 'Space':
           e.preventDefault();
-          if (this.#state === STATE.READY) this.#advanceTrial();
+          this.#onNext();
           break;
         case 'Escape':
           if (this.#state === STATE.TRIAL) this.#abortTrial();
@@ -293,6 +295,32 @@ export default class IBreath {
     this.#trialData = [];
     this.#buildSignalPipeline();
     this.#hud.trialType = null;
+    this.#calibration = null;
+    this.#rangeTracker = null;
+
+    // Explain the calibration to the child first; Space/Next starts it
+    // (#startCalibration).
+    this.#state = STATE.INSTRUCTIONS_CAL;
+    this.#hud.experimentStartedAt = Date.now();
+    this.#hud.stateTimer   = { startedAt: Date.now(), duration: null };
+    this.#hud.startEnabled = false;
+    this.#hud.inputsLocked = true;
+    this.#hud.pauseVisible = false;
+    this.#hud.nextVisible  = true;
+    this.#hud.stateText    = 'explaining calibration — press Space or Next';
+    // After the state text: a preset warning from here must not be
+    // overwritten (and must restore to the text above, not a stale one).
+    this.#delayIndex = this.#initialDelayIndex();
+    this.#updateDelayHud();
+
+    // Gaze columns follow the "use eye tracking" setting, not whether a gaze
+    // sample happened to have arrived by the time Start was pressed.
+    this.#csv = new IBreathCSV(this.#subjectCode, this.#useEyeTracking || this.#gazeEnabled, (msg) => this.#showWarning(`CSV: ${msg}`));
+    this.#csv.init();
+    this.#markers.send('instructions_cal_start');
+  }
+
+  #startCalibration() {
     this.#calibration = new RespCalibration({ durationSecs: CONFIG.CALIBRATION_SECS });
     this.#calibration.start();
     this.#calFailed = false;
@@ -307,22 +335,20 @@ export default class IBreath {
       : null;
 
     this.#state = STATE.CALIBRATING;
-    this.#hud.experimentStartedAt = Date.now();
-    this.#hud.stateTimer   = { startedAt: Date.now(), duration: CONFIG.CALIBRATION_SECS };
-    this.#hud.startEnabled = false;
-    this.#hud.inputsLocked = true;
-    this.#hud.pauseVisible = false;
-    this.#hud.stateText    = 'calibrating…';
-    // After the state text: a preset warning from here must not be
-    // overwritten (and must restore to 'calibrating…', not a stale text).
-    this.#delayIndex = this.#initialDelayIndex();
-    this.#updateDelayHud();
-
-    // Gaze columns follow the "use eye tracking" setting, not whether a gaze
-    // sample happened to have arrived by the time Start was pressed.
-    this.#csv = new IBreathCSV(this.#subjectCode, this.#useEyeTracking || this.#gazeEnabled, (msg) => this.#showWarning(`CSV: ${msg}`));
-    this.#csv.init();
+    this.#hud.stateTimer  = { startedAt: Date.now(), duration: CONFIG.CALIBRATION_SECS };
+    this.#hud.nextVisible = false;
+    this.#hud.stateText   = 'calibrating…';
     this.#markers.send('calibration_start');
+  }
+
+  // Space (scene window) and Space / Next (experimenter window) all land
+  // here, in any state — only these states move on.
+  #onNext() {
+    switch (this.#state) {
+      case STATE.INSTRUCTIONS_CAL:  this.#startCalibration(); break;
+      case STATE.INSTRUCTIONS_TASK:   // the explanation replaces the first READY screen
+      case STATE.READY:             this.#advanceTrial(); break;
+    }
   }
 
   #finishCalibration() {
@@ -349,15 +375,13 @@ export default class IBreath {
     this.#calFailed = false;
     this.#hud.calFailed = false;
 
-    if (CONFIG.AUTO_ADVANCE) {
-      this.#advanceTrial();
-    } else {
-      this.#state = STATE.READY;
-      this.#hud.stateTimer   = { startedAt: Date.now(), duration: null };
-      this.#hud.pauseVisible = false;
-      this.#hud.stateText    = 'ready — press Space or Next trial to begin';
-      this.#hud.nextVisible  = true;
-    }
+    // Explain the task; Space/Next then starts trial 1.
+    this.#state = STATE.INSTRUCTIONS_TASK;
+    this.#hud.stateTimer   = { startedAt: Date.now(), duration: null };
+    this.#hud.pauseVisible = false;
+    this.#hud.stateText    = 'explaining the task — press Space or Next';
+    this.#hud.nextVisible  = true;
+    this.#markers.send('instructions_task_start');
   }
 
   #retryCalibration() {
@@ -687,7 +711,7 @@ export default class IBreath {
     if (!this.#useEyeTracking || !this.#eyelinkControl.connected) return;
     if ([STATE.CALIBRATING, STATE.EYETRACK_CAL].includes(this.#state)) return;
 
-    const standalone = this.#state === STATE.IDLE || this.#state === STATE.DONE;
+    const standalone = [STATE.IDLE, STATE.DONE, STATE.INSTRUCTIONS_CAL, STATE.INSTRUCTIONS_TASK].includes(this.#state);
     if (standalone) {
       // Nothing running — come back to exactly this state afterwards.
       this.#eyeCalReturn = { state: this.#state, stateText: this.#hud.stateText };
@@ -738,6 +762,8 @@ export default class IBreath {
         this.#updateIdleReadiness();      // re-enables Start, refreshes the status text
       } else {
         this.#hud.stateText = ret.stateText;
+        // Back on an explanation screen: it still waits for Space/Next.
+        this.#hud.nextVisible = ret.state === STATE.INSTRUCTIONS_CAL || ret.state === STATE.INSTRUCTIONS_TASK;
       }
       return;
     }
@@ -765,6 +791,18 @@ export default class IBreath {
     // The last trial's rows were dispatched in #endTrial / #onResponse →
     // experimenter may go back to the menu.
     window.api.session.ended();
+  }
+
+  // Text of the explanation screen for the current state (null otherwise).
+  // Follows the session's signal type (breath vs heartbeat) and question set.
+  get #instructions() {
+    if (this.#state === STATE.INSTRUCTIONS_CAL) {
+      return INSTRUCTIONS.calibration({ signal: this.#inputSignalType });
+    }
+    if (this.#state === STATE.INSTRUCTIONS_TASK) {
+      return INSTRUCTIONS.ibreath({ signal: this.#inputSignalType, questionIds: CONFIG.QUESTIONS.map((q) => q.id) });
+    }
+    return null;
   }
 
   // ── Window closing ─────────────────────────────────────────────────────
@@ -893,6 +931,7 @@ export default class IBreath {
         responseStartTime: this.#responseStartTime,
         questionType:      this.#pendingTrial?.questionType ?? '',
         trialCount:        this.#trialData.length,
+        instructions:      this.#instructions,
         subjectCode:       this.#subjectCode,
         gazeX:             this.#gazeX,
         gazeY:             this.#gazeY,

@@ -5,7 +5,8 @@
  * belt before they play the main BioGame.
  *
  * State machine (one trial; CONFIG.TRAINING_PASSES = 2 training phases):
- *   IDLE → CALIBRATING → READY → COUNTDOWN → TRAINING (1) → COUNTDOWN → TRAINING (2)
+ *   IDLE → INSTRUCTIONS_CAL → CALIBRATING → INSTRUCTIONS_TASK →
+ *          READY → COUNTDOWN → TRAINING (1) → COUNTDOWN → TRAINING (2)
  *                          ↑      → COUNTDOWN → TEST → PHOTO → READY → … → DONE
  *                          |_____________________________________|
  *                        (one READY per trial, waits for Space/Next — the fish is
@@ -45,6 +46,7 @@ import { BeltTrainingGameRenderer } from './beltTrainingGame_renderer.js';
 import { BeltTrainingGameCSV } from './beltTrainingGame_csv.js';
 import { SCENE } from '../bioGame/bioGame_scene.js';
 import { BioGameSound } from '../bioGame/bioGame_sound.js';
+import { INSTRUCTIONS } from '../instructions/instructionTexts.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -174,7 +176,7 @@ export default class BeltTrainingGame {
         if (calibrationSecs !== undefined) this.#calibrationSecs = calibrationSecs;
         if (smoothWindow    !== undefined) this.#smoothWindow    = validSmoothWindow(smoothWindow, CONFIG.SMOOTH_WINDOW);
         if (autoProceed     !== undefined) this.#autoProceed     = autoProceed;
-        this.#beginCalibration();
+        this.#beginSession();
         break;
 
       case 'setAutoProceed':
@@ -183,7 +185,9 @@ export default class BeltTrainingGame {
         break;
 
       case 'next':
-        if (this.#state === STATE.READY) this.#beginCountdown(0);
+        if (this.#state === STATE.INSTRUCTIONS_CAL) this.#startCalibration();
+        else if (this.#state === STATE.INSTRUCTIONS_TASK) this.#beginReadyForTrial();
+        else if (this.#state === STATE.READY) this.#beginCountdown(0);
         else if (this.#state === STATE.PHOTO) this.#finishPhotoReview();
         break;
 
@@ -211,7 +215,27 @@ export default class BeltTrainingGame {
 
   // ── State machine ─────────────────────────────────────────────────────────
 
-  #beginCalibration() {
+  // Start pressed: set the session up, then explain the calibration to the
+  // child. The calibration itself starts on Space/Next (#startCalibration).
+  // Both explanation screens always wait for Space/Next, even with
+  // auto-proceed on.
+  #beginSession() {
+    this.#smoother = new GaussianSmoother(this.#smoothWindow);   // fresh, with the chosen window
+    this.#inputsLocked = true;
+    this.#trialIndex   = 0;
+
+    this.#csv = new BeltTrainingGameCSV(
+      this.#subjectCode, SCENE.id,
+      (msg) => this.#csvWarn(msg)
+    );
+    this.#csv.init();
+
+    this.#state = STATE.INSTRUCTIONS_CAL;
+    this.#markers.send('instructions_cal_start');
+    this.#pushState({ stateText: 'explaining calibration — press Space or Next', inputsLocked: true });
+  }
+
+  #startCalibration() {
     this.#calibration = new RespCalibration({ durationSecs: this.#calibrationSecs });
     this.#calibration.start();
     this.#calFailed = false;
@@ -223,19 +247,10 @@ export default class BeltTrainingGame {
           minSpanFraction:  CONFIG.RANGE_MIN_SPAN_FRACTION,
         })
       : null;
-    this.#smoother = new GaussianSmoother(this.#smoothWindow);   // fresh, with the chosen window
-    this.#inputsLocked = true;
-    this.#trialIndex   = 0;
-
-    this.#csv = new BeltTrainingGameCSV(
-      this.#subjectCode, SCENE.id,
-      (msg) => this.#csvWarn(msg)
-    );
-    this.#csv.init();
 
     this.#state = STATE.CALIBRATING;
     this.#markers.send('calibration_start');
-    this.#pushState({ stateText: 'calibrating…', abortVisible: false, inputsLocked: true });
+    this.#pushState({ stateText: 'calibrating…' });
   }
 
   #finishCalibration() {
@@ -261,7 +276,10 @@ export default class BeltTrainingGame {
     this.#rangeTracker?.seed(range, { fromData });
     console.log(`[BeltTrainingGame] norm range: [${range[0].toFixed(3)}, ${range[1].toFixed(3)}]`);
 
-    this.#beginReadyForTrial();
+    // Explain the game; Space/Next then leads into trial 1.
+    this.#state = STATE.INSTRUCTIONS_TASK;
+    this.#markers.send('instructions_task_start');
+    this.#pushState({ stateText: 'explaining the game — press Space or Next', calFailed: false });
   }
 
   #retryCalibration() {
@@ -597,11 +615,14 @@ export default class BeltTrainingGame {
       targetNormY:       this.#targetNormY,
       segment:           this.#segment,
       avatarTilt:        this.#avatarTilt,
-      promptText:        this.#phase === 'training' ? 'Hold your breath in the green area!'
+      promptText:        this.#phase === 'training' ? 'Hold your breath to keep the fish in the green!'
                         : this.#phase === 'test'     ? 'Hold your breath just like before!'
                         : null,
       countdownValue,
       countdownProgress: clamp(countdownProgress, 0, 1),
+      instructions:      this.#state === STATE.INSTRUCTIONS_CAL  ? INSTRUCTIONS.calibration()
+                       : this.#state === STATE.INSTRUCTIONS_TASK ? INSTRUCTIONS.beltTrainingGame({ trainingPasses: CONFIG.TRAINING_PASSES })
+                       : null,
       trialIndex:        this.#trialIndex,
       photoKey:          this.#photoSeq,
       bestFishXRatio:    this.#bestFishXRatio,
@@ -621,7 +642,8 @@ export default class BeltTrainingGame {
     window.api.frontend.sendState({
       startEnabled: this.#streamReady && s === STATE.IDLE,
       startText:    'Start',
-      nextVisible:  s === STATE.READY || (s === STATE.PHOTO && !this.#autoProceed),
+      nextVisible:  s === STATE.INSTRUCTIONS_CAL || s === STATE.INSTRUCTIONS_TASK ||
+                    s === STATE.READY || (s === STATE.PHOTO && !this.#autoProceed),
       abortVisible: s === STATE.COUNTDOWN || s === STATE.TRAINING || s === STATE.TEST,
       calFailed:    s === STATE.CALIBRATING && this.#calFailed,
       inputsLocked: this.#inputsLocked,

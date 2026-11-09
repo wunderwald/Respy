@@ -78,7 +78,8 @@ export const CONFIG = {
 export const STATE = {
   IDLE:         'idle',
   CALIBRATING:  'calibrating',
-  READY:        'ready',        // waiting for experimenter to start block
+  INSTRUCTIONS_CAL:  'instructions_cal',   // explanation before calibration — waits for Space/Next
+  INSTRUCTIONS_TASK: 'instructions_task',  // explanation before game 1 — waits for Space/Next
   COUNTDOWN:    'countdown',
   PLAYING:      'playing',
   INTERMISSION: 'intermission', // between block 1 and block 2

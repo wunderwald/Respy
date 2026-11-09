@@ -34,6 +34,7 @@ export const CONFIG = {
 
 export const STATE = {
   IDLE:    'idle',
+  INSTRUCTIONS: 'instructions',   // explanation before the video — waits for Space/Next
   PLAYING: 'playing',
   DONE:    'done',
 };

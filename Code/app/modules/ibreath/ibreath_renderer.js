@@ -4,6 +4,7 @@
 import { STATE, CONFIG } from './config.js';
 import { drawDisplay } from './animationDisplay.js';
 import { Caustics }    from './caustics.js';
+import { drawInstructions } from '../instructions/instructionScreen.js';
 
 export class IBreathRenderer {
   #canvas   = null;
@@ -43,6 +44,8 @@ export class IBreathRenderer {
 
     switch (state) {
       case STATE.IDLE:        this.#drawIdle(ctx, w, h); break;
+      case STATE.INSTRUCTIONS_CAL:
+      case STATE.INSTRUCTIONS_TASK: drawInstructions(ctx, w, h, data.instructions); break;
       case STATE.CALIBRATING: this.#drawCalibrating(ctx, w, h, data.calProgress, data.calRemaining); break;
       case STATE.READY:       this.#drawReady(ctx, w, h); break;
       case STATE.DISPLAY:     this.#drawDisplayState(ctx, w, h, data.displayElapsed); break;

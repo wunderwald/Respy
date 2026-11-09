@@ -72,7 +72,9 @@ export const CONFIG = {
 
 export const STATE = {
   IDLE:        'idle',
+  INSTRUCTIONS_CAL:  'instructions_cal',   // explanation before calibration — waits for Space/Next
   CALIBRATING: 'calibrating',
+  INSTRUCTIONS_TASK: 'instructions_task',  // explanation before the first trial — waits for Space/Next
   READY:       'ready',       // waiting for experimenter/Space before a trial
   COUNTDOWN:   'countdown',   // 3-2-1-GO before each phase (training and test)
   TRAINING:    'training',    // training phase of the current trial (target visible)

@@ -3,6 +3,7 @@
 
 import { STATE, CONFIG } from './bioGame_config.js';
 import { SceneRenderer } from './sceneRenderer.js';
+import { drawInstructions } from '../instructions/instructionScreen.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -62,8 +63,9 @@ export class BioGameRenderer {
         this.#drawCalibrating(ctx, w, h, renderData.calProgress ?? 0, renderData.calRemaining ?? 0);
         break;
 
-      case STATE.READY:
-        this.#drawReady(ctx, w, h, renderData.blockIndex ?? 0, now);
+      case STATE.INSTRUCTIONS_CAL:
+      case STATE.INSTRUCTIONS_TASK:
+        drawInstructions(ctx, w, h, renderData.instructions);
         break;
 
       case STATE.COUNTDOWN:
@@ -325,18 +327,6 @@ export class BioGameRenderer {
 
     this.#drawCenter(ctx, w, cy, String(remaining), 'rgba(255,255,255,0.72)', 54, '200');
     this.#drawCenter(ctx, w, cy + r + 28, 'calibrating signal…', 'rgba(255,255,255,0.28)', 14);
-  }
-
-  #drawReady(ctx, w, h, blockIndex, now) {
-    const bobNormY    = 0.5 + 0.25 * Math.sin(now / 1000 * 1.5);
-    const tilt        = -0.2 * Math.cos(now / 1000 * 1.5);
-    const topPad      = h * 0.10;
-    const playH       = h * 0.80;
-    const avatarScreenX = w / 2;
-    const avatarScreenY = topPad + (1 - bobNormY) * playH;
-    const avatarH = CONFIG.AVATAR_SIZE_MIN * h + (CONFIG.AVATAR_SIZE_MAX - CONFIG.AVATAR_SIZE_MIN) * h * 0.5;
-    this.#drawAvatar(ctx, avatarScreenX, avatarScreenY, avatarH * 1.3, tilt);
-    this.#drawCenter(ctx, w, h * 0.80, 'Press Space or Start to begin', 'rgba(255,255,255,0.30)', 16);
   }
 
   #drawCountdown(ctx, w, h, value, progress) {

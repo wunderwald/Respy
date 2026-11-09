@@ -1,7 +1,7 @@
 /**
  * bioGame.js — Biofeedback breath-control game
  * =============================================
- * State machine:  IDLE → CALIBRATING → READY → COUNTDOWN → PLAYING
+ * State machine:  IDLE → INSTRUCTIONS_CAL → CALIBRATING → INSTRUCTIONS_TASK → COUNTDOWN → PLAYING
  *                                                 ↑              ↓
  *                                          INTERMISSION ← (block end / abort,
  *                                                 ↓        unless last block)
@@ -29,6 +29,7 @@ import { BioGameRenderer }  from './bioGame_renderer.js';
 import { BioGameCSV }       from './bioGame_csv.js';
 import { BioGameSound }     from './bioGame_sound.js';
 import { SCENE }            from './bioGame_scene.js';
+import { INSTRUCTIONS }     from '../instructions/instructionTexts.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -205,11 +206,12 @@ export default class BioGame {
         if (showCurve       !== undefined) this.#showCurve       = showCurve;
         if (calibrationSecs !== undefined) this.#calibrationSecs = calibrationSecs;
         if (smoothWindow    !== undefined) this.#smoothWindow    = validSmoothWindow(smoothWindow, CONFIG.SMOOTH_WINDOW);
-        this.#beginCalibration();
+        this.#beginSession();
         break;
 
       case 'next':
-        if (this.#state === STATE.INTERMISSION || this.#state === STATE.READY)
+        if (this.#state === STATE.INSTRUCTIONS_CAL) this.#startCalibration();
+        else if (this.#state === STATE.INSTRUCTIONS_TASK || this.#state === STATE.INTERMISSION)
           this.#startCountdown();
         break;
 
@@ -233,18 +235,9 @@ export default class BioGame {
 
   // ── State machine ─────────────────────────────────────────────────────────
 
-  #beginCalibration() {
-    this.#calibration = new RespCalibration({ durationSecs: this.#calibrationSecs });
-    this.#calibration.start();
-    this.#calFailed = false;
-    // Collects from calibration on, so its window is already full once seeded.
-    this.#rangeTracker = CONFIG.RANGE_ADAPT
-      ? new AdaptiveRange({
-          windowSecs:       CONFIG.RANGE_WINDOW_SECS,
-          timeConstantSecs: CONFIG.RANGE_TIME_CONSTANT_SECS,
-          minSpanFraction:  CONFIG.RANGE_MIN_SPAN_FRACTION,
-        })
-      : null;
+  // Start pressed: set the session up, then explain the calibration to the
+  // child. The calibration itself starts on Space/Next (#startCalibration).
+  #beginSession() {
     this.#smoother = new GaussianSmoother(this.#smoothWindow);   // fresh, with the chosen window
     this.#inputsLocked = true;
     this.#blockIndex   = 0;
@@ -257,9 +250,27 @@ export default class BioGame {
     );
     this.#csv.init();
 
+    this.#state = STATE.INSTRUCTIONS_CAL;
+    this.#markers.send('instructions_cal_start');
+    this.#pushState({ stateText: 'explaining calibration — press Space or Next', inputsLocked: true });
+  }
+
+  #startCalibration() {
+    this.#calibration = new RespCalibration({ durationSecs: this.#calibrationSecs });
+    this.#calibration.start();
+    this.#calFailed = false;
+    // Collects from calibration on, so its window is already full once seeded.
+    this.#rangeTracker = CONFIG.RANGE_ADAPT
+      ? new AdaptiveRange({
+          windowSecs:       CONFIG.RANGE_WINDOW_SECS,
+          timeConstantSecs: CONFIG.RANGE_TIME_CONSTANT_SECS,
+          minSpanFraction:  CONFIG.RANGE_MIN_SPAN_FRACTION,
+        })
+      : null;
+
     this.#state = STATE.CALIBRATING;
     this.#markers.send('calibration_start');
-    this.#pushState({ stateText: 'calibrating…', abortVisible: false, inputsLocked: true });
+    this.#pushState({ stateText: 'calibrating…' });
   }
 
   #finishCalibration() {
@@ -285,8 +296,10 @@ export default class BioGame {
     this.#rangeTracker?.seed(range, { fromData });
     console.log(`[BioGame] norm range: [${range[0].toFixed(3)}, ${range[1].toFixed(3)}]`);
 
-    this.#state = STATE.READY;
-    this.#pushState({ stateText: 'ready — press Space or Start', nextVisible: true, calFailed: false });
+    // Explain the game; Space/Next then starts the countdown to game 1.
+    this.#state = STATE.INSTRUCTIONS_TASK;
+    this.#markers.send('instructions_task_start');
+    this.#pushState({ stateText: 'explaining the game — press Space or Next' });
   }
 
   #retryCalibration() {
@@ -728,6 +741,9 @@ export default class BioGame {
       calRemaining:      Math.ceil(this.#calibration?.remainingSecs ?? this.#calibrationSecs),
       countdownValue,
       countdownProgress: clamp(countdownProgress, 0, 1),
+      instructions:      this.#state === STATE.INSTRUCTIONS_CAL  ? INSTRUCTIONS.calibration()
+                       : this.#state === STATE.INSTRUCTIONS_TASK ? INSTRUCTIONS.bioGame()
+                       : null,
     };
   }
 
@@ -742,8 +758,9 @@ export default class BioGame {
       score:        this.#scoreBlock[this.#blockIndex] ?? 0,
       startEnabled: this.#streamReady && this.#state === STATE.IDLE,
       startText:    'Start',
-      nextText:     `Start game ${this.#blockIndex + 1}`,
-      nextVisible:  this.#state === STATE.READY || this.#state === STATE.INTERMISSION,
+      nextText:     this.#state === STATE.INSTRUCTIONS_CAL ? 'Start calibration' : `Start game ${this.#blockIndex + 1}`,
+      nextVisible:  this.#state === STATE.INSTRUCTIONS_CAL || this.#state === STATE.INSTRUCTIONS_TASK ||
+                    this.#state === STATE.INTERMISSION,
       abortVisible: this.#state === STATE.PLAYING,
       calFailed:    this.#state === STATE.CALIBRATING && this.#calFailed,
       inputsLocked: this.#inputsLocked,

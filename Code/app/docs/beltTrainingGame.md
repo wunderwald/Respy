@@ -21,6 +21,8 @@ The game runs `NUM_TRIALS` trials (default **9**). Each trial has three phases �
 1. **Training phases** (`training1`, `training2`) — identical; the target zone (red/yellow/green/yellow/red bands, see screenshot concept) is visible, and so is the fish. The player's goal is to hold their breath level inside the **green** band for the duration of the target crossing.
 2. **Test phase** — the target zone is covered by a drifting bubble overlay, and the fish **fades out** as it enters that zone and fades back in as it leaves (`FISH_FADE_WIDTH_RATIO`, a smooth opacity ramp rather than an instant toggle), reproducing the same breath level as in the training phases, blind.
 
+Explanation screens for the child (large text, simple words) come before the calibration and before trial 1. They always wait for the experimenter (**Space** / **Next**), so the text can be read aloud. All wording is in [instructionTexts.js](../modules/instructions/instructionTexts.js) (one place, for translation later). They wait even with auto-proceed on.
+
 Before each trial there is a **READY** screen: the fish is driven live by the participant's own breath (exactly like gameplay — `AVATAR_SIZE_MIN/MAX`-sized, tilt and all), with the caption "See how your breath moves the fish!", so the child sees the connection before the trial starts. The experimenter must press **Space** (or click **Next trial**) to continue — once per trial, not once per phase — unless **auto-proceed** is on (see below), in which case this screen is skipped entirely. A **3-2-1-GO countdown** (`COUNTDOWN_SECS`, default 3.75s) automatically precedes *each* phase — right after READY and again before every following phase (so three per trial) — showing the same "three fish bopping" animation iBreath shows before its trials (see [`animationDisplay.js`](../modules/ibreath/animationDisplay.js)) with the countdown number overlaid on top. The transitions between the phases of a trial are otherwise automatic (no extra Space press).
 
 During each phase, a caption reminds the participant what to do: **"Hold your breath in the green area!"** in both training phases, **"Hold your breath just like before!"** in the test phase (where the target is hidden).
@@ -90,6 +92,7 @@ There is no scene or group selector — the scene is fixed to "ocean."
 
 Sent to `MARKER_STREAM_URL` (default `ws://localhost:9001`), one per trial index `N` (0-based):
 
+- `instructions_cal_start` / `instructions_task_start` (explanation screens before calibration / before trial 1)
 - `calibration_start` / `calibration_end` / `calibration_failed` / `calibration_default_used`
 - `trial_start_tN` / `trial_end_tN`
 - `training1_start_tN` / `training1_end_tN`, `training2_start_tN` / `training2_end_tN` (one pair per training pass)

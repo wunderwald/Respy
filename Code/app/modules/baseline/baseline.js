@@ -19,13 +19,15 @@
  * 'pagehide' handler. The breathing-rate estimates are computed once at the
  * end (normal end or Abort) from the full recording.
  *
- * State machine:  IDLE → PLAYING → DONE
+ * State machine:  IDLE → INSTRUCTIONS → PLAYING → DONE
  */
 
 import { MarkerStream }        from '../stream/markerStream.js';
 import { CONFIG, STATE }       from './baseline_config.js';
 import { estimateBreathRate }  from '../signal/breathRateEstimators.js';
 import { baselineFileStem, estimatesPath } from './baselineFiles.js';
+import { INSTRUCTIONS }       from '../instructions/instructionTexts.js';
+import { drawInstructions }   from '../instructions/instructionScreen.js';
 
 export default class Baseline {
   #state        = STATE.IDLE;
@@ -166,7 +168,10 @@ export default class Baseline {
           this.#customSecs = Number.isFinite(durationSecs) && durationSecs > 0
             ? durationSecs : CONFIG.DURATION_SECS;
         }
-        this.#begin();
+        this.#showInstructions();
+        break;
+      case 'next':
+        if (this.#state === STATE.INSTRUCTIONS) this.#begin();
         break;
       case 'abort':
         if (this.#state === STATE.PLAYING) this.#finish(true);
@@ -178,6 +183,22 @@ export default class Baseline {
   }
 
   // ── State transitions ─────────────────────────────────────────────────────
+
+  // Start pressed: settings are locked in; explain to the child what's going
+  // to happen. Space/Next then starts the recording (#begin).
+  #showInstructions() {
+    this.#state = STATE.INSTRUCTIONS;
+    this.#markers.send('instructions_start');
+    this.#pushState({ stateText: 'explaining — press Space or Next', inputsLocked: true });
+  }
+
+  // Expected length for the explanation text: the video's own length when
+  // playing it in full (unknown until its metadata has loaded), else the
+  // set duration (or the fallback without a video).
+  get #expectedSecs() {
+    if (!this.#fullVideo) return this.#customSecs;
+    return this.#videoAvailable ? this.#videoDurationSecs : CONFIG.DURATION_SECS;
+  }
 
   #begin() {
     this.#startTime     = performance.now();
@@ -362,7 +383,10 @@ export default class Baseline {
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
 
-    if (this.#state === STATE.IDLE) {
+    if (this.#state === STATE.INSTRUCTIONS) {
+      drawInstructions(ctx, w, h, INSTRUCTIONS.baseline({ durationSecs: this.#expectedSecs }));
+
+    } else if (this.#state === STATE.IDLE) {
       ctx.font      = '200 28px Nunito, sans-serif';
       ctx.fillStyle = 'rgba(255,255,255,0.15)';
       ctx.fillText('Standby', w / 2, h / 2);
@@ -393,6 +417,7 @@ export default class Baseline {
     window.api.frontend.sendState({
       startEnabled: this.#state === STATE.IDLE && this.#streamReady,
       abortVisible: this.#state === STATE.PLAYING,
+      nextVisible:  this.#state === STATE.INSTRUCTIONS,
       warning:      this.#warning,   // included every push so it survives the 'ready' resync
       videoAvailable:    this.#videoAvailable,
       videoDurationSecs: this.#videoDurationSecs,

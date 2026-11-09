@@ -52,9 +52,11 @@ Auto-advance, sync-detection questions, and the flashing-image stimulus are alwa
 ## Session flow
 
 ```
-stream ready → [Start] → Calibration (10 s)
+stream ready → [Start] → Explanation: "Let's get ready!"  → [Space / Next]
                                ↓
-                   [READY — Space or Auto-advance]
+                         Calibration
+                               ↓
+                   Explanation: "Watch the fish!"  → [Space / Next]
                                ↓
                      [DISPLAY — 5 s animation]  (if ANIMATION_DISPLAY=true only)
                                ↓
@@ -67,9 +69,11 @@ stream ready → [Start] → Calibration (10 s)
                    Repeat until 80 trials → Done
 ```
 
-The state machine is: `IDLE → CALIBRATING → [READY] → [DISPLAY] → TRIAL → [RESPONSE] → ITI → … → DONE`
+The state machine is: `IDLE → INSTRUCTIONS_CAL → CALIBRATING → INSTRUCTIONS_TASK → [DISPLAY] → TRIAL → [RESPONSE] → ITI → [READY] → … → DONE`
 
-The `[READY]` step is skipped when `AUTO_ADVANCE` is on. The `[DISPLAY]` step is skipped when `ANIMATION_DISPLAY` is off. The `[RESPONSE]` step is skipped when the trial was aborted.
+Explanation screens for the child (large text, simple words) come before the calibration and before the task. They always wait for the experimenter (**Space** / **Next**), so the text can be read aloud. All wording is in [instructionTexts.js](../modules/instructions/instructionTexts.js) (one place, for translation later). The texts follow the signal type (breathing, or heartbeat for *Peaks only*), and the task explanation adds a "Look carefully" line when the question set includes `img` / `lr` / `flash` questions. Eye-tracker calibration started from an explanation screen returns to it.
+
+The `[READY]` step between trials is skipped when `AUTO_ADVANCE` is on. The `[DISPLAY]` step is skipped when `ANIMATION_DISPLAY` is off. The `[RESPONSE]` step is skipped when the trial was aborted.
 
 ---
 
@@ -199,6 +203,7 @@ Sent to `MARKER_STREAM_URL` (default `ws://localhost:9001`).
 
 | Marker | Event |
 |---|---|
+| `instructions_cal_start` / `instructions_task_start` | Explanation screen before calibration / before trial 1 shown |
 | `calibration_start` | Calibration begins (re-sent for each retry attempt) |
 | `calibration_end` | Calibration recording window ends |
 | `calibration_failed` | Calibration recorded no samples — experimenter is prompted to retry or use defaults |

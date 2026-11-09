@@ -98,7 +98,9 @@ export const CONFIG_DEFAULTS = { ...CONFIG, QUESTIONS: CONFIG.QUESTIONS };
 
 export const STATE = {
   IDLE: 'idle',
+  INSTRUCTIONS_CAL: 'instructions_cal',    // explanation before calibration — waits for Space/Next
   CALIBRATING: 'calibrating',
+  INSTRUCTIONS_TASK: 'instructions_task',  // explanation before the first trial — waits for Space/Next
   READY: 'ready',      // between trials — waiting for experimenter
   DISPLAY: 'display',  // 5-second pre-trial animation
   TRIAL: 'trial',

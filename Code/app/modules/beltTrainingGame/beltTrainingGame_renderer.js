@@ -4,6 +4,7 @@
 import { STATE, CONFIG } from './beltTrainingGame_config.js';
 import { SceneRenderer } from '../bioGame/sceneRenderer.js';
 import { drawDisplay }  from '../ibreath/animationDisplay.js';
+import { drawInstructions } from '../instructions/instructionScreen.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -63,6 +64,11 @@ export class BeltTrainingGameRenderer {
     switch (state) {
       case STATE.IDLE:
         this.#drawCenter(ctx, w, h / 2, 'waiting for stream…', 'rgba(255,255,255,0.38)', 20);
+        break;
+
+      case STATE.INSTRUCTIONS_CAL:
+      case STATE.INSTRUCTIONS_TASK:
+        drawInstructions(ctx, w, h, renderData.instructions);
         break;
 
       case STATE.CALIBRATING:

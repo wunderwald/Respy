@@ -684,8 +684,10 @@ if (frontend === 'ibreath') {
     </span>
     <span id="ib-controls">
       <button id="bl-start-btn" disabled>Start</button>
+      <button id="bl-next-btn"  style="display:none">Start video</button>
       <button id="bl-abort-btn" style="display:none">Abort</button>
     </span>
+    <span id="bl-space-hint" class="space-hint" style="display:none">Press SPACE to continue</span>
     <span id="bl-warning" style="display:none;color:#e0a838;"></span>
   `;
 
@@ -705,6 +707,8 @@ if (frontend === 'ibreath') {
   const blNameEl      = document.getElementById('bl-name');
   const blStartBtn    = document.getElementById('bl-start-btn');
   const blAbortBtn    = document.getElementById('bl-abort-btn');
+  const blNextBtn     = document.getElementById('bl-next-btn');
+  const blSpaceHintEl = document.getElementById('bl-space-hint');
   const blWarningEl   = document.getElementById('bl-warning');
   const blFullVideoEl = document.getElementById('bl-full-video');
   const blDurationEl  = document.getElementById('bl-duration');
@@ -761,7 +765,7 @@ if (frontend === 'ibreath') {
       : '—';
   }, 250);
 
-  window.api.frontend.onState(({ stateText, startEnabled, abortVisible, inputsLocked,
+  window.api.frontend.onState(({ stateText, startEnabled, abortVisible, nextVisible, inputsLocked,
                                   recordingStartedAt, duration, warning,
                                   videoAvailable, videoDurationSecs }) => {
     if (recordingStartedAt !== undefined) blRecordingStartedAt = recordingStartedAt;
@@ -782,6 +786,10 @@ if (frontend === 'ibreath') {
     }
     if (startEnabled !== undefined) blStartBtn.disabled      = !startEnabled;
     if (abortVisible !== undefined) blAbortBtn.style.display = abortVisible ? '' : 'none';
+    if (nextVisible  !== undefined) {
+      blNextBtn.style.display     = nextVisible ? '' : 'none';
+      blSpaceHintEl.style.display = nextVisible ? '' : 'none';
+    }
     if (warning !== undefined) {
       blWarningEl.textContent   = warning ?? '';
       blWarningEl.style.display = warning ? '' : 'none';
@@ -813,9 +821,14 @@ if (frontend === 'ibreath') {
     });
   });
   blAbortBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'abort' }));
+  blNextBtn.addEventListener('click',  () => window.api.frontend.sendAction({ type: 'next' }));
 
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Escape') window.api.frontend.sendAction({ type: 'abort' });
+    if (e.code === 'Space' && document.activeElement !== blSubjectEl && document.activeElement !== blDurationEl) {
+      e.preventDefault();
+      window.api.frontend.sendAction({ type: 'next' });
+    }
   });
 
   window.api.frontend.sendAction({ type: 'ready' });
