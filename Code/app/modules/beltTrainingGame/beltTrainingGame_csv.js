@@ -6,12 +6,18 @@
 //
 // Frame rows are buffered in memory and flushed every FRAME_FLUSH_COUNT rows
 // (and at each phase end) to avoid high-frequency IPC.
+//
+// Session settings are written as `setting` rows right after session_start
+// (value1 = name, value2 = value); a later `setting` row with the same name
+// means it was changed mid-session. Block/trial numbers are 1-based; rows
+// that belong to the whole session leave that column empty.
 
 import { CONFIG } from './beltTrainingGame_config.js';
 
 export class BeltTrainingGameCSV {
   #subjectCode;
   #scene;
+  #settings;
   #onWarn;
 
   #frameBuffer       = [];
@@ -21,9 +27,11 @@ export class BeltTrainingGameCSV {
                  'normMin,normMax,fishX,fishY,targetY,smoothWindow\n';
   #eventHeader = 'timestamp,trialIndex,phase,event,value1,value2\n';
 
-  constructor(subjectCode, scene, onWarn) {
+  // settings: { name: value } — written as `setting` rows by init().
+  constructor(subjectCode, scene, settings, onWarn) {
     this.#subjectCode = subjectCode;
     this.#scene       = scene;
+    this.#settings    = settings;
     this.#onWarn      = onWarn;
   }
 
@@ -38,7 +46,8 @@ export class BeltTrainingGameCSV {
     // round trip first, e.g. a separate ensureDir, could let an early event
     // through that the header write would then wipe.) writeCSV creates the
     // folder.
-    const meta = this.#eventRow('', '', 'session_start', this.#scene, '');
+    const meta = this.#eventRow('', '', 'session_start', this.#scene, '') +
+      Object.entries(this.#settings).map(([k, v]) => this.#eventRow('', '', 'setting', k, v)).join('');
     const [res, res2] = await Promise.all([
       window.api.writeCSV(this.#eventPath, this.#eventHeader),
       window.api.appendCSV(this.#eventPath, meta),

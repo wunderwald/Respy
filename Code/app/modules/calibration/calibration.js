@@ -84,7 +84,7 @@ export class RespCalibration {
     const sorted = Float64Array.from(this.#samples).sort();
     const lo = percentile(sorted, this.#lowerPercentile);
     const hi = percentile(sorted, this.#upperPercentile);
-    if (!(hi > lo)) return null;
+    if (isFlat(lo, hi)) return null;
 
     const centre = (lo + hi) / 2;
     const halfSpan = ((hi - lo) / 2) * this.#gain;
@@ -222,7 +222,7 @@ export class AdaptiveRange {
     const sorted = Float64Array.from(this.#values.slice(this.#head)).sort();
     const lo = percentile(sorted, this.#lowerPercentile);
     const hi = percentile(sorted, this.#upperPercentile);
-    if (!(hi > lo)) return;
+    if (isFlat(lo, hi)) return;
 
     const centre = (lo + hi) / 2;
     let halfSpan = ((hi - lo) / 2) * this.#gain;
@@ -232,6 +232,20 @@ export class AdaptiveRange {
     this.#range[0] += this.#alpha * (centre - halfSpan - this.#range[0]);
     this.#range[1] += this.#alpha * (centre + halfSpan - this.#range[1]);
   }
+}
+
+/**
+ * True when the range is no real signal: empty, inverted, or — after
+ * floating-point rounding in the smoother — a span of a millionth of the
+ * values' size or less (e.g. a disconnected belt streaming a constant, which
+ * comes out of the smoother as 0.4999999…0.5000001). Such a range would blow
+ * rounding noise up to the full 0–1 scale.
+ */
+const FLAT_RELATIVE_SPAN = 1e-6;
+function isFlat(lo, hi) {
+  if (!(hi > lo)) return true;
+  const scale = Math.max(Math.abs(lo), Math.abs(hi));
+  return hi - lo <= scale * FLAT_RELATIVE_SPAN;
 }
 
 /** Linearly interpolated percentile (p in 0–100) of an ascending-sorted array. */

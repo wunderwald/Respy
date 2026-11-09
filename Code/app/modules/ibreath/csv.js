@@ -27,12 +27,18 @@ export class IBreathCSV {
   #frameHeader;
   #trialHeader;
   #smoothWindow;
+  #signalType;
+  #preset;
+  #calibration = '';   // 'measured' | 'default' — set once calibration completes
 
-  constructor(subjectCode, gazeEnabled, onWarn) {
+  // session: { signalType, preset } — repeated on every trial row.
+  constructor(subjectCode, gazeEnabled, session, onWarn) {
     this.#subjectCode = subjectCode;
     this.#gazeEnabled = gazeEnabled;
     this.#onWarn      = onWarn;
     this.#smoothWindow = CONFIG.SMOOTH_WINDOW;   // session's value (set before the CSV is created)
+    this.#signalType   = session.signalType;
+    this.#preset       = session.preset;
 
     this.#frameHeader =
       'trialIndex,timestamp,breathLevel_input,stimulusLevel' +
@@ -41,7 +47,7 @@ export class IBreathCSV {
 
     this.#trialHeader =
       'trialIndex,subject,questionType,synchronous,img,lr,stimX0,stimY0,stimX1,stimY1,delayMs,' +
-      'rangeMin,rangeMax,smoothWindow,ITI,startTime,endTime,aborted' +
+      'rangeMin,rangeMax,smoothWindow,signalType,preset,calibration,ITI,startTime,endTime,aborted' +
       (CONFIG.SHOW_QUESTIONS ? ',response' : '') +
       (CONFIG.FLASHING_IMAGE ? ',flashImage,flashScheduledTime,flashX,flashY,flashShown' : '') + '\n';
   }
@@ -105,6 +111,11 @@ export class IBreathCSV {
     if (!result.ok) console.error('[CSV] could not append final trial row:', result.error);
   }
 
+  /** 'measured' (from the calibration recording) or 'default' (DEFAULT_CAL_RANGE). */
+  setCalibrationSource(source) {
+    this.#calibration = source;
+  }
+
   // ── Row formatting ──────────────────────────────────────────────────────
 
   #frameRowsCSV(trial, frameRows) {
@@ -128,6 +139,7 @@ export class IBreathCSV {
       `${trial.delayMs ?? ''},` +
       `${trial.rangeMin ?? ''},${trial.rangeMax ?? ''},` +
       `${this.#smoothWindow},` +
+      `${this.#signalType},${this.#preset},${this.#calibration},` +
       `${trial.ITI},` +
       `${trial.startTime ?? ''},` +
       `${trial.endTime ?? ''},` +

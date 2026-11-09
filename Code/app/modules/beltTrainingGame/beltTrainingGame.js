@@ -182,6 +182,10 @@ export default class BeltTrainingGame {
 
       case 'setAutoProceed':
         this.#autoProceed = !!autoProceed;
+        // Changed during a session → record it (initial value is in the settings rows).
+        if (this.#csv && this.#state !== STATE.DONE) {
+          this.#csv.appendEvent('', '', 'setting', 'auto_proceed', this.#autoProceed);
+        }
         this.#pushState();   // Next's visibility on the photo screen depends on it
         break;
 
@@ -227,6 +231,13 @@ export default class BeltTrainingGame {
 
     this.#csv = new BeltTrainingGameCSV(
       this.#subjectCode, SCENE.id,
+      {
+        calibration_secs: this.#calibrationSecs,
+        smooth_window:    this.#smoothWindow,
+        auto_proceed:     this.#autoProceed,   // can change mid-session → later `setting` rows
+        num_trials:       CONFIG.NUM_TRIALS,
+        training_passes:  CONFIG.TRAINING_PASSES,
+      },
       (msg) => this.#csvWarn(msg)
     );
     this.#csv.init();
@@ -261,6 +272,7 @@ export default class BeltTrainingGame {
     if (!result) {
       console.warn('[BeltTrainingGame] calibration produced no usable range (no samples, or flat signal)');
       this.#markers.send('calibration_failed');
+      this.#csv.appendEvent('', '', 'calibration_failed');
       this.#calFailed = true;
       this.#pushState({
         stateText: '⚠ calibration failed — no signal or flat signal',
@@ -275,6 +287,10 @@ export default class BeltTrainingGame {
   #completeCalibration(range, { fromData = true } = {}) {
     this.#normRange = [...range];
     this.#rangeTracker?.seed(range, { fromData });
+    // Calibration outcome in eventData.csv (the markers alone are lost if the
+    // marker stream was down).
+    this.#csv.appendEvent('', '', fromData ? 'calibration_complete' : 'calibration_default_used',
+      range[0].toFixed(6), range[1].toFixed(6));
     console.log(`[BeltTrainingGame] norm range: [${range[0].toFixed(3)}, ${range[1].toFixed(3)}]`);
 
     // Explain the game; Space/Next then leads into trial 1.
@@ -318,6 +334,12 @@ export default class BeltTrainingGame {
     });
   }
 
+  // 1-based trial number — used for everything written to markers and CSVs
+  // (#trialIndex itself stays 0-based for logic and the renderer).
+  get #trialNo() {
+    return this.#trialIndex + 1;
+  }
+
   // ── Phase steps ───────────────────────────────────────────────────────────
   //
   // A trial is TRAINING_PASSES training phases followed by one test phase,
@@ -358,11 +380,11 @@ export default class BeltTrainingGame {
     this.#segTotalTime   = 0;
 
     if (step === 0) {
-      this.#markers.send(`trial_start_t${this.#trialIndex}`);
-      this.#csv.initTrialCSV(this.#trialIndex);
+      this.#markers.send(`trial_start_t${this.#trialNo}`);
+      this.#csv.initTrialCSV(this.#trialNo);
       this.#sound.startBlock();  // spans the whole trial — first training through test
     }
-    this.#markers.send(`${this.#phaseLabel}_start_t${this.#trialIndex}`);
+    this.#markers.send(`${this.#phaseLabel}_start_t${this.#trialNo}`);
     this.#state = this.#phase === 'training' ? STATE.TRAINING : STATE.TEST;
 
     this.#pushState({
@@ -373,16 +395,16 @@ export default class BeltTrainingGame {
   }
 
   #endPhase() {
-    this.#csv.flushFrames(this.#trialIndex);
-    this.#markers.send(`${this.#phaseLabel}_end_t${this.#trialIndex}`);
+    this.#csv.flushFrames(this.#trialNo);
+    this.#markers.send(`${this.#phaseLabel}_end_t${this.#trialNo}`);
 
     if (this.#phase === 'training') {
       this.#beginCountdown(this.#phaseStep + 1);   // next training pass, or the test
       return;
     }
 
-    this.#markers.send(`trial_end_t${this.#trialIndex}`);
-    this.#csv.appendEvent(this.#trialIndex, this.#phaseLabel, 'trial_end');
+    this.#markers.send(`trial_end_t${this.#trialNo}`);
+    this.#csv.appendEvent(this.#trialNo, this.#phaseLabel, 'trial_end');
     this.#sound.stopBlock();
 
     this.#beginPhotoReview();
@@ -417,11 +439,11 @@ export default class BeltTrainingGame {
   // Ends only the running trial; the session moves on to the next trial
   // (or ends, if this was the last one). No photo for an aborted trial.
   #abortTrial() {
-    this.#csv?.flushFrames(this.#trialIndex);
-    this.#markers.send(`trial_abort_t${this.#trialIndex}`);
+    this.#csv?.flushFrames(this.#trialNo);
+    this.#markers.send(`trial_abort_t${this.#trialNo}`);
     // value1 = state aborted in ('countdown' | 'training' | 'test'): during the
     // countdown before training 2, the phase column still says 'training1'.
-    this.#csv?.appendEvent(this.#trialIndex, this.#phaseLabel, 'trial_abort', this.#state);
+    this.#csv?.appendEvent(this.#trialNo, this.#phaseLabel, 'trial_abort', this.#state);
     this.#sound?.stopBlock();  // no-op if the soundscape wasn't playing
     this.#pendingStep = null;
 
@@ -438,8 +460,8 @@ export default class BeltTrainingGame {
   // in) synchronously — an async write might never arrive.
   #onWindowClose() {
     if (!this.#csv || this.#state === STATE.DONE) return;   // no session running
-    this.#csv.flushFramesSync(this.#trialIndex);
-    this.#csv.appendEventSync(this.#trialIndex, this.#phaseLabel, 'session_closed', this.#state);
+    this.#csv.flushFramesSync(this.#trialNo);
+    this.#csv.appendEventSync(this.#trialNo, this.#phaseLabel, 'session_closed', this.#state);
     this.#markers.send('session_closed');   // best effort — the socket may already be gone
   }
 
@@ -554,7 +576,7 @@ export default class BeltTrainingGame {
       const ORDER = ['approach', 'target', 'exit', null];
       const from = ORDER.indexOf(this.#segment), to = ORDER.indexOf(newSegment);
       if (from < 1 && to >= 1) {
-        this.#markers.send(`target_enter_t${this.#trialIndex}`);
+        this.#markers.send(`target_enter_t${this.#trialNo}`);
         this.#segGreenTime = 0;
         this.#segTotalTime = 0;
         if (this.#phase === 'test') this.#bestTargetDistance = Infinity;
@@ -562,8 +584,8 @@ export default class BeltTrainingGame {
       if (from <= 1 && to >= 2) {
         // Empty if no frame was drawn inside the target zone at all.
         const greenFraction = this.#segTotalTime > 0 ? (this.#segGreenTime / this.#segTotalTime).toFixed(3) : '';
-        this.#markers.send(`target_leave_t${this.#trialIndex}`);
-        this.#csv.appendEvent(this.#trialIndex, this.#phaseLabel, 'target_leave', greenFraction);
+        this.#markers.send(`target_leave_t${this.#trialNo}`);
+        this.#csv.appendEvent(this.#trialNo, this.#phaseLabel, 'target_leave', greenFraction);
       }
       this.#segment = newSegment;
     }
@@ -592,7 +614,7 @@ export default class BeltTrainingGame {
   #recordFrame() {
     this.#csv.bufferFrame({
       t:        new Date().toISOString(),
-      trialIndex: this.#trialIndex,
+      trialIndex: this.#trialNo,
       phase:    this.#phaseLabel,   // 'training1' | 'training2' | 'test'
       segment:  this.#segment ?? '',
       raw:      this.#lastRaw,

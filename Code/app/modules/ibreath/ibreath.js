@@ -269,7 +269,7 @@ export default class IBreath {
 
   // ── State machine ──────────────────────────────────────────────────────
 
-  #beginCalibration({ debugGaze, inputSignalType, calibrationSecs, numTrials, smoothWindow, questions, configOverrides } = {}) {
+  #beginCalibration({ debugGaze, inputSignalType, calibrationSecs, numTrials, smoothWindow, presetName, questions, configOverrides } = {}) {
     // Reset to the hardcoded defaults first so a previous session's preset
     // (configOverrides) never silently lingers into a session that loads no
     // preset, or a different one that doesn't mention the same keys.
@@ -315,7 +315,9 @@ export default class IBreath {
 
     // Gaze columns follow the "use eye tracking" setting, not whether a gaze
     // sample happened to have arrived by the time Start was pressed.
-    this.#csv = new IBreathCSV(this.#subjectCode, this.#useEyeTracking || this.#gazeEnabled, (msg) => this.#showWarning(`CSV: ${msg}`));
+    this.#csv = new IBreathCSV(this.#subjectCode, this.#useEyeTracking || this.#gazeEnabled,
+      { signalType: this.#inputSignalType, preset: presetName ?? '' },
+      (msg) => this.#showWarning(`CSV: ${msg}`));
     this.#csv.init();
     this.#markers.send('instructions_cal_start');
   }
@@ -369,6 +371,7 @@ export default class IBreath {
 
   #completeCalibration(range, { fromData = true } = {}) {
     this.#stimulusRange = [...range];
+    this.#csv.setCalibrationSource(fromData ? 'measured' : 'default');   // trialData `calibration` column
     this.#rangeTracker?.seed(range, { fromData });
 
     this.#hud.trialText = `0 / ${this.#trials.length}`;

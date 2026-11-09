@@ -35,10 +35,10 @@ export class RemoteHud {
                 onRetryCalibration, onUseDefaultCalibration, onSetUseEyeTracking,
                 onEyelinkStartRecording, onEyelinkStopRecording }) {
     window.api.hud.onAction(({ type, subjectCode, value,
-                               debugGaze, inputSignalType, calibrationSecs, numTrials, smoothWindow, questions, configOverrides }) => {
+                               debugGaze, inputSignalType, calibrationSecs, numTrials, smoothWindow, presetName, questions, configOverrides }) => {
       if (subjectCode !== undefined) this.#subjectCode = subjectCode;
       switch (type) {
-        case 'start':           onStart({ debugGaze, inputSignalType, calibrationSecs, numTrials, smoothWindow, questions, configOverrides }); break;
+        case 'start':           onStart({ debugGaze, inputSignalType, calibrationSecs, numTrials, smoothWindow, presetName, questions, configOverrides }); break;
         case 'next':            onNext(); break;
         case 'abort':           onAbort(); break;
         case 'response':        onResponse?.(value); break;

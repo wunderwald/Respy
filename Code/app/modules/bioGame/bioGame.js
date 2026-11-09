@@ -135,6 +135,12 @@ export default class BioGame {
     return this.#group === 'slow' ? CONFIG.SLOW_BPM : this.#naturalBpm;
   }
 
+  // 1-based game number — used for everything written to markers and CSVs
+  // (#blockIndex itself stays 0-based for arrays and logic).
+  get #blockNo() {
+    return this.#blockIndex + 1;
+  }
+
   get #scrollSpeed() {
     return lerp(CONFIG.SCROLL_SPEED_MIN, CONFIG.SCROLL_SPEED_MAX, this.#speedNorm);
   }
@@ -246,6 +252,15 @@ export default class BioGame {
 
     this.#csv = new BioGameCSV(
       this.#subjectCode, this.#group, SCENE.id,
+      {
+        target_bpm:          this.#activeBpm,   // 6 (slow) or the entered natural BPM
+        show_curve:          this.#showCurve,
+        calibration_secs:    this.#calibrationSecs,
+        smooth_window:       this.#smoothWindow,
+        num_blocks:          CONFIG.NUM_BLOCKS,
+        block_duration_secs: CONFIG.BLOCK_DURATION_SECS,
+        sim_fps:             CONFIG.SIM_FPS,
+      },
       (msg) => this.#csvWarn(msg)
     );
     this.#csv.init();
@@ -280,6 +295,7 @@ export default class BioGame {
     if (!result) {
       console.warn('[BioGame] calibration produced no usable range (no samples, or flat signal)');
       this.#markers.send('calibration_failed');
+      this.#csv.appendEvent('', 'calibration_failed');
       this.#calFailed = true;
       this.#pushState({
         stateText: '⚠ calibration failed — no signal or flat signal',
@@ -294,6 +310,10 @@ export default class BioGame {
   #completeCalibration(range, { fromData = true } = {}) {
     this.#normRange = [...range];
     this.#rangeTracker?.seed(range, { fromData });
+    // Calibration outcome in eventData.csv (the markers alone are lost if the
+    // marker stream was down).
+    this.#csv.appendEvent('', fromData ? 'calibration_complete' : 'calibration_default_used',
+      range[0].toFixed(6), range[1].toFixed(6));
     console.log(`[BioGame] norm range: [${range[0].toFixed(3)}, ${range[1].toFixed(3)}]`);
 
     // Explain the game; Space/Next then starts the countdown to game 1.
@@ -317,7 +337,7 @@ export default class BioGame {
   #startCountdown() {
     this.#countdownStartTime = performance.now();
     this.#state = STATE.COUNTDOWN;
-    this.#markers.send(`countdown_start_block${this.#blockIndex}`);
+    this.#markers.send(`countdown_start_block${this.#blockNo}`);
     this.#pushState({ stateText: 'starting…', nextVisible: false });
   }
 
@@ -339,13 +359,13 @@ export default class BioGame {
     this.#dropLowWindows = 0;
     this.#warning        = null;   // a previous game's frame-drop warning
 
-    this.#csv.initBlockCSV(this.#blockIndex);
+    this.#csv.initBlockCSV(this.#blockNo);
     this.#nextTrialTime = (60 / this.#activeBpm) * 0.75;
     this.#nextCueTime   = (60 / this.#activeBpm) * 0.25;   // first peak
 
     this.#sound.startBlock();
     this.#state = STATE.PLAYING;
-    this.#markers.send(`block_start_${this.#blockIndex}`);
+    this.#markers.send(`block_start_${this.#blockNo}`);
     this.#pushState({
       stateText:   `game ${this.#blockIndex + 1} / ${CONFIG.NUM_BLOCKS}`,
       abortVisible: true,
@@ -354,11 +374,11 @@ export default class BioGame {
 
   #endBlock(aborted = false) {
     this.#sound.stopBlock();
-    this.#csv.flushFrames(this.#blockIndex);
+    this.#csv.flushFrames(this.#blockNo);
     this.#markers.send(aborted
-      ? `block_abort_${this.#blockIndex}`
-      : `block_end_${this.#blockIndex}`);
-    this.#csv.appendEvent(this.#blockIndex, aborted ? 'block_abort' : 'block_end',
+      ? `block_abort_${this.#blockNo}`
+      : `block_end_${this.#blockNo}`);
+    this.#csv.appendEvent(this.#blockNo, aborted ? 'block_abort' : 'block_end',
       this.#scoreBlock[this.#blockIndex]);
 
     // An aborted block only ends that block — the session goes on.
@@ -385,8 +405,8 @@ export default class BioGame {
   #onWindowClose() {
     if (!this.#csv || this.#state === STATE.DONE) return;   // no session running
     const playing = this.#state === STATE.PLAYING;
-    this.#csv.flushFramesSync(this.#blockIndex);
-    this.#csv.appendEventSync(this.#blockIndex, 'session_closed', this.#state,
+    this.#csv.flushFramesSync(this.#blockNo);
+    this.#csv.appendEventSync(this.#blockNo, 'session_closed', this.#state,
       playing ? this.#blockTime.toFixed(2) : '');
     this.#markers.send('session_closed');   // best effort — the socket may already be gone
   }
@@ -448,13 +468,13 @@ export default class BioGame {
 
     if (isLow) {
       if (!wasLow) {
-        this.#csv.appendEvent(this.#blockIndex, 'frame_drop_warning', ratio.toFixed(2), this.#blockTime.toFixed(2));
+        this.#csv.appendEvent(this.#blockNo, 'frame_drop_warning', ratio.toFixed(2), this.#blockTime.toFixed(2));
         console.warn(`[BioGame] display dropping frames: rendering at ${pct}% of ${CONFIG.SIM_FPS} fps`);
       }
       this.#warning = `⚠ display dropping frames — rendering at ${pct}% of ${CONFIG.SIM_FPS} fps (game ${this.#blockIndex + 1})`;
       this.#pushState();
     } else if (wasLow) {
-      this.#csv.appendEvent(this.#blockIndex, 'frame_drop_recovered', ratio.toFixed(2), this.#blockTime.toFixed(2));
+      this.#csv.appendEvent(this.#blockNo, 'frame_drop_recovered', ratio.toFixed(2), this.#blockTime.toFixed(2));
       this.#warning = `⚠ display dropped frames earlier in game ${this.#blockIndex + 1} (see eventData.csv)`;
       this.#pushState();
     }
@@ -599,8 +619,8 @@ export default class BioGame {
     this.#scoreBlock[this.#blockIndex]++;
     this.#avatarStressNorm = clamp(this.#avatarStressNorm + CONFIG.STRESS_GROW_STEP,  0, 1);
     this.#speedNorm        = clamp(this.#speedNorm        + CONFIG.SPEED_GROW_STEP,   0, 1);
-    this.#markers.send(`item_collect_b${this.#blockIndex}_s${this.#scoreBlock[this.#blockIndex]}`);
-    this.#csv.appendEvent(this.#blockIndex, 'item_collect',
+    this.#markers.send(`item_collect_b${this.#blockNo}_s${this.#scoreBlock[this.#blockIndex]}`);
+    this.#csv.appendEvent(this.#blockNo, 'item_collect',
       this.#scoreBlock[this.#blockIndex], blockTime.toFixed(2));
     this.#burstParticles(item.xRatio, item.normY);
     this.#avatarBumpT = 0;
@@ -612,8 +632,8 @@ export default class BioGame {
     item.missT  = 0;
     this.#avatarStressNorm = clamp(this.#avatarStressNorm - CONFIG.STRESS_SHRINK_STEP, 0, 1);
     this.#speedNorm        = clamp(this.#speedNorm        - CONFIG.SPEED_SHRINK_STEP,  0, 1);
-    this.#markers.send(`item_miss_b${this.#blockIndex}`);
-    this.#csv.appendEvent(this.#blockIndex, 'item_miss', '', blockTime.toFixed(2));
+    this.#markers.send(`item_miss_b${this.#blockNo}`);
+    this.#csv.appendEvent(this.#blockNo, 'item_miss', '', blockTime.toFixed(2));
   }
 
   // ── Particles ─────────────────────────────────────────────────────────────
@@ -660,7 +680,7 @@ export default class BioGame {
   #recordFrame(blockTime) {
     this.#lastFrameRow = {
       t:         new Date().toISOString(),
-      block:     this.#blockIndex,
+      block:     this.#blockNo,
       frame:     this.#simFrame,
       blockTime,
       drawn:     false,
