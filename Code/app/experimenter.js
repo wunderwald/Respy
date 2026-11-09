@@ -134,6 +134,9 @@ if (frontend === 'ibreath') {
     <span class="label">cal secs</span>
     <input id="s-cal-secs" type="number" class="settings-num" min="5" max="120" step="5"
            value="${CONFIG.CALIBRATION_SECS}" />
+    <span class="label">trials</span>
+    <input id="s-num-trials" type="number" class="settings-num" min="1" step="1"
+           value="${CONFIG.MAX_NUM_TRIALS}" title="Number of trials — set by the preset if it defines numTrials" />
     <span class="label">preset</span>
     <select id="s-preset" class="stream-select">
       <option value="">None (sync only)</option>
@@ -175,6 +178,7 @@ if (frontend === 'ibreath') {
   eyetrackGroupEl.appendChild(gazeBarEl);   // fold the existing gaze-stream status pill into the shared group
 
   const signalTypeSelect  = document.getElementById('s-signal-type');
+  const numTrialsInput    = document.getElementById('s-num-trials');
   const presetSelect      = document.getElementById('s-preset');
   const presetStatusEl    = document.getElementById('s-preset-status');
   const presetWarningEl   = document.getElementById('ib-preset-warning');
@@ -269,12 +273,19 @@ if (frontend === 'ibreath') {
   // ── Send actions to scene window ─────────────────────────────────────────────
 
   startBtn.addEventListener('click', () => {
+    const numTrials = parseTrialCount(numTrialsInput.value);
+    if (numTrials == null) {   // the field is editable in that case — let the experimenter fix it
+      presetStatusEl.textContent = '⚠ trials must be a whole number ≥ 1';
+      numTrialsInput.focus();
+      return;
+    }
     window.api.hud.sendAction({
       type:            'start',
       subjectCode:     subjectInput.value.trim() || 'TEST',
       debugGaze:       document.getElementById('s-debug-gaze').checked,
       inputSignalType: signalTypeSelect.value,
       calibrationSecs: parseInt(document.getElementById('s-cal-secs').value) || CONFIG.CALIBRATION_SECS,
+      numTrials,
       questions:       activePreset?.questions ?? null,
       configOverrides: activePreset?.configOverrides ?? null,
     });
@@ -307,13 +318,20 @@ if (frontend === 'ibreath') {
   // ── Presets ──────────────────────────────────────────────────────────────────
   //
   // A preset is a JSON file (bundled under app/presets/, or any file via
-  // "Browse…") that can define: inputSignalType / useEyeTracking (pre-filled
-  // and locked in the UI the moment the preset loads — not deferred to
-  // Start), a custom `questions` list (replacing the default sync-only
-  // question), and arbitrary `configOverrides` (applied to CONFIG at Start,
-  // same as every other setting). See docs/ibreath.md for the file format.
+  // "Browse…") that can define: inputSignalType / useEyeTracking / numTrials
+  // (pre-filled and locked in the UI the moment the preset loads — not
+  // deferred to Start), a custom `questions` list (replacing the default
+  // sync-only question), and arbitrary `configOverrides` (applied to CONFIG
+  // at Start, same as every other setting). See docs/ibreath.md for the file
+  // format.
 
   let activePreset = null;
+
+  // Whole number ≥ 1, or null.
+  function parseTrialCount(v) {
+    const n = Number(v);
+    return Number.isInteger(n) && n >= 1 ? n : null;
+  }
 
   function updateSyncWarning(questions) {
     const list = questions?.length ? questions : CONFIG.QUESTIONS;
@@ -340,6 +358,21 @@ if (frontend === 'ibreath') {
       useEyeTrackingBox.disabled = false;
     }
 
+    if (preset?.numTrials !== undefined) {
+      const n = parseTrialCount(preset.numTrials);
+      if (n != null) {
+        numTrialsInput.value    = n;
+        numTrialsInput.disabled = true;
+      } else {
+        // Don't lock a bad value in — leave the field editable and say why.
+        numTrialsInput.disabled = false;
+        const warn = `⚠ preset numTrials ${JSON.stringify(preset.numTrials)} is not a whole number ≥ 1 — set trials manually`;
+        presetStatusEl.textContent = presetStatusEl.textContent ? `${presetStatusEl.textContent} · ${warn}` : warn;
+      }
+    } else {
+      numTrialsInput.disabled = false;
+    }
+
     updateSyncWarning(preset?.questions);
   }
 
@@ -364,8 +397,9 @@ if (frontend === 'ibreath') {
         if (!path) { presetSelect.value = ''; applyPreset(null); return; }
         const result = await window.api.readFile(path);
         if (!result.ok) throw new Error(result.error);
-        applyPreset(JSON.parse(result.content));
+        const preset = JSON.parse(result.content);
         presetStatusEl.textContent = `loaded: ${path.split(/[\\/]/).pop()}`;
+        applyPreset(preset);   // may append a warning to the status
       } catch (err) {
         console.error('[Preset] failed to load:', err);
         presetStatusEl.textContent = `⚠ failed to load: ${err.message}`;

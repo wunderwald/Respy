@@ -266,7 +266,7 @@ export default class IBreath {
 
   // ── State machine ──────────────────────────────────────────────────────
 
-  #beginCalibration({ debugGaze, inputSignalType, calibrationSecs, questions, configOverrides } = {}) {
+  #beginCalibration({ debugGaze, inputSignalType, calibrationSecs, numTrials, questions, configOverrides } = {}) {
     // Reset to the hardcoded defaults first so a previous session's preset
     // (configOverrides) never silently lingers into a session that loads no
     // preset, or a different one that doesn't mention the same keys.
@@ -277,6 +277,10 @@ export default class IBreath {
     if (debugGaze       !== undefined) CONFIG.DEBUG_GAZE        = debugGaze;
     if (inputSignalType !== undefined) this.#inputSignalType    = inputSignalType;
     if (calibrationSecs !== undefined) CONFIG.CALIBRATION_SECS = calibrationSecs;
+    // Trial count from the experimenter's "trials" field (a preset's
+    // numTrials, or the experimenter's own value). Takes precedence over a
+    // configOverrides MAX_NUM_TRIALS; invalid values keep the default.
+    if (Number.isInteger(numTrials) && numTrials >= 1) CONFIG.MAX_NUM_TRIALS = numTrials;
 
     this.#subjectCode = this.#hud.subjectCode;
     this.#trials = makeTrialParams(CONFIG.MAX_NUM_TRIALS);

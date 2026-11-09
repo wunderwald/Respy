@@ -24,6 +24,7 @@ Two windows open:
 |---|---|
 | **Subject** | Subject code written to the CSV filename. Locked once calibration begins. |
 | **Cal secs** | Calibration recording duration (default 10 s). |
+| **Trials** | Number of trials in the session (default `MAX_NUM_TRIALS`, 80). Pre-filled and locked when the loaded preset defines `numTrials`; otherwise editable (whole number ≥ 1). Locked once calibration begins. |
 | **Retry calibration** | Appears only if calibration fails (no signal received, or the signal was flat). Restarts the calibration recording. |
 | **Use default calibration** | Appears only if calibration fails. Skips ahead using `CONFIG.DEFAULT_CAL_RANGE` instead of a measured range. |
 | **Data dir** | Folder for CSV output. Default: `iBreathData/` inside the app folder. |
@@ -131,7 +132,7 @@ Flags in [app/modules/ibreath/config.js](./modules/ibreath/config.js):
 | `ANIMATION_DISPLAY` | `true` | Show 5-second pre-trial animation |
 | `SEND_MARKERS` | `true` | Send LSL markers via WebSocket |
 | `DEBUG_GAZE` | `false` | Overlay gaze position dot on scene |
-| `MAX_NUM_TRIALS` | `80` | Total trial count |
+| `MAX_NUM_TRIALS` | `80` | Default trial count — the **Trials** field's initial value; overridden per session by that field (a preset's `numTrials`, or the experimenter's own value) |
 | `MAX_TRIAL_TIME` | `30` | Trial auto-ends after this many seconds |
 | `CALIBRATION_SECS` | `10` | Duration of the calibration recording |
 | `DELAY_VALUES_MS` | `[200, 500, 800, 1000, 1200, 1600, 2200, 3000]` | The fixed set of values the async delay staircase steps through (see [Async delay staircase](#async-delay-staircase)) |
@@ -252,6 +253,7 @@ A preset is a JSON file that bundles a set of iBreath settings — the experimen
   "description": "optional human-readable blurb",
   "inputSignalType": "physiological",
   "useEyeTracking": true,
+  "numTrials": 80,
   "questions": [
     { "id": "sync",        "probability": 0.8, "text": "Was the fish in sync with your breathing?", "answers": ["yes", "no"] },
     { "id": "placeholder", "probability": 0.2, "text": "Placeholder question — replace before use", "answers": ["yes", "no"] }
@@ -266,6 +268,7 @@ Every field is optional except `questions`' internal shape (if `questions` is pr
 |---|---|
 | `inputSignalType` | `'physiological'` or `'peaksOnly'` — pre-fills and locks the **Signal type** control. Omit to leave it to the experimenter. |
 | `useEyeTracking` | `true` or `false` — pre-fills and locks the **Use eye tracking** checkbox (and applies it immediately, same as checking it by hand). Omit (or `null`) to leave it to the experimenter. |
+| `numTrials` | Whole number ≥ 1 — pre-fills and locks the **Trials** field. Omit to leave it to the experimenter (default 80). An invalid value isn't locked in: the field stays editable and a warning appears next to the preset selector. All bundled presets set `80`. |
 | `questions` | Replaces `CONFIG.QUESTIONS` wholesale for the session (applied at Start). Omit to keep the built-in default (100% `sync`). |
 | `configOverrides` | Arbitrary `key: value` pairs applied directly onto `CONFIG` at Start (after resetting CONFIG to its hardcoded defaults, so a previous session's preset never silently lingers). Any key in [config.js](./modules/ibreath/config.js) can be overridden this way — this is how the iBeat presets carry their peak-envelope timings. The signal pipeline (smoother, peak envelope, async delay buffer) is rebuilt after the overrides are applied, so `SMOOTH_WINDOW`, `PEAK_*` and `DELAY_VALUES_MS` overrides take effect too. |
 

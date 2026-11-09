@@ -3,6 +3,7 @@
   "description": "Same question setup as iBeat_only_sync_question, with a placeholder question added at 20% probability (replace its text/answers before real use). Peaks-only (ECG) input signal, with the default peak-envelope timings carried explicitly so this preset doesn't depend on whatever config.js happens to default to. Eye tracking activated.",
   "inputSignalType": "peaksOnly",
   "useEyeTracking": true,
+  "numTrials": 80,
   "questions": [
     { "id": "sync",        "probability": 0.8, "text": "Was the fish in sync with your breathing?",   "answers": ["yes", "no"] },
     { "id": "placeholder", "probability": 0.2, "text": "Placeholder question — replace before use",   "answers": ["yes", "no"] }
