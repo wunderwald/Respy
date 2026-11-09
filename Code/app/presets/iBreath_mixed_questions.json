@@ -4,9 +4,9 @@
   "inputSignalType": "physiological",
   "numTrials": 80,
   "questions": [
-    { "id": "sync",  "probability": 0.5,    "text": "Was the fish in sync with your breathing?",   "answers": ["yes", "no"] },
-    { "id": "flash", "probability": 0.1667, "text": "Did you see the pink fish flashing?",          "answers": ["yes", "no"] },
-    { "id": "lr",    "probability": 0.1667, "text": "Was the fish left or right?",                  "answers": ["left", "right"] },
-    { "id": "img",   "probability": 0.1667, "text": "Did you see the pufferfish or the starfish?",  "answers": ["pufferfish", "starfish"] }
+    { "id": "sync",  "probability": 0.5,    "text": "Hat der Fisch genau zu deinem Atem gepasst?",   "answers": ["yes", "no"], "labels": ["ja", "nein"] },
+    { "id": "flash", "probability": 0.1667, "text": "Hast du den rosa Fisch blinken sehen?",          "answers": ["yes", "no"], "labels": ["ja", "nein"] },
+    { "id": "lr",    "probability": 0.1667, "text": "War der Fisch links oder rechts?",                  "answers": ["left", "right"], "labels": ["links", "rechts"] },
+    { "id": "img",   "probability": 0.1667, "text": "Hast du den Kugelfisch oder den Seestern gesehen?",  "answers": ["pufferfish", "starfish"], "labels": ["Kugelfisch", "Seestern"] }
   ]
 }

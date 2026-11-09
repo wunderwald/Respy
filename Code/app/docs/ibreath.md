@@ -71,7 +71,7 @@ stream ready → [Start] → Explanation: "Let's get ready!"  → [Space / Next]
 
 The state machine is: `IDLE → INSTRUCTIONS_CAL → CALIBRATING → INSTRUCTIONS_TASK → [DISPLAY] → TRIAL → [RESPONSE] → ITI → [READY] → … → DONE`
 
-Explanation screens for the child (large text, simple words) come before the calibration and before the task. They always wait for the experimenter (**Space** / **Next**), so the text can be read aloud. All wording is in [instructionTexts.js](../modules/instructions/instructionTexts.js) (one place, for translation later). The texts follow the signal type (breathing, or heartbeat for *Peaks only*), and the task explanation adds a "Look carefully" line when the question set includes `img` / `lr` / `flash` questions. Eye-tracker calibration started from an explanation screen returns to it.
+Explanation screens for the child (large text, simple words) come before the calibration and before the task. They always wait for the experimenter (**Space** / **Next**), so the text can be read aloud. All wording is German, in [instructionTexts.js](../modules/instructions/instructionTexts.js); iBreath's other screen texts are in [ibreath_texts.js](../modules/ibreath/ibreath_texts.js). The texts follow the signal type (breathing, or heartbeat for *Peaks only*). The task explanation deliberately doesn't mention the fish type / side / pink-fish questions, so the child isn't prepared for them. Eye-tracker calibration started from an explanation screen returns to it.
 
 The `[READY]` step between trials is skipped when `AUTO_ADVANCE` is on. The `[DISPLAY]` step is skipped when `ANIMATION_DISPLAY` is off. The `[RESPONSE]` step is skipped when the trial was aborted.
 
@@ -262,8 +262,8 @@ A preset is a JSON file that bundles a set of iBreath settings — the experimen
   "useEyeTracking": true,
   "numTrials": 80,
   "questions": [
-    { "id": "sync",        "probability": 0.8, "text": "Was the fish in sync with your breathing?", "answers": ["yes", "no"] },
-    { "id": "placeholder", "probability": 0.2, "text": "Placeholder question — replace before use", "answers": ["yes", "no"] }
+    { "id": "sync",        "probability": 0.8, "text": "Hat der Fisch genau zu deinem Atem gepasst?", "answers": ["yes", "no"], "labels": ["ja", "nein"] },
+    { "id": "placeholder", "probability": 0.2, "text": "Placeholder question — replace before use", "answers": ["yes", "no"], "labels": ["ja", "nein"] }
   ],
   "configOverrides": { "PEAK_SWELL_MS": 80 }
 }
@@ -284,8 +284,9 @@ Every field is optional except `questions`' internal shape (if `questions` is pr
 | Field | Meaning |
 |---|---|
 | `id` | Stable identifier — used by the adaptive delay logic (`questionType === 'sync'`), CSV (`questionType` column), and markers. **Not** translated; invent new ids freely (e.g. `placeholder`) but keep `sync` as `sync` if you want one. |
-| `text` | The prompt shown on screen. Freely overridable per preset — e.g. for translations — even for `sync`/`flash`/`lr`/`img`'s built-in ids. |
-| `answers` | `[leftLabel, rightLabel]` — what ← and → record as `response`. **A `sync`-id question must use `['yes', 'no']`** for the adaptive delay staircase to make sense. |
+| `text` | The prompt shown on screen (German in all bundled presets). Freely overridable per preset, even for `sync`/`flash`/`lr`/`img`'s built-in ids. |
+| `answers` | `[left, right]` — what ← and → **record** as `response` (CSV, markers). Kept in English so the data stays comparable. **A `sync`-id question must use `['yes', 'no']`** for the adaptive delay staircase to make sense. |
+| `labels` | `[left, right]` — what the answer cards **show** (e.g. `["ja", "nein"]`). Optional: without it, the `answers` are shown. Not used for the `img` question, which shows pictures. |
 | `probability` | This question's share of trials, as a fraction (all entries' probabilities should sum to ~1). Realized via the smallest shuffled block that reproduces the given probabilities exactly (e.g. 0.8/0.2 → a 5-trial block of 4×this + 1×that) — see [Trial design](#trial-design). Built separately for sync and async trials, so both see the same mix, not just the combined pool overall. |
 
 If the resulting question set has no `sync`-id entry, the experimenter HUD shows a warning next to the preset selector (the adaptive delay has nothing to drive it in that case — see [Async delay staircase](#async-delay-staircase)).

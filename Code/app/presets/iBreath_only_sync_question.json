@@ -4,6 +4,6 @@
   "inputSignalType": "physiological",
   "numTrials": 80,
   "questions": [
-    { "id": "sync", "probability": 1, "text": "Was the fish in sync with your breathing?", "answers": ["yes", "no"] }
+    { "id": "sync", "probability": 1, "text": "Hat der Fisch genau zu deinem Atem gepasst?", "answers": ["yes", "no"], "labels": ["ja", "nein"] }
   ]
 }

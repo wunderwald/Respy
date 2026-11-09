@@ -78,7 +78,7 @@ stream ready → [Start] → Explanation: "Let's get ready!"  → [Space / Next]
                           Done screen
 ```
 
-Explanation screens for the child (large text, simple words) come before the calibration and before the task. They always wait for the experimenter (**Space** / **Next**), so the text can be read aloud. All wording is in [instructionTexts.js](../modules/instructions/instructionTexts.js) (one place, for translation later).
+Explanation screens for the child (large text, simple words) come before the calibration and before the task. They always wait for the experimenter (**Space** / **Next**), so the text can be read aloud. All wording is German, in [instructionTexts.js](../modules/instructions/instructionTexts.js); the game's other screen texts are in [bioGame_texts.js](../modules/bioGame/bioGame_texts.js).
 
 ---
 

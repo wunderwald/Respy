@@ -4,6 +4,7 @@
 import { STATE, CONFIG } from './bioGame_config.js';
 import { SceneRenderer } from './sceneRenderer.js';
 import { drawInstructions } from '../instructions/instructionScreen.js';
+import { TEXTS } from './bioGame_texts.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -56,7 +57,7 @@ export class BioGameRenderer {
 
     switch (state) {
       case STATE.IDLE:
-        this.#drawCenter(ctx, w, h, 'waiting for stream…', 'rgba(255,255,255,0.38)', 20);
+        this.#drawCenter(ctx, w, h, TEXTS.waiting, 'rgba(255,255,255,0.38)', 20);
         break;
 
       case STATE.CALIBRATING:
@@ -292,7 +293,7 @@ export class BioGameRenderer {
     ctx.font         = '300 11px Nunito, sans-serif';
     ctx.textAlign    = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText('score', x, y + cardH + 5);
+    ctx.fillText(TEXTS.scoreLabel, x, y + cardH + 5);
   }
 
   #drawDigitChar(ctx, char, x, y, w, h, alpha) {
@@ -309,8 +310,6 @@ export class BioGameRenderer {
     const cx = w / 2, cy = h / 2;
     const r  = 62;
 
-    this.#drawCenter(ctx, w, h * 0.35, 'Breathe normally…', 'rgba(255,255,255,0.82)', 22);
-
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.strokeStyle = 'rgba(255,255,255,0.12)';
@@ -326,11 +325,10 @@ export class BioGameRenderer {
     ctx.lineCap     = 'butt';
 
     this.#drawCenter(ctx, w, cy, String(remaining), 'rgba(255,255,255,0.72)', 54, '200');
-    this.#drawCenter(ctx, w, cy + r + 28, 'calibrating signal…', 'rgba(255,255,255,0.28)', 14);
   }
 
   #drawCountdown(ctx, w, h, value, progress) {
-    const text  = value === 0 ? 'GO!' : String(value);
+    const text  = value === 0 ? TEXTS.go : String(value);
     const color = value === 0 ? 'rgba(126,232,162,0.95)' : 'rgba(255,255,255,0.92)';
     const size  = value === 0 ? 84 : 108;
     const scale = 1 + 0.35 * (1 - easeOut(clamp(progress, 0, 1)));
@@ -405,7 +403,7 @@ export class BioGameRenderer {
 
     const cy = h / 2;
 
-    this.#drawCenter(ctx, w, cy - 80, `Game ${finishedIndex + 1} complete  ·  Good job!`, 'rgba(255,255,255,0.85)', 30, '300');
+    this.#drawCenter(ctx, w, cy - 80, TEXTS.intermissionTitle(finishedIndex + 1), 'rgba(255,255,255,0.85)', 30, '300');
 
     const scoreStr = `★  ${score}  ★`;
     ctx.fillStyle    = '#ffd060';
@@ -417,9 +415,9 @@ export class BioGameRenderer {
     ctx.fillText(scoreStr, w / 2, cy);
     ctx.shadowBlur   = 0;
 
-    const label = score === 1 ? '1 item caught' : `${score} items caught`;
+    const label = TEXTS.starsCollected(score);
     this.#drawCenter(ctx, w, cy + 60, label, 'rgba(255,255,255,0.55)', 18);
-    this.#drawCenter(ctx, w, cy + 110, 'Press Space', 'rgba(255,255,255,0.28)', 15);
+    this.#drawCenter(ctx, w, cy + 110, TEXTS.continueSoon, 'rgba(255,255,255,0.28)', 15);
   }
 
   #drawDone(ctx, w, h, scores) {
@@ -429,7 +427,7 @@ export class BioGameRenderer {
     const cy    = h / 2;
     const total = scores.reduce((a, b) => a + b, 0);
 
-    this.#drawCenter(ctx, w, cy - 90, 'Experiment complete!', 'rgba(255,255,255,0.85)', 28, '300');
+    this.#drawCenter(ctx, w, cy - 90, TEXTS.doneTitle, 'rgba(255,255,255,0.85)', 28, '300');
 
     ctx.fillStyle    = '#ffd060';
     ctx.font         = '200 72px Nunito, sans-serif';
@@ -440,7 +438,7 @@ export class BioGameRenderer {
     ctx.fillText(`★  ${total}  ★`, w / 2, cy);
     ctx.shadowBlur   = 0;
 
-    const perGame = scores.map((s, i) => `Game ${i + 1}: ${s}`).join('  ·  ');
+    const perGame = scores.map((s, i) => TEXTS.perGame(i + 1, s)).join('  ·  ');
     this.#drawCenter(ctx, w, cy + 65, perGame, 'rgba(255,255,255,0.42)', 16);
   }
 

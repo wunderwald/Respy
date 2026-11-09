@@ -5,8 +5,8 @@
   "useEyeTracking": true,
   "numTrials": 80,
   "questions": [
-    { "id": "sync",        "probability": 0.8, "text": "Was the fish in sync with your heartbeat?",   "answers": ["yes", "no"] },
-    { "id": "placeholder", "probability": 0.2, "text": "Placeholder question — replace before use",   "answers": ["yes", "no"] }
+    { "id": "sync",        "probability": 0.8, "text": "Hat der Fisch genau zu deinem Herzschlag gepasst?",   "answers": ["yes", "no"], "labels": ["ja", "nein"] },
+    { "id": "placeholder", "probability": 0.2, "text": "Placeholder question — replace before use",   "answers": ["yes", "no"], "labels": ["ja", "nein"] }
   ],
   "configOverrides": {
     "PEAK_SWELL_MS": 80,

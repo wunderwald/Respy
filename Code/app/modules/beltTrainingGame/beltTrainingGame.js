@@ -47,6 +47,7 @@ import { BeltTrainingGameCSV } from './beltTrainingGame_csv.js';
 import { SCENE } from '../bioGame/bioGame_scene.js';
 import { BioGameSound } from '../bioGame/bioGame_sound.js';
 import { INSTRUCTIONS } from '../instructions/instructionTexts.js';
+import { TEXTS } from './beltTrainingGame_texts.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -615,8 +616,8 @@ export default class BeltTrainingGame {
       targetNormY:       this.#targetNormY,
       segment:           this.#segment,
       avatarTilt:        this.#avatarTilt,
-      promptText:        this.#phase === 'training' ? 'Hold your breath to keep the fish in the green!'
-                        : this.#phase === 'test'     ? 'Hold your breath just like before!'
+      promptText:        this.#phase === 'training' ? TEXTS.promptTraining
+                        : this.#phase === 'test'     ? TEXTS.promptTest
                         : null,
       countdownValue,
       countdownProgress: clamp(countdownProgress, 0, 1),

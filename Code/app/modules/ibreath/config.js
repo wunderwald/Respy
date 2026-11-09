@@ -55,14 +55,16 @@ export const CONFIG = {
   SHOW_QUESTIONS: true,      // show a post-trial response question after each trial (fixed — not exposed in experimenter UI)
   RESPONSE_TIMEOUT_SECS: 5,        // seconds before a non-response is recorded as 'timeout'
 
-  // Active question set. Each entry: { id, text, answers: [leftLabel, rightLabel], probability }.
+  // Active question set. Each entry: { id, text, answers: [left, right], labels: [left, right], probability }.
+  // `answers` are the values recorded in the CSV/markers (and checked by the adaptive delay: 'yes'/'no');
+  // `labels` are what the answer cards show (German). Without `labels`, the answers are shown.
   // probability values across the set must sum to ~1. `id` is the stable identifier used by
   // CSV/markers/the adaptive-delay logic (which specifically requires an 'sync' entry with
   // answers ['yes', 'no'] to function); `text`/`answers` are freely overridable display strings
   // (e.g. for translations). Replaced wholesale by a preset's `questions` list when one is
   // loaded; this single-entry default (100% 'sync') is what's used when no preset is loaded.
   QUESTIONS: [
-    { id: 'sync', text: 'Was the fish in sync with your breathing?', answers: ['yes', 'no'], probability: 1 },
+    { id: 'sync', text: 'Hat der Fisch genau zu deinem Atem gepasst?', answers: ['yes', 'no'], labels: ['ja', 'nein'], probability: 1 },
   ],
 
   // Flash image

@@ -5,6 +5,7 @@ import { STATE, CONFIG } from './beltTrainingGame_config.js';
 import { SceneRenderer } from '../bioGame/sceneRenderer.js';
 import { drawDisplay }  from '../ibreath/animationDisplay.js';
 import { drawInstructions } from '../instructions/instructionScreen.js';
+import { TEXTS } from './beltTrainingGame_texts.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -63,7 +64,7 @@ export class BeltTrainingGameRenderer {
 
     switch (state) {
       case STATE.IDLE:
-        this.#drawCenter(ctx, w, h / 2, 'waiting for stream…', 'rgba(255,255,255,0.38)', 20);
+        this.#drawCenter(ctx, w, h / 2, TEXTS.waiting, 'rgba(255,255,255,0.38)', 20);
         break;
 
       case STATE.INSTRUCTIONS_CAL:
@@ -265,7 +266,7 @@ export class BeltTrainingGameRenderer {
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
     ctx.fillRect(0, 0, w, h);
 
-    this.#drawCenter(ctx, w, h * 0.13, "Here's how you did!", 'rgba(255,255,255,0.92)', 28, '400');
+    this.#drawCenter(ctx, w, h * 0.13, TEXTS.photo, 'rgba(255,255,255,0.92)', 28, '400');
 
     const frameW   = Math.min(w * 0.46, 420);
     const border   = 14;
@@ -325,8 +326,6 @@ export class BeltTrainingGameRenderer {
     const cx = w / 2, cy = h / 2;
     const r  = 62;
 
-    this.#drawCenter(ctx, w, h * 0.35, 'Breathe normally…', 'rgba(255,255,255,0.82)', 22);
-
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.strokeStyle = 'rgba(255,255,255,0.12)';
@@ -342,7 +341,6 @@ export class BeltTrainingGameRenderer {
     ctx.lineCap     = 'butt';
 
     this.#drawCenter(ctx, w, cy, String(remaining), 'rgba(255,255,255,0.72)', 54, '200');
-    this.#drawCenter(ctx, w, cy + r + 28, 'calibrating signal…', 'rgba(255,255,255,0.28)', 14);
   }
 
   // Driven by the live breath signal (fishNormY/avatarTilt), exactly like
@@ -355,7 +353,7 @@ export class BeltTrainingGameRenderer {
     const avatarScreenY = topPad + (1 - fishNormY) * playH;
     const avatarH = CONFIG.AVATAR_SIZE_MIN * h + (CONFIG.AVATAR_SIZE_MAX - CONFIG.AVATAR_SIZE_MIN) * h * 0.5;
     this.#sceneRenderer.drawAvatar(ctx, avatarScreenX, avatarScreenY, avatarH * 1.3, avatarTilt);
-    this.#drawCenter(ctx, w, h * 0.85, 'See how your breath moves the fish!', 'rgba(255,255,255,0.75)', 20);
+    this.#drawCenter(ctx, w, h * 0.85, TEXTS.ready, 'rgba(255,255,255,0.75)', 20);
   }
 
   // The same "three fish bopping happily" animation ibreath shows before each
@@ -363,7 +361,7 @@ export class BeltTrainingGameRenderer {
   #drawCountdown(ctx, w, h, now, value, progress) {
     drawDisplay(ctx, w, h, now / 1000, this.#images);
 
-    const text  = value === 0 ? 'GO!' : String(value);
+    const text  = value === 0 ? TEXTS.go : String(value);
     const color = value === 0 ? 'rgba(126,232,162,0.95)' : 'rgba(255,255,255,0.92)';
     const size  = value === 0 ? 84 : 108;
     const scale = 1 + 0.35 * (1 - easeOut(clamp(progress, 0, 1)));
@@ -382,7 +380,7 @@ export class BeltTrainingGameRenderer {
   #drawDone(ctx, w, h) {
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.fillRect(0, 0, w, h);
-    this.#drawCenter(ctx, w, h / 2, 'All trials complete!', 'rgba(255,255,255,0.85)', 28, '300');
+    this.#drawCenter(ctx, w, h / 2, TEXTS.done, 'rgba(255,255,255,0.85)', 28, '300');
   }
 
   // ── Canvas helpers ────────────────────────────────────────────────────────

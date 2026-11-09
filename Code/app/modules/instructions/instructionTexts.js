@@ -1,5 +1,6 @@
 // Explanation screens shown to the child before calibration and before the
 // task, in every experiment. All wording lives here (one place to translate).
+// Language: German (being translated experiment by experiment).
 // Each function returns { title, lines } for drawInstructions().
 //
 // Keep it simple: short sentences, everyday words.
@@ -16,59 +17,47 @@ export const INSTRUCTIONS = {
   // `signal`: 'physiological' (breath) or 'peaksOnly' (heartbeat, iBeat).
   calibration({ signal = 'physiological' } = {}) {
     const lines = signal === 'peaksOnly'
-      ? ['Sit still and relax.']
-      : ['Sit still and breathe calmly.', 'Just breathe like you always do.'];
-    return { title: "Let's get ready!", lines };
+      ? ['Sitz ruhig und entspann dich.']
+      : ['Sitz ruhig und atme ganz entspannt.', 'Atme einfach so wie immer.'];
+    return { title: 'Mach dich bereit!', lines };
   },
 
   bioGame() {
     return {
-      title: 'Catch the stars!',
+      title: 'Fang die Sterne!',
       lines: [
-        'You are the fish. Your breathing makes it swim.',
-        'Breathe in → the fish swims up.',
-        'Breathe out → the fish swims down.',
-        'Catch as many stars as you can!',
+        'Dein Atem steuert den Fisch.',
+        'Einatmen → der Fisch schwimmt nach oben.',
+        'Ausatmen → der Fisch schwimmt nach unten.',
+        'Sammel so viele Sterne, wie du kannst!',
       ],
     };
   },
 
   beltTrainingGame({ trainingPasses = 2 } = {}) {
     return {
-      title: 'Keep the fish in the green!',
+      title: 'Halte den Fisch im grünen Bereich!',
       lines: [
-        'Your breathing moves the fish up and down.',
-        'The fish swims through a green stripe.',
-        'Breathe until the fish is in the green. Then hold your breath to keep it there!',
-        `First you practise ${trainingPasses} times.`,
-        'Then the stripe hides under bubbles. Do it just like before!',
-        'After that, you get a photo of your fish.',
+        'Dein Atem steuert den Fisch nach oben und unten.',
+        'Der Fisch schwimmt durch einen grünen Streifen.',
+        'Atme, bis der Fisch im grünen Bereich ist. Dann halte die Luft an, damit er dort bleibt!',
+        `Zuerst übst du ${trainingPasses}-mal.`,
+        'Dann ist der Streifen hinter Luftblasen versteckt. Mach es genauso wie vorher!',
+        'Danach bekommst du ein Foto von deinem Fisch.',
       ],
     };
   },
 
-  // `questionIds`: ids of the session's question set — 'img' / 'lr' / 'flash'
-  // add a "look carefully" line naming what to watch for.
-  ibreath({ signal = 'physiological', questionIds = [] } = {}) {
+  // Deliberately says nothing about which questions come (fish type, side,
+  // pink fish) — those should catch the child unprepared.
+  ibreath({ signal = 'physiological' } = {}) {
     const lines = signal === 'peaksOnly'
-      ? ['The fish pulses with your heartbeat.',
-         'Sometimes it beats together with your heart. Sometimes it is a little late.']
-      : ['The fish grows and shrinks with your breathing.',
-         'Sometimes it follows your breathing exactly. Sometimes it is a little late.'];
-    lines.push('After each fish, you answer a question.', 'Use the arrows: ← or →.');
-
-    const watch = [
-      questionIds.includes('img')   && 'which fish is it',
-      questionIds.includes('lr')    && 'where is it',
-      questionIds.includes('flash') && 'does a pink fish flash',
-    ].filter(Boolean);
-    if (watch.length) {
-      const list = watch.length > 1
-        ? `${watch.slice(0, -1).join(', ')}, and ${watch.at(-1)}`
-        : watch[0];
-      lines.push(`Look carefully: ${list}?`);
-    }
-    return { title: 'Watch the fish!', lines };
+      ? ['Der Fisch pocht mit deinem Herzschlag.',
+         'Manchmal passt er genau zu deinem Herzschlag, manchmal nicht.']
+      : ['Der Fisch wird mit deinem Atem größer und kleiner.',
+         'Manchmal passt er genau zu deinem Atem. Manchmal ist er ein bisschen zu spät.'];
+    lines.push('Nach jedem Fisch beantwortest du eine Frage.', 'Drück eine Pfeiltaste: ← oder →.');
+    return { title: 'Schau genau auf den Fisch!', lines };
   },
 
   baseline({ durationSecs } = {}) {

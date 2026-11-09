@@ -5,6 +5,7 @@ import { STATE, CONFIG } from './config.js';
 import { drawDisplay } from './animationDisplay.js';
 import { Caustics }    from './caustics.js';
 import { drawInstructions } from '../instructions/instructionScreen.js';
+import { TEXTS } from './ibreath_texts.js';
 
 export class IBreathRenderer {
   #canvas   = null;
@@ -54,7 +55,7 @@ export class IBreathRenderer {
       case STATE.ITI:         break;   // background only — no text between trials
       case STATE.PAUSED:      this.#drawPaused(ctx, w, h, now); break;
       case STATE.EYETRACK_CAL: this.#drawEyeCal(ctx, w, h); break;
-      case STATE.DONE:        this.#drawDone(ctx, w, h, data.trialCount, data.subjectCode); break;
+      case STATE.DONE:        this.#drawDone(ctx, w, h); break;
     }
 
     if (CONFIG.DEBUG_GAZE && data.gazeX != null && data.gazeY != null) {
@@ -82,18 +83,13 @@ export class IBreathRenderer {
   // ── State draw methods ─────────────────────────────────────────────────
 
   #drawIdle(ctx, w, h) {
-    this.#centerText(ctx, w / 2, h / 2, 'waiting for stream…', 'rgba(255,255,255,0.4)', 18);
+    this.#centerText(ctx, w / 2, h / 2, TEXTS.waiting, 'rgba(255,255,255,0.4)', 18);
   }
 
   #drawCalibrating(ctx, w, h, progress, remaining) {
     const cx = w / 2, cy = h / 2;
     const r = 60;
 
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.font = '300 20px Nunito, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('Breathe normally…', cx, cy - 80);
 
     // Track ring
     ctx.beginPath();
@@ -119,7 +115,7 @@ export class IBreathRenderer {
 
   #drawReady(ctx, w, h) {
     this.#centerText(ctx, w / 2, h / 2,
-      'Press Space or "Next trial" to begin',
+      TEXTS.ready,
       'rgba(255,255,255,0.35)', 18);
   }
 
@@ -178,7 +174,8 @@ export class IBreathRenderer {
     const cardDx = Math.min(46 * u, w * 0.27);     // card centre offset from screen centre
     // Gentle, symmetric "come press me" nudge of both arrows outward.
     const nudge  = (0.5 + 0.5 * Math.sin(now / 1000 * Math.PI * 1.6)) * 1.6 * u;
-    const [leftLabel, rightLabel] = questionDef.answers ?? ['yes', 'no'];
+    // `labels` = what's shown (German); `answers` = what's recorded (unchanged).
+    const [leftLabel, rightLabel] = questionDef.labels ?? questionDef.answers ?? ['ja', 'nein'];
 
     for (const side of [-1, 1]) {
       const x = cx + side * cardDx;
@@ -305,22 +302,21 @@ export class IBreathRenderer {
     }
     ctx.restore();
 
-    this.#centerText(ctx, cx, cy + unit * 0.22, 'paused', 'rgba(255,255,255,0.28)', 16);
+    this.#centerText(ctx, cx, cy + unit * 0.22, TEXTS.paused, 'rgba(255,255,255,0.28)', 16);
   }
 
   #drawEyeCal(ctx, w, h) {
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, w, h);
     this.#centerText(ctx, w / 2, h / 2,
-      'Recalibrating eye tracker — please wait…',
+      TEXTS.eyeCal,
       'rgba(255,255,255,0.4)', 18);
   }
 
-  #drawDone(ctx, w, h, trialCount, subjectCode) {
-    const cx = w / 2, cy = h / 2;
-    this.#centerText(ctx, cx, cy - 40, 'Experiment complete', 'rgba(255,255,255,0.6)', 24);
-    this.#centerText(ctx, cx, cy + 10, `${trialCount} trials recorded`, 'rgba(255,255,255,0.35)', 16);
-    this.#centerText(ctx, cx, cy + 50, `Subject: ${subjectCode}`, 'rgba(255,255,255,0.25)', 14);
+  // Child-facing end screen only — trial count and subject code are
+  // experimenter information (shown in the experimenter window).
+  #drawDone(ctx, w, h) {
+    this.#centerText(ctx, w / 2, h / 2, TEXTS.done, 'rgba(255,255,255,0.6)', 24);
   }
 
   // ── Canvas helpers ─────────────────────────────────────────────────────

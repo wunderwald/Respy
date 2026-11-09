@@ -794,13 +794,13 @@ export default class IBreath {
   }
 
   // Text of the explanation screen for the current state (null otherwise).
-  // Follows the session's signal type (breath vs heartbeat) and question set.
+  // Follows the session's signal type (breath vs heartbeat).
   get #instructions() {
     if (this.#state === STATE.INSTRUCTIONS_CAL) {
       return INSTRUCTIONS.calibration({ signal: this.#inputSignalType });
     }
     if (this.#state === STATE.INSTRUCTIONS_TASK) {
-      return INSTRUCTIONS.ibreath({ signal: this.#inputSignalType, questionIds: CONFIG.QUESTIONS.map((q) => q.id) });
+      return INSTRUCTIONS.ibreath({ signal: this.#inputSignalType });
     }
     return null;
   }
@@ -930,9 +930,7 @@ export default class IBreath {
         displayElapsed:    this.#displayStartTime != null ? (now - this.#displayStartTime) / 1000 : 0,
         responseStartTime: this.#responseStartTime,
         questionType:      this.#pendingTrial?.questionType ?? '',
-        trialCount:        this.#trialData.length,
         instructions:      this.#instructions,
-        subjectCode:       this.#subjectCode,
         gazeX:             this.#gazeX,
         gazeY:             this.#gazeY,
         ...(trialDrawData ?? {}),
