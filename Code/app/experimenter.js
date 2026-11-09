@@ -5,6 +5,7 @@ import { EYELINK_OFFLINE, EYELINK_UNAVAILABLE_STATES, EYELINK_SETUP_STATES }
 import { CONFIG }        from './modules/ibreath/config.js';
 import { CONFIG as BG }  from './modules/bioGame/bioGame_config.js';
 import { CONFIG as BTG } from './modules/beltTrainingGame/beltTrainingGame_config.js';
+import { CONFIG as BL }  from './modules/baseline/baseline_config.js';
 
 // ── Frontend detection ────────────────────────────────────────────────────────
 
@@ -497,9 +498,15 @@ if (frontend === 'ibreath') {
 
   // ── Baseline BPM auto-load ────────────────────────────────────────────────────
 
+  // Natural breathing rate = the subject's *Resting* baseline. Falls back to
+  // the pre-name file (<subject>_baseline_estimates.csv) for older data.
   async function tryLoadBaseline(subjectCode) {
-    const filePath = `output_data/baseline/${subjectCode}_baseline_estimates.csv`;
-    const result   = await window.api.readFile(filePath);
+    const resting = BL.NAMES.find((n) => n.slug === 'resting') ?? BL.NAMES[0];
+    let result = await window.api.readFile(
+      `${BL.DATA_DIR}/${subjectCode}_baseline_${resting.slug}_estimates.csv`);
+    if (!result.ok) {
+      result = await window.api.readFile(`${BL.DATA_DIR}/${subjectCode}_baseline_estimates.csv`);
+    }
 
     if (!result.ok) {
       bgBpmSrcEl.textContent = 'enter manually';
@@ -613,6 +620,12 @@ if (frontend === 'ibreath') {
       <input id="bl-subject" type="text" value="TEST"
              placeholder="subject code" autocomplete="off" spellcheck="false" />
     </span>
+    <span>
+      <span class="label">name</span>
+      <select id="bl-name" class="stream-select">
+        ${BL.NAMES.map((n) => `<option value="${n.label}">${n.label}</option>`).join('')}
+      </select>
+    </span>
     <span id="ib-controls">
       <button id="bl-start-btn" disabled>Start</button>
       <button id="bl-abort-btn" style="display:none">Abort</button>
@@ -620,11 +633,61 @@ if (frontend === 'ibreath') {
     <span id="bl-warning" style="display:none;color:#e0a838;"></span>
   `;
 
-  const blStatusEl  = document.getElementById('bl-status');
-  const blSubjectEl = document.getElementById('bl-subject');
-  const blStartBtn  = document.getElementById('bl-start-btn');
-  const blAbortBtn  = document.getElementById('bl-abort-btn');
-  const blWarningEl = document.getElementById('bl-warning');
+  // ── Baseline settings bar ─────────────────────────────────────────────────
+
+  settingsBar.innerHTML = `
+    <span class="label">settings</span>
+    <label><input type="checkbox" id="bl-full-video" checked> play full video</label>
+    <input id="bl-duration" type="number" class="settings-num" min="1" step="1"
+           value="${BL.DURATION_SECS}" disabled />
+    <span class="label">secs</span>
+    <span id="bl-video-len" class="label"></span>
+  `;
+
+  const blStatusEl    = document.getElementById('bl-status');
+  const blSubjectEl   = document.getElementById('bl-subject');
+  const blNameEl      = document.getElementById('bl-name');
+  const blStartBtn    = document.getElementById('bl-start-btn');
+  const blAbortBtn    = document.getElementById('bl-abort-btn');
+  const blWarningEl   = document.getElementById('bl-warning');
+  const blFullVideoEl = document.getElementById('bl-full-video');
+  const blDurationEl  = document.getElementById('bl-duration');
+  const blVideoLenEl  = document.getElementById('bl-video-len');
+
+  // Video length as reported by the scene window (null until its metadata
+  // has loaded / when there's no playable video).
+  let blVideoAvailable = true;
+  let blVideoSecs      = null;
+  let blLocked         = false;
+
+  function blCustomSecs() {
+    const v = parseFloat(blDurationEl.value);
+    return Number.isFinite(v) && v > 0 ? v : null;
+  }
+
+  // Seconds field is only editable with "play full video" off (and before
+  // Start); the hint says what "full video" means right now, and flags
+  // custom values the video can't fill.
+  function updateDurationControls() {
+    blDurationEl.disabled = blLocked || blFullVideoEl.checked;
+    let hint;
+    if (!blVideoAvailable) {
+      hint = `no video — full = ${fmtTime(BL.DURATION_SECS)} countdown`;
+    } else if (blVideoSecs == null) {
+      hint = 'video length: loading…';
+    } else {
+      hint = `video length: ${fmtTime(blVideoSecs)}`;
+      const custom = blCustomSecs();
+      if (!blFullVideoEl.checked && custom != null && custom > blVideoSecs) {
+        hint += ' — longer than the video: its last frame stays on screen';
+      }
+    }
+    if (!blFullVideoEl.checked && blCustomSecs() == null) hint = 'enter a duration > 0 secs';
+    blVideoLenEl.textContent = hint;
+  }
+  blFullVideoEl.addEventListener('change', updateDurationControls);
+  blDurationEl.addEventListener('input', updateDurationControls);
+  updateDurationControls();
 
   const blTimerStateEl   = document.getElementById('ib-state-text');
   const blElapsedEl      = document.getElementById('ib-elapsed');
@@ -643,9 +706,15 @@ if (frontend === 'ibreath') {
   }, 250);
 
   window.api.frontend.onState(({ stateText, startEnabled, abortVisible, inputsLocked,
-                                  recordingStartedAt, duration, warning }) => {
+                                  recordingStartedAt, duration, warning,
+                                  videoAvailable, videoDurationSecs }) => {
     if (recordingStartedAt !== undefined) blRecordingStartedAt = recordingStartedAt;
     if (duration           !== undefined) blDurationSecs       = duration;
+    if (videoAvailable !== undefined || videoDurationSecs !== undefined) {
+      if (videoAvailable    !== undefined) blVideoAvailable = videoAvailable;
+      if (videoDurationSecs !== undefined) blVideoSecs      = videoDurationSecs;
+      updateDurationControls();
+    }
     if (stateText !== undefined) {
       blStatusEl.textContent    = stateText;
       blTimerStateEl.textContent = stateText;
@@ -662,18 +731,31 @@ if (frontend === 'ibreath') {
       blWarningEl.style.display = warning ? '' : 'none';
     }
     if (inputsLocked) {
-      blSubjectEl.disabled = true;
+      blLocked = true;
+      blSubjectEl.disabled   = true;
+      blNameEl.disabled      = true;
+      blFullVideoEl.disabled = true;
+      updateDurationControls();
       // Stream selection stays live even once everything else locks, so the
       // experimenter can recover from a dropped stream mid-session.
     }
   });
 
-  blStartBtn.addEventListener('click', () =>
+  blStartBtn.addEventListener('click', () => {
+    const fullVideo = blFullVideoEl.checked;
+    const custom    = blCustomSecs();
+    if (!fullVideo && custom == null) {   // the hint already says why
+      blDurationEl.focus();
+      return;
+    }
     window.api.frontend.sendAction({
-      type:        'start',
-      subjectCode: blSubjectEl.value.trim() || 'TEST',
-    })
-  );
+      type:         'start',
+      subjectCode:  blSubjectEl.value.trim() || 'TEST',
+      name:         blNameEl.value,
+      fullVideo,
+      durationSecs: fullVideo ? undefined : custom,
+    });
+  });
   blAbortBtn.addEventListener('click', () => window.api.frontend.sendAction({ type: 'abort' }));
 
   window.addEventListener('keydown', (e) => {

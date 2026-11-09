@@ -1,10 +1,16 @@
 /**
  * baseline.js — Resting-state baseline recording
  * ================================================
- * Plays a resting-state video full-screen for a fixed duration (default
- * 7 min) while recording the resp signal in the background. Falls back to a
- * plain countdown display if the video file isn't present.
- * Sends LSL markers at start and end.
+ * Plays a resting-state video full-screen while recording the resp signal in
+ * the background. Falls back to a plain countdown display if the video file
+ * isn't present. Sends LSL markers at start and end.
+ *
+ * Experimenter settings (sent with Start):
+ *   - name:       one of CONFIG.NAMES — written to the CSVs and file names
+ *   - fullVideo:  true  → the recording ends when the video ends
+ *                 false → it ends after `durationSecs` (the video is paused
+ *                         then; if it's shorter, its last frame stays up)
+ *   Without a playable video, "full video" means CONFIG.DURATION_SECS.
  *
  * The raw signal is written to CSV *while* recording (header at Start, new
  * rows appended every CONFIG.FLUSH_INTERVAL_MS), so an abort, crash or
@@ -22,12 +28,21 @@ import { estimateBreathRate }  from '../signal/breathRateEstimators.js';
 
 export default class Baseline {
   #state        = STATE.IDLE;
+  #stateText    = 'waiting for stream…';   // last status line sent to the experimenter
   #streamReady  = false;
   #startTime    = null;
   #lastRafTime  = null;
 
   // Experimenter-supplied params (overridden on 'start' action)
   #subjectCode = CONFIG.SUBJECT_CODE;
+  #name        = CONFIG.NAMES[0];       // { label, slug }
+  #fullVideo   = true;
+  #customSecs  = CONFIG.DURATION_SECS;
+
+  // Resolved at Start: end on the video's 'ended' event, or after #targetSecs.
+  #endsWithVideo = false;
+  #targetSecs    = null;   // null = until the video ends (its length unknown)
+  #videoDurationSecs = null;   // from the video's metadata, once loaded
 
   // Recording: every value (for the end-of-recording estimates) plus the CSV
   // rows not yet written to disk.
@@ -82,6 +97,30 @@ export default class Baseline {
     }
 
     if (this.#videoAvailable) {
+      this.#video.addEventListener('loadedmetadata', () => {
+        if (!Number.isFinite(this.#video.duration)) return;
+        this.#videoDurationSecs = this.#video.duration;
+        // Started before the length was known: now the HUD can count down.
+        if (this.#state === STATE.PLAYING && this.#endsWithVideo) {
+          this.#targetSecs = this.#videoDurationSecs;
+          this.#pushState({ duration: this.#targetSecs });
+        } else {
+          this.#pushState();   // experimenter shows the video length
+        }
+      });
+      this.#video.addEventListener('ended', () => {
+        if (this.#state === STATE.PLAYING && this.#endsWithVideo) this.#finish(false);
+      });
+      this.#video.addEventListener('error', () => {
+        if (this.#state === STATE.PLAYING) {
+          this.#onVideoFailed('error');
+        } else if (this.#state === STATE.IDLE) {
+          // Unplayable before Start: behave as if it were missing (countdown).
+          this.#videoAvailable = false;
+          this.#warning = `video could not be loaded (${CONFIG.VIDEO_PATH}) — a countdown is shown instead`;
+          this.#pushState();
+        }
+      });
       this.#video.src = CONFIG.VIDEO_PATH;
       this.#video.load();
     } else {
@@ -99,7 +138,7 @@ export default class Baseline {
     this.#firstSampleMs ??= nowMs;
     this.#lastSampleMs = nowMs;
     this.#values.push(value);
-    this.#pendingRows.push(`${new Date(nowMs).toISOString()},${value.toFixed(6)}`);
+    this.#pendingRows.push(`${new Date(nowMs).toISOString()},${value.toFixed(6)},${this.#name.label}`);
   }
 
   setStatus({ type, text }) {
@@ -113,11 +152,20 @@ export default class Baseline {
 
   // ── Action handler ────────────────────────────────────────────────────────
 
-  #onAction({ type, subjectCode }) {
+  #onAction({ type, subjectCode, name, fullVideo, durationSecs }) {
     switch (type) {
       case 'start':
+        if (this.#state !== STATE.IDLE || !this.#streamReady) break;
         if (subjectCode !== undefined) this.#subjectCode = subjectCode;
-        if (this.#state === STATE.IDLE && this.#streamReady) this.#begin();
+        if (name !== undefined) {
+          this.#name = CONFIG.NAMES.find((n) => n.label === name) ?? CONFIG.NAMES[0];
+        }
+        if (fullVideo !== undefined) this.#fullVideo = !!fullVideo;
+        if (durationSecs !== undefined) {
+          this.#customSecs = Number.isFinite(durationSecs) && durationSecs > 0
+            ? durationSecs : CONFIG.DURATION_SECS;
+        }
+        this.#begin();
         break;
       case 'abort':
         if (this.#state === STATE.PLAYING) this.#finish(true);
@@ -138,8 +186,15 @@ export default class Baseline {
     this.#pendingRows   = [];
     this.#lastFlush     = performance.now();
     this.#state         = STATE.PLAYING;
+
+    this.#endsWithVideo = this.#fullVideo && this.#videoAvailable;
+    this.#targetSecs    = this.#endsWithVideo ? this.#videoDurationSecs   // null if metadata not loaded yet
+                        : this.#fullVideo     ? CONFIG.DURATION_SECS      // no video: fallback length
+                        :                       this.#customSecs;
+
     this.#initCSV();
     this.#markers.send('baseline_start');
+    this.#markers.send(`baseline_name_${this.#name.slug}`);
 
     if (this.#videoAvailable) {
       // Swap to the video and stop the canvas draw loop from doing any work
@@ -147,19 +202,36 @@ export default class Baseline {
       this.#canvas.style.display = 'none';
       this.#video.style.display  = 'block';
       this.#video.currentTime = 0;
-      this.#video.play().catch((err) =>
-        console.error('[Baseline] video playback failed:', err)
-      );
+      this.#video.play().catch((err) => this.#onVideoFailed(`playback failed: ${err.message ?? err}`));
     }
 
     this.#pushState({
-      stateText:           'recording',
+      stateText:           `recording — ${this.#name.label}`,
       startEnabled:        false,
       abortVisible:        true,
       inputsLocked:        true,
       recordingStartedAt:  Date.now(),
-      duration:            CONFIG.DURATION_SECS,
+      duration:            this.#targetSecs,
     });
+  }
+
+  // The video can't (or can no longer) play while recording: keep recording
+  // on a timer instead, so the recording still ends on its own.
+  #onVideoFailed(reason) {
+    console.error('[Baseline] video:', reason);
+    if (this.#state !== STATE.PLAYING) return;
+    // Show the countdown instead of a dead video element.
+    this.#videoAvailable       = false;
+    this.#video.style.display  = 'none';
+    this.#canvas.style.display = 'block';
+    if (this.#endsWithVideo) {
+      this.#endsWithVideo = false;
+      this.#targetSecs    = this.#videoDurationSecs ?? CONFIG.DURATION_SECS;
+      this.#warning = `⚠ video ${reason} — recording ends after ${Math.round(this.#targetSecs)} s instead`;
+    } else {
+      this.#warning = `⚠ video ${reason} — recording continues (countdown shown)`;
+    }
+    this.#pushState({ duration: this.#targetSecs });
   }
 
   #finish(aborted = false) {
@@ -187,7 +259,8 @@ export default class Baseline {
     if (this.#state !== STATE.PLAYING) return;
     const now = performance.now();
     if (now - this.#lastFlush >= CONFIG.FLUSH_INTERVAL_MS) this.#flushRows();
-    if ((now - this.#startTime) / 1000 >= CONFIG.DURATION_SECS) this.#finish(false);
+    // Ending with the video is driven by its 'ended' event instead.
+    if (!this.#endsWithVideo && (now - this.#startTime) / 1000 >= this.#targetSecs) this.#finish(false);
   }
 
   // ── CSV output ────────────────────────────────────────────────────────────
@@ -195,10 +268,14 @@ export default class Baseline {
   // Main processes file IPC in order with synchronous fs calls, so the
   // header written here always lands before the first appended rows.
 
+  get #fileStem() {
+    return `${CONFIG.DATA_DIR}/${this.#subjectCode}_baseline_${this.#name.slug}`;
+  }
+
   #initCSV() {
-    this.#csvPath = `${CONFIG.DATA_DIR}/${this.#subjectCode}_baseline.csv`;
+    this.#csvPath = `${this.#fileStem}.csv`;
     if (!window.api) return;
-    window.api.writeCSV(this.#csvPath, 'timestamp,value\n').then((res) => {
+    window.api.writeCSV(this.#csvPath, 'timestamp,value,name\n').then((res) => {
       if (!res.ok) this.#csvError(`could not create ${this.#csvPath}: ${res.error}`);
     });
   }
@@ -245,13 +322,13 @@ export default class Baseline {
 
     const estimates = estimateBreathRate(values, sampleRate, { windowed: true });
 
-    const path   = `${CONFIG.DATA_DIR}/${this.#subjectCode}_baseline_estimates.csv`;
-    const header = 'method,hz,bpm\n';
+    const path   = `${this.#fileStem}_estimates.csv`;
+    const header = 'method,hz,bpm,name\n';
     const rows   = Object.entries(estimates)
       .map(([method, hz]) => {
         const hzStr  = hz !== null ? hz.toFixed(4)        : '';
         const bpmStr = hz !== null ? (hz * 60).toFixed(2) : '';
-        return `${method},${hzStr},${bpmStr}`;
+        return `${method},${hzStr},${bpmStr},${this.#name.label}`;
       })
       .join('\n') + '\n';
 
@@ -294,7 +371,8 @@ export default class Baseline {
       ctx.fillText('Standby', w / 2, h / 2);
 
     } else if (this.#state === STATE.PLAYING) {
-      const remaining = Math.max(0, CONFIG.DURATION_SECS - (now - this.#startTime) / 1000);
+      // Only drawn without a playing video, i.e. always on a timer.
+      const remaining = Math.max(0, (this.#targetSecs ?? CONFIG.DURATION_SECS) - (now - this.#startTime) / 1000);
       const mm = String(Math.floor(remaining / 60)).padStart(1, '0');
       const ss = String(Math.floor(remaining % 60)).padStart(2, '0');
       ctx.font      = '200 80px Nunito, sans-serif';
@@ -310,13 +388,19 @@ export default class Baseline {
 
   // ── Experimenter state push ───────────────────────────────────────────────
 
+  // Every push is a full snapshot. Abort's visibility is derived from the
+  // state, so a partial update (warning, video length) can't hide it; the
+  // status line repeats the last one sent unless overridden.
   #pushState(overrides = {}) {
+    if (overrides.stateText !== undefined) this.#stateText = overrides.stateText;
     window.api.frontend.sendState({
-      stateText:    this.#state,
       startEnabled: this.#state === STATE.IDLE && this.#streamReady,
-      abortVisible: false,
+      abortVisible: this.#state === STATE.PLAYING,
       warning:      this.#warning,   // included every push so it survives the 'ready' resync
+      videoAvailable:    this.#videoAvailable,
+      videoDurationSecs: this.#videoDurationSecs,
       ...overrides,
+      stateText:    this.#stateText,
     });
   }
 }
