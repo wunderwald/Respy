@@ -110,8 +110,8 @@ Written to `output_data/belt_training_game/<subjectCode>/`:
 
 - **`eventData.csv`** — `timestamp,trialIndex,phase,event,value1,value2`
   - `session_start` (value1 = scene id)
-  - `target_leave` (value1 = fraction of the target-crossing segment spent inside the green band, `0`–`1`)
-  - `trial_end`, `trial_abort`
+  - `target_leave` (value1 = fraction of the target-crossing segment spent inside the green band, `0`–`1`; empty if no frame was drawn inside the target zone, e.g. after a display stall — the event and the `target_enter/leave` markers are still written)
+  - `trial_end`; `trial_abort` (value1 = state it was aborted in: `countdown`, `training` or `test` — during the countdown before training 2 the `phase` column still says `training1`)
   - `session_closed` (value1 = state the window was closed in, e.g. `training`; the `phase` column says which pass)
 - **`frameData_trial<N>.csv`** — one file per trial, one row per drawn animation frame, `timestamp,trialIndex,phase,segment,breathRaw,breathSmoothed,breathNorm,normMin,normMax,fishX,fishY,targetY,smoothWindow`
   - `smoothWindow` is the breath-smoothing window (samples) used in this session — the **Smoothing** control

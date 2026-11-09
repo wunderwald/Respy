@@ -731,6 +731,13 @@ export default class IBreath {
       }
       // ITI / READY: nothing pending to clean up.
       this.#pausedFromState = null;
+
+      // The cleanup may have finished the *last* trial, i.e. #endExperiment
+      // already ran (experiment_done sent). Come back to DONE afterwards
+      // instead of ending the experiment a second time.
+      if (this.#state === STATE.DONE) {
+        this.#eyeCalReturn = { state: STATE.DONE, stateText: this.#hud.stateText };
+      }
     }
 
     this.#state = STATE.EYETRACK_CAL;

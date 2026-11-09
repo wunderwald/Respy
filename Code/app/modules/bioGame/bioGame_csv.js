@@ -34,19 +34,20 @@ export class BioGameCSV {
       console.warn('[CSV] window.api unavailable — file I/O disabled');
       return;
     }
-    const dir = `${CONFIG.DATA_DIR}/${this.#subjectCode}`;
-    const dirResult = await window.api.ensureDir(dir);
-    if (!dirResult.ok) { this.#warn(`Could not create data dir: ${dirResult.error}`); return; }
-
-    const evtPath = `${dir}/eventData.csv`;
-    const res = await window.api.writeCSV(evtPath, this.#eventHeader);
-    if (!res.ok) { this.#warn(`Could not init eventData.csv: ${res.error}`); return; }
-
-    // Write session metadata as the first event row
-    const meta = `${new Date().toISOString()},0,session_start,${this.#group},${this.#scene}\n`;
-    const res2 = await window.api.appendCSV(evtPath, meta);
-    if (!res2.ok) this.#warn(`Could not write session_start: ${res2.error}`);
-    else console.log(`[CSV] initialised ${evtPath}`);
+    // Header and first row are issued right away, with no await in between:
+    // main handles file IPC in order (synchronous fs calls), so they always
+    // land before any later write — even one sent right after Start. (A
+    // round trip first, e.g. a separate ensureDir, could let an early event
+    // through that the header write would then wipe.) writeCSV creates the
+    // folder.
+    const meta = this.#eventRow(0, 'session_start', this.#group, this.#scene);
+    const [res, res2] = await Promise.all([
+      window.api.writeCSV(this.#eventPath, this.#eventHeader),
+      window.api.appendCSV(this.#eventPath, meta),
+    ]);
+    if (!res.ok)       this.#warn(`Could not init eventData.csv: ${res.error}`);
+    else if (!res2.ok) this.#warn(`Could not write session_start: ${res2.error}`);
+    else console.log(`[CSV] initialised ${this.#eventPath}`);
   }
 
   async initBlockCSV(blockIndex) {

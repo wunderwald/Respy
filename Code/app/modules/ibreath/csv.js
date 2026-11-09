@@ -51,20 +51,13 @@ export class IBreathCSV {
       console.warn('[CSV] window.api not available — file I/O disabled');
       return;
     }
-    const dir = `${CONFIG.DATA_DIR}/${this.#subjectCode}`;
-
-    const dirResult = await window.api.ensureDir(dir);
-    if (!dirResult.ok) {
-      this.#warn(`Could not create data dir: ${dirResult.error}`);
-      return;
-    }
-
-    const trialFile = `${dir}/trialData.csv`;
-    const result = await window.api.writeCSV(trialFile, this.#trialHeader);
+    // Issued right away (no ensureDir round trip first — writeCSV creates the
+    // folder), so the header always lands before any trial row.
+    const result = await window.api.writeCSV(this.#trialPath, this.#trialHeader);
     if (!result.ok) {
       this.#warn(`Could not init trialData.csv: ${result.error}`);
     } else {
-      console.log(`[CSV] initialised ${trialFile}`);
+      console.log(`[CSV] initialised ${this.#trialPath}`);
     }
   }
 

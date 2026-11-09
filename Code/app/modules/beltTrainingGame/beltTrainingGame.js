@@ -419,7 +419,9 @@ export default class BeltTrainingGame {
   #abortTrial() {
     this.#csv?.flushFrames(this.#trialIndex);
     this.#markers.send(`trial_abort_t${this.#trialIndex}`);
-    this.#csv?.appendEvent(this.#trialIndex, this.#phaseLabel, 'trial_abort');
+    // value1 = state aborted in ('countdown' | 'training' | 'test'): during the
+    // countdown before training 2, the phase column still says 'training1'.
+    this.#csv?.appendEvent(this.#trialIndex, this.#phaseLabel, 'trial_abort', this.#state);
     this.#sound?.stopBlock();  // no-op if the soundscape wasn't playing
     this.#pendingStep = null;
 
@@ -487,8 +489,13 @@ export default class BeltTrainingGame {
 
     if (inGameplay) {
       this.#updatePhase(now, dt);
-      this.#recordFrame();
-      this.#sound.setNoiseLevel(this.#avatarNormY);
+      // #updatePhase may just have ended the phase (and flushed its rows):
+      // only record while still in a phase, or a row would leak into the
+      // next flush — after the test, into the next trial's file.
+      if (this.#state === STATE.TRAINING || this.#state === STATE.TEST) {
+        this.#recordFrame();
+        this.#sound.setNoiseLevel(this.#avatarNormY);
+      }
     }
 
     try {
@@ -541,16 +548,22 @@ export default class BeltTrainingGame {
     }
 
     if (newSegment !== this.#segment) {
-      if (this.#segment === 'approach' && newSegment === 'target') {
+      // Compare positions in the segment order, so a stalled frame that
+      // jumps straight from 'approach' to 'exit' (or past the end) still
+      // produces target_enter + target_leave and the phase's event row.
+      const ORDER = ['approach', 'target', 'exit', null];
+      const from = ORDER.indexOf(this.#segment), to = ORDER.indexOf(newSegment);
+      if (from < 1 && to >= 1) {
         this.#markers.send(`target_enter_t${this.#trialIndex}`);
         this.#segGreenTime = 0;
         this.#segTotalTime = 0;
         if (this.#phase === 'test') this.#bestTargetDistance = Infinity;
       }
-      if (this.#segment === 'target' && newSegment !== 'target') {
-        const greenFraction = this.#segTotalTime > 0 ? this.#segGreenTime / this.#segTotalTime : 0;
+      if (from <= 1 && to >= 2) {
+        // Empty if no frame was drawn inside the target zone at all.
+        const greenFraction = this.#segTotalTime > 0 ? (this.#segGreenTime / this.#segTotalTime).toFixed(3) : '';
         this.#markers.send(`target_leave_t${this.#trialIndex}`);
-        this.#csv.appendEvent(this.#trialIndex, this.#phaseLabel, 'target_leave', greenFraction.toFixed(3));
+        this.#csv.appendEvent(this.#trialIndex, this.#phaseLabel, 'target_leave', greenFraction);
       }
       this.#segment = newSegment;
     }
