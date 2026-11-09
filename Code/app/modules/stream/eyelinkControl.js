@@ -8,6 +8,20 @@
 
 export const EYELINK_OFFLINE = 'offline';
 
+// Bridge states grouped by what the app does with them. Keep every
+// state-based decision on these sets, so a new bridge state only has to be
+// added here.
+//
+// Bridge unreachable or going away: it accepts no more commands. The bridge
+// only sends 'aborted' while shutting down (shutdown / Ctrl+C during a
+// calibration), so it counts as gone as well.
+export const EYELINK_UNAVAILABLE_STATES = new Set([EYELINK_OFFLINE, 'disconnected', 'aborted']);
+// EyeLink setup mode: 'setup' = waiting for the operator (C/V/Esc on the
+// Host PC), 'calibrating' = targets on screen.
+export const EYELINK_SETUP_STATES = new Set(['setup', 'calibrating']);
+// Calibration finished and the tracker is usable.
+export const EYELINK_CALIBRATED_STATES = new Set(['calibrated', 'recording']);
+
 export class EyeLinkControl {
   #ws = null;
   #url;

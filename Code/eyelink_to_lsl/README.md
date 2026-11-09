@@ -109,7 +109,7 @@ The keys work on the Host PC, or on this PC while the calibration window has foc
 
 Either way, the operator still has to accept and exit setup (Esc) on the Host PC.
 
-**Ending a calibration without the operator.** Disconnecting the app doesn't affect a running calibration: the calibration window is part of the bridge and stays up until the operator exits setup. To stop the bridge in the middle of a calibration, send `shutdown` or press **Ctrl+C** in its console (press twice to force). Either one aborts setup mode via `abort_setup()`, which calls `exitCalibration()` and falls back to Esc key presses, then shuts down cleanly with the EDF transfer. An aborted calibration is reported as state `aborted`, and the tracker keeps its previous calibration.
+**Ending a calibration without the operator.** Disconnecting the app doesn't affect a running calibration: the calibration window is part of the bridge and stays up until the operator exits setup. To stop the bridge in the middle of a calibration, send `shutdown` or press **Ctrl+C** in its console (press twice to force). Either one aborts setup mode via `abort_setup()`, which calls `exitCalibration()` and falls back to Esc key presses, then shuts down cleanly with the EDF transfer. An aborted calibration is reported as state `aborted`: a calibration in progress is discarded and the tracker keeps the last accepted one. Recording is not resumed and the bridge exits. A `calibrate` that was queued but hadn't started yet is skipped and also reported as `aborted`.
 
 ## Recalibration mid-experiment
 
@@ -153,7 +153,7 @@ On startup it opens the PsychoPy window and the control WebSocket (default `ws:/
 | `status` | Request an immediate status snapshot. |
 | `shutdown` | Stop recording, transfer the EDF file, disconnect the tracker, and exit. If a calibration is running, it's cut short first. |
 
-A status snapshot (`state` ∈ `idle`, `connecting`, `connected`, `setup`, `calibrating`, `calibrated`, `recording`, `stopped`, `disconnected`) is sent to every client on connect and broadcast to all connected clients whenever the bridge's lifecycle state changes — so a client doesn't need to poll to know when a recalibration it triggered has finished.
+A status snapshot (`state` ∈ `idle`, `connecting`, `connected`, `setup`, `calibrating`, `calibrated`, `aborted` (shutdown cut a calibration short), `recording`, `stopped`, `disconnected`) is sent to every client on connect and broadcast to all connected clients whenever the bridge's lifecycle state changes — so a client doesn't need to poll to know when a recalibration it triggered has finished.
 
 ---
 
@@ -176,6 +176,8 @@ bridge = EyeLinkLSLBridge(
     display=MyDisplay(),
 )
 ```
+
+The bridge also uses a few optional hooks when the display has them: `begin_setup()`, `end_setup()`, `request_abort()`, `abort_delivered` and `on_first_target`. Their contracts are documented on the `CalibrationDisplay` protocol in `eyelink_to_lsl.py`. Without `request_abort()`, `shutdown` / Ctrl+C can't end a running calibration, so the operator has to exit setup on the Host PC first. If you need these features, copy the hooks from `PsychopyCalibrationDisplay`.
 
 `PsychopyCalibrationDisplay` draws a white filled circle with a black centre dot, forwards arrow/enter/escape key presses to the Host, and restores the background colour between targets. Adjust `TARGET_OUTER_RADIUS`, `TARGET_INNER_RADIUS`, `TARGET_COLOR_OUTER/INNER`, and `BG_COLOR` as class attributes if needed.
 

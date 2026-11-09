@@ -57,6 +57,32 @@ class CalibrationDisplay(Protocol):
     """
     Minimal interface the bridge needs from a calibration display.
     Implement this to use a renderer other than PsychoPy.
+
+    Optional hooks. The bridge looks them up with getattr(), so a display
+    without them still works but loses the matching feature.
+    PsychopyCalibrationDisplay implements all of them; copy from there:
+
+      begin_setup(start_calibration: bool) -> None
+          Called right before doTrackerSetup(). Must reset per-setup state,
+          including an earlier abort request, and if `start_calibration` is
+          set, inject a 'c' key press. Without it: no auto-start of calibration.
+      end_setup() -> None
+          Called after doTrackerSetup() returns, and also when setup is
+          aborted or skipped. Must clear the abort request so later pylink
+          calls stop receiving Esc.
+      request_abort() -> None
+          Thread-safe and safe to call from a signal handler: only set a
+          flag, then act on it from get_input_key() (exitCalibration() / Esc)
+          on the main thread. Without it, `shutdown` / Ctrl+C can't end a
+          running setup; the operator has to exit setup on the Host PC first.
+      abort_delivered: bool (attribute or property)
+          True once get_input_key() has actually acted on request_abort()
+          during the current setup. This lets the bridge tell a real abort
+          apart from a request that arrived while setup was already ending.
+          Without it, any abort request during setup is reported as "aborted".
+      on_first_target: Callable[[], None] | None (attribute)
+          Assigned by the bridge; call it when the first calibration target
+          is drawn. Without it: no "calibrating" state.
     """
     def setup(self, tracker: pylink.EyeLink) -> None: ...
     def teardown(self) -> None: ...
@@ -209,8 +235,14 @@ class PsychopyCalibrationDisplay(pylink.EyeLinkCustomDisplay):
         possible. Only sets a flag — the actual abort happens on the main
         thread in get_input_key() (exitCalibration() + Esc presses as a
         fallback: Esc aborts a running calibration, a second Esc leaves setup).
+        end_setup() and begin_setup() clear the flag again.
         """
         self._abort_requested = True
+
+    @property
+    def abort_delivered(self) -> bool:
+        """True once get_input_key() has acted on request_abort() in this setup."""
+        return self._abort_sent
 
     def _abort_keys(self):
         if not self._abort_sent:
@@ -223,7 +255,10 @@ class PsychopyCalibrationDisplay(pylink.EyeLinkCustomDisplay):
         return [pylink.KeyInput(pylink.ESC_KEY, 0)]
 
     def end_setup(self) -> None:
-        """Called by the bridge after doTrackerSetup() returns."""
+        """Called by the bridge after doTrackerSetup() returns (or setup is skipped)."""
+        # Stop answering get_input_key() with Esc: other pylink calls that
+        # poll it outside setup mode must get the operator's real keys.
+        self._abort_requested = False
         # exit_cal_display() normally hides the window already; make sure,
         # including after an abort.
         self._set_window_visible(False)
@@ -372,8 +407,8 @@ class EyeLinkLSLBridge:
             raise ValueError("Provide either `window` or a custom `display`.")
 
         self._tracker: pylink.EyeLink | None = None
-        self._in_setup = False         # True while doTrackerSetup() is running
-        self._setup_aborted = False
+        self._in_setup = False         # True while doTrackerSetup() is (about to be) running
+        self._abort_pending = False    # sticky; set by abort_setup()
         self._outlet: StreamOutlet | None = None
         self._thread: threading.Thread | None = None
         self._running = False
@@ -428,7 +463,7 @@ class EyeLinkLSLBridge:
         log.info("Connected.")
         self._emit_state("connected")
 
-    def calibrate(self, start_calibration: bool = False) -> None:
+    def calibrate(self, start_calibration: bool = False) -> bool:
         """
         Enter EyeLink setup mode and block until the operator leaves it.
 
@@ -438,12 +473,14 @@ class EyeLinkLSLBridge:
           "setup"        — in setup mode, waiting for the operator
           "calibrating"  — first calibration/validation target drawn
           "calibrated"   — setup mode exited
-          "aborted"      — setup was cut short via abort_setup(); the
-                           tracker keeps its previous calibration (if any)
+          "aborted"      — setup was cut short (or never entered) because
+                           abort_setup() was called; a calibration in progress
+                           is discarded, the tracker keeps the last accepted one
         With `start_calibration=True` a C key press is injected so targets
         appear immediately (skips camera setup — the operator can still press
         Esc to go back to it).
 
+        Returns True if the operator exited setup, False if it was aborted.
         Must be called from the thread that created the calibration window.
         """
         log.info("Entering EyeLink setup (start_calibration=%s) ...", start_calibration)
@@ -454,59 +491,81 @@ class EyeLinkLSLBridge:
             log.warning("Custom display has no begin_setup(); can't auto-start calibration.")
         if hasattr(self._display, "on_first_target"):
             self._display.on_first_target = lambda: self._emit_state("calibrating")
-        self._setup_aborted = False
+
+        # Set _in_setup *before* checking _abort_pending; abort_setup() does
+        # the reverse (sets _abort_pending, then reads _in_setup). That way a
+        # concurrent abort is never lost: either we see it here and skip
+        # setup, or abort_setup() sees _in_setup and signals the display.
+        # Its flag can't be cleared by begin_setup() anymore, because that
+        # already ran above.
         self._in_setup = True
+        if self._abort_pending:
+            self._in_setup = False
+            self._end_display_setup()
+            log.warning("Setup aborted before it started — shutdown requested.")
+            self._emit_state("aborted")
+            return False
+
         self._emit_state("setup")
         try:
             self._tracker.doTrackerSetup()
         finally:
             self._in_setup = False
-            end = getattr(self._display, "end_setup", None)
-            if end is not None:
-                end()
-        if self._setup_aborted:
-            log.warning("Setup aborted — calibration not completed.")
+            # Read this before end_setup(): did an abort actually reach
+            # pylink, or did the request only arrive while setup was already
+            # ending (operator accepted / pressed Esc at the same moment)?
+            delivered = getattr(self._display, "abort_delivered", None)
+            self._end_display_setup()
+        aborted = self._abort_pending if delivered is None else bool(delivered)
+        if aborted:
+            log.warning("Setup aborted — in-progress calibration discarded.")
             self._emit_state("aborted")
-        else:
-            log.info("Setup exited — calibration complete.")
-            self._emit_state("calibrated")
-
-    @property
-    def in_setup(self) -> bool:
-        """True while calibrate() is blocked in EyeLink setup mode."""
-        return self._in_setup
+            return False
+        log.info("Setup exited — calibration complete.")
+        self._emit_state("calibrated")
+        return True
 
     def abort_setup(self) -> bool:
         """
-        Thread-safe: make a running calibrate() return without waiting for
-        the operator (e.g. the controlling app went away, or shutdown was
-        requested). Returns False if not in setup mode or the display can't
-        abort (custom display without request_abort()).
+        Thread-safe, and safe to call from a signal handler: end EyeLink
+        setup mode for good. Meant for shutdown. A running calibrate()
+        returns as soon as possible without waiting for the operator, and
+        every later calibrate() returns immediately. Both report "aborted".
+
+        Returns True if a running setup was signalled, False if none was
+        running or the display can't abort (custom display without
+        request_abort()). Later calibrate() calls are skipped either way.
         """
+        # Order matters; see the matching comment in calibrate().
+        self._abort_pending = True
         if not self._in_setup:
             return False
         req = getattr(self._display, "request_abort", None)
         if req is None:
-            log.warning("Display has no request_abort(); can't abort setup mode.")
+            log.warning("Display has no request_abort(); can't abort setup mode. "
+                        "Exit setup on the Host PC.")
             return False
         log.info("Aborting EyeLink setup mode ...")
-        self._setup_aborted = True
         req()
         return True
 
     def recalibrate(self, start_calibration: bool = True) -> None:
         """
         Pause recording (if running), calibrate, and resume recording.
-        Blocking. Like calibrate(), must be called from the thread that
-        created the calibration window — never from the pump thread.
+        Recording is *not* resumed if setup was aborted (shutdown in
+        progress). Blocking. Like calibrate(), must be called from the thread
+        that created the calibration window — never from the pump thread.
         By default skips camera setup and goes straight to the targets.
         """
         was_recording = self._running
         if was_recording:
             self.stop()
-        self.calibrate(start_calibration)
+        completed = self.calibrate(start_calibration)
         if was_recording:
-            self.start()
+            if completed:
+                self.start()
+            else:
+                log.info("Not resuming recording after aborted setup.")
 
     def start(self) -> None:
         """Start EyeLink recording and launch the background LSL pump thread."""
@@ -556,6 +615,11 @@ class EyeLinkLSLBridge:
     # ------------------------------------------------------------------ #
     #  Internal                                                            #
     # ------------------------------------------------------------------ #
+
+    def _end_display_setup(self) -> None:
+        end = getattr(self._display, "end_setup", None)
+        if end is not None:
+            end()
 
     def _emit_state(self, state: str) -> None:
         if self._on_state is None:

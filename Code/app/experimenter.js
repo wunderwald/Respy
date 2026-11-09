@@ -1,5 +1,7 @@
 // Experimenter control window — stream selection + frontend-specific controls.
 import { StreamManager } from './modules/stream/stream.js';
+import { EYELINK_OFFLINE, EYELINK_UNAVAILABLE_STATES, EYELINK_SETUP_STATES }
+  from './modules/stream/eyelinkControl.js';
 import { CONFIG }        from './modules/ibreath/config.js';
 import { CONFIG as BG }  from './modules/bioGame/bioGame_config.js';
 import { CONFIG as BTG } from './modules/beltTrainingGame/beltTrainingGame_config.js';
@@ -192,18 +194,21 @@ if (frontend === 'ibreath') {
   // ── Receive state from scene window ─────────────────────────────────────────
 
   let gazeCalibrating  = false;
-  let eyelinkState     = 'offline';
+  let eyelinkState     = EYELINK_OFFLINE;
   let eyelinkRecording = false;
+
+  const EYELINK_LABELS = {
+    setup:   'setup — waiting for operator',
+    aborted: 'aborted — bridge shutting down',
+  };
 
   // Eye-tracker buttons only make sense while the bridge's control socket is
   // up and it isn't busy connecting / calibrating.
   function updateEyelinkControls() {
-    const online = eyelinkState !== 'offline' && eyelinkState !== 'disconnected';
-    // 'setup' = EyeLink setup mode, waiting for the operator (C/V/Esc on the
-    // Host PC); 'calibrating' = targets are on screen.
-    const inSetup = eyelinkState === 'setup' || eyelinkState === 'calibrating';
+    const online  = !EYELINK_UNAVAILABLE_STATES.has(eyelinkState);
+    const inSetup = EYELINK_SETUP_STATES.has(eyelinkState);
     const busy    = gazeCalibrating || inSetup || eyelinkState === 'connecting';
-    const label   = eyelinkState === 'setup' ? 'setup — waiting for operator' : eyelinkState;
+    const label   = EYELINK_LABELS[eyelinkState] ?? eyelinkState;
     eyelinkStateEl.textContent   = eyelinkRecording && eyelinkState !== 'recording'
       ? `${label} (recording)` : label;
     eyelinkHintEl.style.display  = inSetup ? '' : 'none';

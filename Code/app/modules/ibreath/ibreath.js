@@ -27,7 +27,10 @@ import { LocalHud } from './hud.js';
 import { IBreathRenderer } from './ibreath_renderer.js';
 import { IBreathCSV } from './csv.js';
 import { MarkerStream } from '../stream/markerStream.js';
-import { EyeLinkControl, EYELINK_OFFLINE } from '../stream/eyelinkControl.js';
+import {
+  EyeLinkControl, EYELINK_OFFLINE,
+  EYELINK_UNAVAILABLE_STATES, EYELINK_SETUP_STATES, EYELINK_CALIBRATED_STATES,
+} from '../stream/eyelinkControl.js';
 
 export { CONFIG };
 
@@ -595,7 +598,7 @@ export default class IBreath {
     this.#hud.stateText = !this.#streamReady
       ? this.#respStatusText
       : !eyelinkOk
-        ? (this.#eyelinkState === EYELINK_OFFLINE
+        ? (EYELINK_UNAVAILABLE_STATES.has(this.#eyelinkState)
             ? 'waiting for eye tracker bridge (run_bridge.py)…'
             : 'waiting for eye tracker calibration…')
         : 'stream ready';
@@ -606,17 +609,19 @@ export default class IBreath {
     this.#hud.eyelinkState     = status.state;
     this.#hud.eyelinkRecording = !!status.recording;
     // A fresh, working status clears any stale startup error.
-    if (status.state !== EYELINK_OFFLINE && status.state !== 'disconnected') this.#hud.eyelinkError = '';
-    this.#eyelinkReady = status.state === 'calibrated' || status.state === 'recording';
+    const unavailable = EYELINK_UNAVAILABLE_STATES.has(status.state);
+    if (!unavailable) this.#hud.eyelinkError = '';
+    this.#eyelinkReady = EYELINK_CALIBRATED_STATES.has(status.state);
     this.#updateIdleReadiness();
 
     if (this.#state !== STATE.EYETRACK_CAL) return;
-    if (status.state === 'setup' || status.state === 'calibrating') {
+    if (EYELINK_SETUP_STATES.has(status.state)) {
       this.#eyelinkCalSeen = true;
-    } else if (status.state === 'disconnected' || status.state === EYELINK_OFFLINE) {
-      // Bridge went away mid-calibration — don't leave the scene minimized forever.
+    } else if (unavailable) {
+      // Bridge went away (or is shutting down) mid-calibration — don't leave
+      // the scene minimized forever.
       this.#finishEyeCalibration();
-    } else if (this.#eyelinkCalSeen && ['calibrated', 'recording', 'aborted'].includes(status.state)) {
+    } else if (this.#eyelinkCalSeen && EYELINK_CALIBRATED_STATES.has(status.state)) {
       // Only finish once *this* calibration has actually run: a status
       // snapshot of the pre-calibration state ('recording') can arrive
       // right after the command was sent.

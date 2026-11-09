@@ -32,10 +32,13 @@ console shuts it down cleanly, also during calibration.
 
 Server -> client (JSON):
   {"type": "status", "state": "idle"|"connecting"|"connected"|"setup"|"calibrating"|"calibrated"|
-                               "recording"|"stopped"|"disconnected",
+                               "aborted"|"recording"|"stopped"|"disconnected",
    "recording": bool, "host_ip": str, "edf_filename": str,
    "sample_rate": float, "screen_w": int, "screen_h": int}
   {"type": "error", "message": str}
+'aborted' is only sent during shutdown: a calibration that was running (or
+about to start) when shutdown / Ctrl+C arrived was cut short. The bridge
+exits right after; recording is not resumed.
 
 A status snapshot is sent to every client on connect and broadcast to all
 connected clients whenever the bridge's lifecycle state changes (and once
