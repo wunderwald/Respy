@@ -789,3 +789,21 @@ if (frontend === 'ibreath') {
 } else {
   statsEl.style.display = 'none';
 }
+
+// ── Back to menu (launcher mode) ──────────────────────────────────────────────
+//
+// Main only forwards session:ended when the app was started from the
+// launcher, so this button never appears for direct `npm run <frontend>`
+// launches. The scene keeps showing its end screen until it's clicked.
+
+window.api.session.onEnded(() => {
+  if (document.getElementById('back-to-menu-btn')) return;
+  const btn = document.createElement('button');
+  btn.id          = 'back-to-menu-btn';
+  btn.textContent = 'Back to menu';
+  btn.addEventListener('click', () => {
+    btn.disabled = true;
+    window.api.session.backToMenu();
+  });
+  (document.getElementById('ib-controls') ?? statsEl).appendChild(btn);
+});

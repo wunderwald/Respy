@@ -400,6 +400,8 @@ export default class BeltTrainingGame {
     this.#state = STATE.DONE;
     this.#markers.send('experiment_done');
     this.#pushState({ stateText: 'done', nextVisible: false, abortVisible: false });
+    // All final writes were dispatched at phase end / abort → experimenter may go back to the menu.
+    window.api.session.ended();
   }
 
   // ── Update loop ───────────────────────────────────────────────────────────

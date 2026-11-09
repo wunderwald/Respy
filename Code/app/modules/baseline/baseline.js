@@ -175,7 +175,10 @@ export default class Baseline {
     this.#pushState({ stateText: aborted ? 'aborted' : 'done', abortVisible: false });
     this.#flushRows();
     console.log(`[Baseline] recorded ${this.#values.length} samples → ${this.#csvPath}`);
-    this.#writeEstimates();
+    // Offer "Back to menu" only once the estimates are on disk too.
+    this.#writeEstimates()
+      .catch((e) => console.error('[Baseline] estimates failed:', e))
+      .finally(() => window.api.session.ended());
   }
 
   // ── Tick (duration check, periodic flush) ─────────────────────────────────

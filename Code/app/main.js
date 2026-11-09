@@ -8,6 +8,10 @@ let mainWindow     = null;
 let controlWindow  = null;
 let launcherWindow = null;
 
+// True when started without --frontend (`npm run start`): sessions are
+// picked from the launcher, and ending one returns to it instead of quitting.
+let launcherMode = false;
+
 // ── Python bridge ────────────────────────────────────────────────────────────
 
 function startBridge() {
@@ -215,9 +219,52 @@ function createControlWindow(frontend) {
   controlWindow.loadFile("experimenter.html", { query: { frontend } });
   controlWindow.on("closed", () => {
     controlWindow = null;
-    app.quit();
+    onExperimentWindowClosed();
   });
 }
+
+// ── Session end / back to launcher ────────────────────────────────────────────
+//
+// Direct launch (`npm run <frontend>`): closing either experiment window
+// quits the app, as before.
+//
+// Launcher mode: closing either experiment window ends (aborts) the session
+// and returns to the launcher. The frontends' 'pagehide' handlers save
+// whatever is still in memory. When a session ends on its own, the scene
+// window calls session.ended(); the experimenter window then shows a
+// "Back to menu" button (session:back-to-menu). Quitting = closing the launcher.
+//
+// The launcher is opened *before* the experiment windows close, so the app
+// never has zero windows. Otherwise 'window-all-closed' would quit it and kill
+// the LSL bridge process, closing its RespFishMarkers outlet. That outlet must
+// stay open across sessions (e.g. for one continuous LabRecorder recording).
+
+function onExperimentWindowClosed() {
+  if (!launcherMode) {
+    app.quit();
+    return;
+  }
+  returnToLauncher();
+}
+
+function returnToLauncher() {
+  if (!launcherWindow) createLauncherWindow();
+  // close() (not destroy()) so each window's 'pagehide' handler runs and
+  // flushes its data. Each 'closed' handler re-enters here; that's a no-op
+  // once the launcher exists and the window is gone.
+  mainWindow?.close();
+  controlWindow?.close();
+}
+
+// Scene window: the session is over and its final writes are dispatched.
+ipcMain.on("session:ended", () => {
+  if (launcherMode) controlWindow?.webContents.send("session:ended");
+});
+
+// Experimenter window: "Back to menu" clicked.
+ipcMain.on("session:back-to-menu", () => {
+  if (launcherMode) returnToLauncher();
+});
 
 // Relay: scene window → experimenter window
 ipcMain.on("hud:state", (_event, data) => {
@@ -297,7 +344,7 @@ function createWindow(frontend) {
   mainWindow.loadFile("index.html", { query: { frontend } });
   mainWindow.on("closed", () => {
     mainWindow = null;
-    app.quit();
+    onExperimentWindowClosed();
   });
 }
 
@@ -385,8 +432,13 @@ app.whenReady().then(() => {
     }, 600);
   } else {
     // No frontend specified — show the launcher so the user can choose.
+    // Persistent listener: the launcher comes back after every session.
+    launcherMode = true;
     createLauncherWindow();
-    ipcMain.once("launcher:select", (_event, chosen) => launchFrontend(chosen));
+    ipcMain.on("launcher:select", (_event, chosen) => {
+      if (mainWindow || controlWindow) return;   // a session is still open / closing
+      launchFrontend(chosen);
+    });
   }
 
   app.on("activate", () => {

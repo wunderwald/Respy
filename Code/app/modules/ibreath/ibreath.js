@@ -747,6 +747,9 @@ export default class IBreath {
     this.#hud.pauseVisible = false;
     this.#hud.stateText    = 'experiment complete';
     this.#hud.trialText    = `${this.#trials.length} / ${this.#trials.length}`;
+    // The last trial's rows were dispatched in #endTrial / #onResponse →
+    // experimenter may go back to the menu.
+    window.api.session.ended();
   }
 
   // ── Window closing ─────────────────────────────────────────────────────

@@ -388,6 +388,8 @@ export default class BioGame {
     this.#markers.send('experiment_done');
     const total = this.#scoreBlock.reduce((a, b) => a + b, 0);
     this.#pushState({ stateText: 'done', abortVisible: false, nextVisible: false, score: total });
+    // All final writes were dispatched by #endBlock → experimenter may go back to the menu.
+    window.api.session.ended();
   }
 
   // ── Update loop ───────────────────────────────────────────────────────────

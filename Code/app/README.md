@@ -28,6 +28,14 @@ npm run beltTrainingGame  # belt training game
 npm run visualizer        # real-time waveform
 ```
 
+**Sessions from the start screen** (`npm start` only):
+- When a session ends (finished, or its last game/trial aborted, or a baseline recording stopped), the end screen stays up and the experimenter window shows **Back to menu**. Clicking it closes both windows and reopens the start screen, ready for the next session.
+- Closing either experiment window mid-session ends the session early: unsaved data is written first (see each frontend's docs), then the start screen comes back.
+- To quit the app, close the start screen.
+- The LSL bridge process, and with it the `RespFishMarkers` outlet, stays up across sessions, so one LabRecorder recording can span several sessions.
+
+With the direct-launch shortcuts, closing either window quits the app, as before.
+
 ---
 
 ## Modules

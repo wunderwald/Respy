@@ -121,6 +121,16 @@ contextBridge.exposeInMainWorld("api", {
     select: (frontend) => ipcRenderer.send('launcher:select', frontend),
   },
 
+  // Session lifecycle (launcher mode only — no-ops for direct launches)
+  session: {
+    // Scene window: the session is over and its final file writes are sent.
+    ended:      ()   => ipcRenderer.send('session:ended'),
+    // Experimenter window: notified of the above → show "Back to menu".
+    onEnded:    (cb) => ipcRenderer.on('session:ended', () => cb()),
+    // Experimenter window: close both experiment windows, reopen the launcher.
+    backToMenu: ()   => ipcRenderer.send('session:back-to-menu'),
+  },
+
   // Frontend IPC — scene window pushes state, experimenter window sends actions
   frontend: {
     sendState:  (data) => ipcRenderer.send('frontend:state', data),
