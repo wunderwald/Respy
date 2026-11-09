@@ -5,7 +5,7 @@
   "useEyeTracking": true,
   "numTrials": 80,
   "questions": [
-    { "id": "sync",        "probability": 0.8, "text": "Was the fish in sync with your breathing?",   "answers": ["yes", "no"] },
+    { "id": "sync",        "probability": 0.8, "text": "Was the fish in sync with your heartbeat?",   "answers": ["yes", "no"] },
     { "id": "placeholder", "probability": 0.2, "text": "Placeholder question — replace before use",   "answers": ["yes", "no"] }
   ],
   "configOverrides": {

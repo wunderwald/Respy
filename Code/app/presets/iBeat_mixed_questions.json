@@ -4,7 +4,7 @@
   "inputSignalType": "peaksOnly",
   "numTrials": 80,
   "questions": [
-    { "id": "sync",  "probability": 0.5,    "text": "Was the fish in sync with your breathing?",   "answers": ["yes", "no"] },
+    { "id": "sync",  "probability": 0.5,    "text": "Was the fish in sync with your heartbeat?",   "answers": ["yes", "no"] },
     { "id": "flash", "probability": 0.1667, "text": "Did you see the pink fish flashing?",          "answers": ["yes", "no"] },
     { "id": "lr",    "probability": 0.1667, "text": "Was the fish left or right?",                  "answers": ["left", "right"] },
     { "id": "img",   "probability": 0.1667, "text": "Did you see the pufferfish or the starfish?",  "answers": ["pufferfish", "starfish"] }

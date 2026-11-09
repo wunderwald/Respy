@@ -4,7 +4,7 @@
   "inputSignalType": "peaksOnly",
   "numTrials": 80,
   "questions": [
-    { "id": "sync", "probability": 1, "text": "Was the fish in sync with your breathing?", "answers": ["yes", "no"] }
+    { "id": "sync", "probability": 1, "text": "Was the fish in sync with your heartbeat?", "answers": ["yes", "no"] }
   ],
   "configOverrides": {
     "PEAK_SWELL_MS": 80,
