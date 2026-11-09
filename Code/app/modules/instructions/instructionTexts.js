@@ -11,7 +11,7 @@ export const INSTRUCTIONS = {
   calibration({ signal = 'physiological' } = {}) {
     const lines = signal === 'peaksOnly'
       ? ['Sitz ruhig und entspann dich.']
-      : ['Sitz ruhig und atme ganz entspannt.', 'Atme einfach so wie immer.'];
+      : ['Sitz ruhig und atme ganz entspannt.'];
     return { title: 'Mach dich bereit!', lines };
   },
 
