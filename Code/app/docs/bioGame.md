@@ -20,7 +20,7 @@ Two windows open:
 
 | Control | What it does |
 |---|---|
-| **Subject** | Type the subject code before pressing Start. Locked once calibration begins. |
+| **Subject** | Type the subject code before pressing Start. Locked once calibration begins. Only letters, digits, `-` and `_` (empty = `TEST`); anything else shows a red hint under the field and disables Start. If data for this code already exists, an amber hint warns that Start will overwrite it (Start stays enabled). |
 | **Group** | *Target (slow 6 BPM)* — fish follows a 6 BPM breath curve, starfish appear on that curve. *Control (natural)* — curve uses the participant's natural BPM (set the BPM field). |
 | **Natural BPM** | Only visible in the natural condition. Sets the target curve frequency. Filled in automatically from the subject's **Resting** baseline (the average of the methods in `output_data/baseline/<subject>_baseline_resting_estimates.csv` within 4–25 BPM; older recordings without a name: `<subject>_baseline_estimates.csv`), re-checked whenever the subject code changes. Other baselines (Post slow, …) are never used. Without a Resting baseline, enter it manually. |
 | **Show target curve** | Overlays the sinusoidal target curve on screen (for debugging / operator monitoring). |
@@ -110,14 +110,14 @@ cd resp && python mouse_y_to_lsl.py
 
 Saved to `output_data/bio_game/<SUBJECT_CODE>/`.
 
-### Frame data — `frameData_block<N>.csv`
+### Frame data — `frameData_block<N>.csv` (N = 1, 2, …)
 
 One row per simulation frame (`SIM_FPS`, 60 per second) during game N.
 
 | Column | Description |
 |---|---|
 | `timestamp` | ISO-8601 wall-clock time the frame was simulated (frames caught up after a stall share a timestamp) |
-| `blockIndex` | 0 = Game 1, 1 = Game 2, … |
+| `blockIndex` | 1 = Game 1, 2 = Game 2, … (1-based) |
 | `frame` | Simulation frame number within the game (1, 2, …) |
 | `blockTime` | Game time in seconds, `frame / SIM_FPS` |
 | `drawn` | `1` if a rendered frame showed this step as its newest state, `0` if the display skipped it (slow rendering, a stall, or the game's last step). At display rate ≈ `SIM_FPS`, an occasional `0` from timing jitter is normal. |
@@ -132,11 +132,13 @@ One row per simulation frame (`SIM_FPS`, 60 per second) during game N.
 
 ### Events — `eventData.csv`
 
+Session settings rows: `target_bpm` (6 in the slow group, else the entered natural BPM), `show_curve`, `calibration_secs`, `smooth_window`, `num_blocks`, `block_duration_secs`, `sim_fps`.
+
 | Column | Description |
 |---|---|
 | `timestamp` | ISO-8601 wall-clock time |
-| `blockIndex` | 0 / 1 / … |
-| `event` | `session_start`, `item_collect`, `item_miss`, `block_end`, `block_abort`, `frame_drop_warning`, `frame_drop_recovered`, `session_closed` |
+| `blockIndex` | 1 / 2 / … (1-based); empty for session-level rows (`session_start`, `setting`, calibration) |
+| `event` | `session_start`, `setting` (session settings, written right after `session_start`: value1 = name, value2 = value; a later `setting` row with the same name = changed mid-session), `calibration_complete` / `calibration_default_used` (value1 = range min, value2 = max), `calibration_failed`, `item_collect`, `item_miss`, `block_end`, `block_abort`, `frame_drop_warning`, `frame_drop_recovered`, `session_closed` |
 | `value1` | Score at collect / block end — group for `session_start` — render ratio (0–1) for `frame_drop_*` — state the window was closed in for `session_closed` |
 | `value2` | Block time in seconds at the event — scene for `session_start` |
 
@@ -157,10 +159,10 @@ MARKER_STREAM_URL: 'ws://localhost:8765',
 | `calibration_start` / `calibration_end` | calibration phase (re-sent for each retry attempt) |
 | `calibration_failed` | calibration recorded no samples — experimenter is prompted to retry or use defaults |
 | `calibration_default_used` | experimenter chose to skip to `CONFIG.DEFAULT_CAL_RANGE` after a failed calibration |
-| `countdown_start_block0` / `countdown_start_block1` | countdown before each game |
-| `block_start_0` / `block_start_1` | game begins |
-| `block_end_0` / `block_end_1` | game ends normally |
-| `block_abort_0` / `block_abort_1` | game aborted (session continues with the next game) |
+| `countdown_start_block1` / `countdown_start_block2` | countdown before each game (game numbers are 1-based) |
+| `block_start_1` / `block_start_2` | game begins |
+| `block_end_1` / `block_end_2` | game ends normally |
+| `block_abort_1` / `block_abort_2` | game aborted (session continues with the next game) |
 | `trial_<N>` | target curve minimum — inhale onset; N increments from 1 across both blocks |
 | `item_collect_b<N>_s<score>` | item collected |
 | `item_miss_b<N>` | item missed |

@@ -49,6 +49,11 @@ cal.progress;       // 0..1, elapsed fraction of durationSecs
 cal.remainingSecs;   // seconds left
 ```
 
+"Flat" includes a range of a millionth of the values' size or less — e.g. a
+disconnected belt streaming a constant, whose smoothed values differ only by
+floating-point rounding. Such a range would blow rounding noise up to the full
+0–1 scale, so it's rejected (`AdaptiveRange` ignores such windows the same way).
+
 `RespCalibration` itself has no opinion on what to do when `finish()` returns
 `null` — that choice (retry vs. fall back to a default range) is up to the
 caller. [bioGame](bioGame.md) and [iBreath](ibreath.md) both surface it to the

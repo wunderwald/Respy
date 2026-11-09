@@ -19,7 +19,7 @@ Or select **Baseline Video** from the start screen (`npm start`).
 | Control | What it does |
 |---|---|
 | **Resp stream** | Select the LSL resp stream. Required before pressing Start. |
-| **Subject** | Subject code — first part of the file names. Locked once recording begins. |
+| **Subject** | Subject code — first part of the file names. Locked once recording begins. Only letters, digits, `-` and `_` (empty = `TEST`); anything else shows a red hint under the field and disables Start. If data for this code already exists, an amber hint warns that Start will overwrite it (Start stays enabled). The existing-data check uses the selected **Name**. |
 | **Name** | *Resting*, *Post natural*, *Post slow*, *Post stressor* or *Post slow post stressor* (`NAMES` in `baseline_config.js`). Written to both CSVs' `name` column, into the file names and as a `baseline_name_<slug>` marker. Locked once recording begins. |
 | **Play full video** (settings bar) | On by default: the recording ends when the video ends. Off: the **secs** field becomes editable and the recording ends after that many seconds (the video is paused then). The hint next to it shows the video's length, and warns if the entered time is longer than the video — its last frame then stays on screen until the time is up. Locked once recording begins. |
 | **Start** | Locks the settings and shows the explanation screen to the child (`instructions_start` marker). Requires a connected resp stream (and a duration > 0 when "play full video" is off). |

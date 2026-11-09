@@ -70,7 +70,7 @@ The photo starts blank and "develops" in over `PHOTO_DEVELOP_MS` (default 2000ms
 
 | Control | Description |
 |---|---|
-| Subject code | Text field, locked once calibration starts |
+| Subject code | Text field, locked once calibration starts. Only letters, digits, `-` and `_` (empty = `TEST`); anything else shows a red hint under the field and disables Start. If data for this code already exists, an amber hint warns that Start will overwrite it (Start stays enabled). |
 | Auto-proceed | Checkbox, toggleable any time (never locked). When on, READY screens are skipped and trials chain automatically — no Space/Next trial needed between them |
 | Cal secs | Calibration duration in seconds (settings bar) |
 | Smoothing | Breath-smoothing window in samples: 64 (default), 128, 256, 512 or 1024. Locked once the session starts; recorded in the data. Larger = smoother fish but more delay — about half the window, so its length in seconds depends on the stream's sample rate (e.g. 1024 at 100 Hz ≈ 10 s window, ≈ 5 s delay). (settings bar) |
@@ -90,7 +90,7 @@ There is no scene or group selector — the scene is fixed to "ocean."
 
 ## Markers
 
-Sent to `MARKER_STREAM_URL` (default `ws://localhost:9001`), one per trial index `N` (0-based):
+Sent to `MARKER_STREAM_URL` (default `ws://localhost:9001`), one per trial number `N` (1-based):
 
 - `instructions_cal_start` / `instructions_task_start` (explanation screens before calibration / before trial 1)
 - `calibration_start` / `calibration_end` / `calibration_failed` / `calibration_default_used`
@@ -110,10 +110,12 @@ Written to `output_data/belt_training_game/<subjectCode>/`:
 
 - **`eventData.csv`** — `timestamp,trialIndex,phase,event,value1,value2`
   - `session_start` (value1 = scene id)
+  - `setting` (session settings, written right after `session_start`: value1 = name, value2 = value; a later `setting` row with the same name = changed mid-session), `calibration_complete` / `calibration_default_used` (value1 = range min, value2 = max), `calibration_failed`. Settings rows: `calibration_secs`, `smooth_window`, `auto_proceed` (repeated whenever it's toggled during the session), `num_trials`, `training_passes`
+  - `trialIndex` is 1-based; empty for session-level rows
   - `target_leave` (value1 = fraction of the target-crossing segment spent inside the green band, `0`–`1`; empty if no frame was drawn inside the target zone, e.g. after a display stall — the event and the `target_enter/leave` markers are still written)
   - `trial_end`; `trial_abort` (value1 = state it was aborted in: `countdown`, `training` or `test` — during the countdown before training 2 the `phase` column still says `training1`)
   - `session_closed` (value1 = state the window was closed in, e.g. `training`; the `phase` column says which pass)
-- **`frameData_trial<N>.csv`** — one file per trial, one row per drawn animation frame, `timestamp,trialIndex,phase,segment,breathRaw,breathSmoothed,breathNorm,normMin,normMax,fishX,fishY,targetY,smoothWindow`
+- **`frameData_trial<N>.csv`** (N = 1, 2, …) — one file per trial, one row per drawn animation frame, `timestamp,trialIndex,phase,segment,breathRaw,breathSmoothed,breathNorm,normMin,normMax,fishX,fishY,targetY,smoothWindow`
   - `smoothWindow` is the breath-smoothing window (samples) used in this session — the **Smoothing** control
   - `phase` is `training1`, `training2` or `test` (also in `eventData.csv`'s `phase` column); `segment` is `approach`, `target`, or `exit`
   - `fishX`/`fishY` and `targetY` are normalized canvas fractions (`targetY` is the trial's fixed target centre, repeated on every row for convenience)

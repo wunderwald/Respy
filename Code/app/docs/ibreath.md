@@ -22,7 +22,7 @@ Two windows open:
 
 | Control | What it does |
 |---|---|
-| **Subject** | Subject code written to the CSV filename. Locked once calibration begins. |
+| **Subject** | Subject code written to the CSV filename. Locked once calibration begins. Only letters, digits, `-` and `_` (empty = `TEST`); anything else shows a red hint under the field and disables Start. If data for this code already exists, an amber hint warns that Start will overwrite it (Start stays enabled). |
 | **Cal secs** | Calibration recording duration (default 10 s). |
 | **Smoothing** | Breath-smoothing window in samples: 64 (default), 128, 256, 512 or 1024. Locked once the session starts; recorded in the data. Larger = smoother fish but more delay — about half the window, so its length in seconds depends on the stream's sample rate (e.g. 1024 at 100 Hz ≈ 10 s window, ≈ 5 s delay). Only used for the *Physiological* signal type (*Peaks only* uses the peak envelope). Overrides a preset's `SMOOTH_WINDOW` config override. |
 | **Trials** | Number of trials in the session (default `MAX_NUM_TRIALS`, 80). Pre-filled and locked when the loaded preset defines `numTrials`; otherwise editable (whole number ≥ 1). Locked once calibration begins. A warning appears next to it if the number isn't a multiple of 4: left/right and pufferfish/starfish are balanced in blocks of 4, so other counts aren't exactly balanced (the session still runs). |
@@ -170,6 +170,9 @@ One row per trial, appended after each trial ends (or after the response screen)
 | `delayMs` | Async delay applied to this trial (ms), or empty (sync trials) — see [Async delay staircase](#async-delay-staircase) |
 | `rangeMin`, `rangeMax` | Signal range (native units) mapped to stimulus `[0, 1]` for this trial — see [Signal range](#signal-range) |
 | `smoothWindow` | Breath-smoothing window (samples) used in this session — the **Smoothing** control (not used with *Peaks only*) |
+| `signalType` | `physiological` (iBreath) or `peaksOnly` (iBeat) |
+| `preset` | Name of the loaded preset (its `name` field, or the file name for a browsed file without one); empty without a preset |
+| `calibration` | `measured` (range from the calibration recording) or `default` (`DEFAULT_CAL_RANGE` after a failed calibration) |
 | `ITI` | Inter-trial interval in ms |
 | `startTime` | ISO-8601 trial start time |
 | `endTime` | ISO-8601 trial end time |
