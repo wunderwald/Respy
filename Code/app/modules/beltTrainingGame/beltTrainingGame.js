@@ -39,7 +39,7 @@ import { MarkerStream } from '../stream/markerStream.js';
 import { CONFIG, STATE } from './beltTrainingGame_config.js';
 import { BeltTrainingGameRenderer } from './beltTrainingGame_renderer.js';
 import { BeltTrainingGameCSV } from './beltTrainingGame_csv.js';
-import { resolveScene } from '../bioGame/bioGame_scene.js';
+import { SCENE } from '../bioGame/bioGame_scene.js';
 import { BioGameSound } from '../bioGame/bioGame_sound.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -112,16 +112,15 @@ export default class BeltTrainingGame {
   #sound    = null;
 
   constructor({ sceneContainer }) {
-    const scene = resolveScene(CONFIG.SCENE);
-    this.#renderer = new BeltTrainingGameRenderer(sceneContainer, scene);
+    this.#renderer = new BeltTrainingGameRenderer(sceneContainer, SCENE);
 
     // Reuses bioGame's ocean soundscape as-is: a steady ambience loop plus a
     // noise layer whose volume tracks the live breath signal in real time
-    // (see #rafLoop's setNoiseLevel call). Scene is fixed here, so the
-    // buffers are loaded once up front rather than per-calibration.
+    // (see #rafLoop's setNoiseLevel call). The buffers are loaded once up
+    // front.
     this.#sound = new BioGameSound();
     this.#sound.init()
-      .then(() => this.#sound.loadScene(scene.sounds))
+      .then(() => this.#sound.loadScene(SCENE.sounds))
       .catch(e => console.warn('[BeltTrainingGame] sound init failed:', e));
 
     this.#markers = CONFIG.SEND_MARKERS
@@ -219,7 +218,7 @@ export default class BeltTrainingGame {
     this.#trialIndex   = 0;
 
     this.#csv = new BeltTrainingGameCSV(
-      this.#subjectCode, CONFIG.SCENE,
+      this.#subjectCode, SCENE.id,
       (msg) => this.#csvWarn(msg)
     );
     this.#csv.init();

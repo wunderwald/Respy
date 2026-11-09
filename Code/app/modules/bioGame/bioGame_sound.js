@@ -8,8 +8,8 @@
  *
  * blockFadeGain ramps 0→1 on startBlock and 1→0 on stopBlock.
  * noiseGain is updated in real-time via setNoiseLevel().
- * File paths come from the scene definition passed to loadScene() — call it
- * again (after init()) whenever the experimenter changes the scene.
+ * File paths come from the scene definition (SCENE.sounds) passed to
+ * loadScene(), called once after init().
  */
 
 import { SoundEngine } from '../sound/soundEngine.js';
@@ -30,8 +30,8 @@ export class BioGameSound {
     await this.#engine.init();
   }
 
-  // Loads the buffers for one scene. Safe to call again to switch scenes —
-  // previously loaded buffers are simply replaced.
+  // Loads the buffers for the scene's sounds (previously loaded buffers are
+  // replaced).
   async loadScene(sounds) {
     const [ambience, noise, ...collectBufs] = await Promise.all([
       this.#engine.loadBuffer(sounds.ambience),

@@ -442,13 +442,6 @@ if (frontend === 'ibreath') {
         <option value="natural">Control (natural)</option>
       </select>
     </span>
-    <span>
-      <span class="label">scene</span>
-      <select id="bg-scene" class="stream-select">
-        <option value="ocean"  ${BG.SCENE === 'ocean'  ? 'selected' : ''}>Ocean</option>
-        <option value="jungle" ${BG.SCENE === 'jungle' ? 'selected' : ''}>Jungle</option>
-      </select>
-    </span>
     <span id="bg-natural-bpm-wrap">
       <span class="label">natural BPM</span>
       <input id="bg-natural-bpm" type="number" min="4" max="20" step="0.5"
@@ -484,7 +477,6 @@ if (frontend === 'ibreath') {
   const bgStatusEl   = document.getElementById('bg-status');
   const bgSubjectEl  = document.getElementById('bg-subject');
   const bgGroupEl    = document.getElementById('bg-group');
-  const bgSceneEl    = document.getElementById('bg-scene');
   const bgNatBpmWrap = document.getElementById('bg-natural-bpm-wrap');
   const bgNatBpmEl   = document.getElementById('bg-natural-bpm');
   const bgBpmSrcEl   = document.getElementById('bg-bpm-source');
@@ -571,7 +563,6 @@ if (frontend === 'ibreath') {
     if (inputsLocked !== undefined && inputsLocked) {
       bgSubjectEl.disabled = true;
       bgGroupEl.disabled   = true;
-      bgSceneEl.disabled   = true;
       bgNatBpmEl.disabled  = true;
       // Stream selection stays live even once everything else locks, so the
       // experimenter can recover from a dropped stream mid-session.
@@ -588,7 +579,6 @@ if (frontend === 'ibreath') {
       type:            'start',
       subjectCode:     bgSubjectEl.value.trim() || 'TEST',
       group:           bgGroupEl.value,
-      scene:           bgSceneEl.value,
       naturalBpm:      parseFloat(bgNatBpmEl.value) || BG.NATURAL_BPM,
       showCurve:       document.getElementById('bg-show-curve').checked,
       calibrationSecs: parseInt(document.getElementById('bg-cal-secs').value) || BG.CALIBRATION_SECS,

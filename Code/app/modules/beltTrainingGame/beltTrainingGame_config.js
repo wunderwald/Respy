@@ -1,7 +1,6 @@
 export const CONFIG = {
   // ── Experiment ───────────────────────────────────────────────────────────
   SUBJECT_CODE:          'TEST',
-  SCENE:                 'ocean',   // fixed — no experimenter scene selector
   DATA_DIR:              'output_data/belt_training_game',
   SEND_MARKERS:          true,
   MARKER_STREAM_URL:     'ws://localhost:9001',

@@ -22,7 +22,6 @@ Two windows open:
 |---|---|
 | **Subject** | Type the subject code before pressing Start. Locked once calibration begins. |
 | **Group** | *Target (slow 6 BPM)* — fish follows a 6 BPM breath curve, starfish appear on that curve. *Control (natural)* — curve uses the participant's natural BPM (set the BPM field). |
-| **Scene** | *Ocean* or *Jungle* — sets the visual theme (avatar, background, item shape, sounds). Chosen by the experimenter; no longer picked at random. |
 | **Natural BPM** | Only visible in the natural condition. Sets the target curve frequency. |
 | **Show target curve** | Overlays the sinusoidal target curve on screen (for debugging / operator monitoring). |
 | **Cal secs** | How many seconds to calibrate the breath signal (default 10 s). Calibration captures the participant's breathing range. |
@@ -31,8 +30,12 @@ Two windows open:
 | **Data dir** | Folder where CSV files are saved. Click **…** to pick a different folder. Default: `bioGameData/` inside the app folder. |
 | **Score** | Live count of starfish collected in the current game. |
 | **Start** | Begins calibration. Requires a connected resp stream. |
-| **Start Game 2** | Appears after Game 1 ends. Starts the second block (also triggered by Space). |
-| **Abort game** | Ends only the current game and saves its data (`block_abort` event / marker). The session continues with the intermission before the next game, or ends if it was the last one. |
+| **Start game N** | Appears on the ready screen and after each game. Starts the next game (also triggered by Space). |
+| **Abort game** | Shown throughout every game (both groups). Ends only the current game and saves its data (`block_abort` event / marker). The session continues with the intermission before the next game, or ends if it was the last one. Also triggered by Escape. |
+
+There is only one scene, the ocean: it's always used (`bioGame_scene.js`, shared with beltTrainingGame).
+
+**On screen during a game:** the time-left bar (top right) is shown in both groups; the score counter (top left) only in the slow/target group.
 
 **Keyboard shortcuts** (experimenter window focused):
 - `Space` — advance (start Game 2 / confirm ready state)

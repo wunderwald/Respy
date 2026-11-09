@@ -1,5 +1,5 @@
 // SceneRenderer — the scene-definition-driven drawing primitives shared by
-// bioGame and any other frontend that reuses its "ocean"/"jungle" visuals:
+// bioGame and any other frontend that reuses its ocean visuals:
 // the tiling procedural background texture and the avatar sprite. Nothing
 // here depends on any particular game's state (score, items, stress, etc.)
 // — callers compute their own screen position/size/rotation and pass them in.
@@ -26,14 +26,6 @@ export class SceneRenderer {
   #bgTex = null;
 
   constructor(scene) {
-    this.#scene = scene;
-    this.#loadAvatarImg();
-    this.#buildBgTex();
-  }
-
-  // Switches the active scene (avatar sprite + background texture).
-  // Safe to call repeatedly.
-  setScene(scene) {
     this.#scene = scene;
     this.#loadAvatarImg();
     this.#buildBgTex();
@@ -93,11 +85,7 @@ export class SceneRenderer {
       return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; };
     })();
 
-    if (this.#scene.id === 'jungle') {
-      this.#buildJungleTex(ctx, tw, th, bg, rng);
-    } else {
-      this.#buildOceanTex(ctx, tw, th, bg, rng);
-    }
+    this.#buildOceanTex(ctx, tw, th, bg, rng);
 
     this.#bgTex = c;
   }
@@ -118,58 +106,6 @@ export class SceneRenderer {
         ctx.beginPath();
         ctx.ellipse(mx, by, rx, ry, 0, 0, Math.PI * 2);
         ctx.fill();
-      }
-    }
-  }
-
-  #buildJungleTex(ctx, tw, th, bg, rng) {
-    // Ground strip
-    const grd = ctx.createLinearGradient(0, th * 0.72, 0, th);
-    grd.addColorStop(0, 'rgba(0,0,0,0)');
-    grd.addColorStop(1, 'rgba(0,12,0,0.55)');
-    ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, tw, th);
-
-    // Subtle light patches (filtered sunlight through canopy)
-    for (let i = 0; i < 18; i++) {
-      const bx = rng() * tw;
-      const by = rng() * th * 0.85;
-      const r  = 22 + rng() * 55;
-      const alpha = 0.03 + rng() * 0.035;
-      for (const mx of [bx, bx - tw]) {
-        const g = ctx.createRadialGradient(mx, by, 0, mx, by, r);
-        g.addColorStop(0, `rgba(150,230,70,${alpha})`);
-        g.addColorStop(1, 'rgba(150,230,70,0)');
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(mx, by, r, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    // Tree silhouettes
-    for (let i = 0; i < 12; i++) {
-      const bx      = rng() * tw;
-      const groundY = th * (0.72 + rng() * 0.22);
-      const trunkW  = 10 + rng() * 14;
-      const trunkH  = 70 + rng() * 110;
-      const canopyR = 42 + rng() * 55;
-
-      for (const mx of [bx, bx - tw]) {
-        // Trunk
-        ctx.fillStyle = 'rgba(6,14,5,0.92)';
-        ctx.fillRect(mx - trunkW / 2, groundY - trunkH, trunkW, trunkH);
-
-        // Canopy — 3 overlapping circles
-        for (let ci = 0; ci < 3; ci++) {
-          const cx2 = mx + (rng() - 0.5) * canopyR * 0.7;
-          const cy2 = groundY - trunkH + (rng() - 0.6) * canopyR * 0.5;
-          const cr  = canopyR * (0.65 + rng() * 0.55);
-          ctx.fillStyle = `rgba(8,20,7,${0.82 + rng() * 0.14})`;
-          ctx.beginPath();
-          ctx.arc(cx2, cy2, cr, 0, Math.PI * 2);
-          ctx.fill();
-        }
       }
     }
   }

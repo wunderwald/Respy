@@ -38,13 +38,6 @@ export class BioGameRenderer {
 
   // ── Public ────────────────────────────────────────────────────────────────
 
-  // Switches the active scene (avatar sprite + background texture), e.g.
-  // when the experimenter picks a scene at Start. Safe to call repeatedly.
-  setScene(scene) {
-    this.#scene = scene;
-    this.#sceneRenderer.setScene(scene);
-  }
-
   draw(renderData) {
     const canvas = this.#canvas;
     canvas.width  = canvas.offsetWidth;
@@ -121,21 +114,13 @@ export class BioGameRenderer {
         const t     = clamp(item.collectT / 0.45, 0, 1);
         const alpha = 1 - t;
         const scale = 1 + 0.6 * easeOut(t);
-        this.#drawItemShape(ctx, sx, sy, size * scale, alpha, si.collectColor, si.glowColor, si.shape);
+        this.#drawStar(ctx, sx, sy, size * scale, alpha, si.collectColor);
       } else if (item.missT != null) {
         const alpha = clamp(1 - item.missT / 0.5, 0, 1);
-        this.#drawItemShape(ctx, sx, sy, size, alpha, si.missColor, si.missColor, si.shape);
+        this.#drawStar(ctx, sx, sy, size, alpha, si.missColor);
       } else {
-        this.#drawItemShape(ctx, sx, sy, size, 1, si.color, si.glowColor, si.shape);
+        this.#drawStar(ctx, sx, sy, size, 1, si.color);
       }
-    }
-  }
-
-  #drawItemShape(ctx, cx, cy, size, alpha, color, glowColor, shape) {
-    if (shape === 'fruit') {
-      this.#drawFruit(ctx, cx, cy, size, alpha, color, glowColor);
-    } else {
-      this.#drawStar(ctx, cx, cy, size, alpha, color);
     }
   }
 
@@ -161,26 +146,6 @@ export class BioGameRenderer {
     }
     ctx.closePath();
     ctx.fill();
-    ctx.restore();
-  }
-
-  // Fruit (circle + stem) for jungle scene
-  #drawFruit(ctx, cx, cy, r, alpha, color, glowColor) {
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle   = color;
-    ctx.shadowColor = glowColor;
-    ctx.shadowBlur  = 8;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur  = 0;
-    ctx.strokeStyle = '#4a7a20';
-    ctx.lineWidth   = Math.max(1.5, r * 0.12);
-    ctx.beginPath();
-    ctx.moveTo(cx, cy - r);
-    ctx.lineTo(cx + r * 0.45, cy - r * 1.55);
-    ctx.stroke();
     ctx.restore();
   }
 
@@ -420,9 +385,10 @@ export class BioGameRenderer {
       : 1;
     this.#drawAvatar(ctx, avatarScreenX, avatarScreenY, baseH * bumpScale, avatarTilt);
 
+    // Time-left bar: every game, both groups. The score counter is slow-group only.
+    this.#drawTimerBar(ctx, w, h, blockTime, now);
     if (group === 'slow') {
       this.#drawScoreDisplay(ctx, 18, 16, score, dt);
-      this.#drawTimerBar(ctx, w, h, blockTime, now);
     }
   }
 
