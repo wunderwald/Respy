@@ -461,7 +461,7 @@ if (frontend === 'ibreath') {
     <span id="ib-controls">
       <button id="bg-start-btn"       disabled>Start</button>
       <button id="bg-next-btn"        style="display:none">Start Game 2</button>
-      <button id="bg-abort-btn"       style="display:none">Abort</button>
+      <button id="bg-abort-btn"       style="display:none">Abort game</button>
       <button id="bg-cal-retry-btn"   style="display:none">Retry calibration</button>
       <button id="bg-cal-default-btn" style="display:none">Use default calibration</button>
     </span>
@@ -703,7 +703,7 @@ if (frontend === 'ibreath') {
     <span id="ib-controls">
       <button id="btg-start-btn"       disabled>Start</button>
       <button id="btg-next-btn"        style="display:none">Next trial</button>
-      <button id="btg-abort-btn"       style="display:none">Abort</button>
+      <button id="btg-abort-btn"       style="display:none">Abort trial</button>
       <button id="btg-cal-retry-btn"   style="display:none">Retry calibration</button>
       <button id="btg-cal-default-btn" style="display:none">Use default calibration</button>
     </span>

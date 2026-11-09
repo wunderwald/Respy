@@ -101,7 +101,6 @@ export default class BeltTrainingGame {
 
   // ── Data / frame recording ───────────────────────────────────────────────
   #csv             = null;
-  #lastFrameRecord = 0;
 
   // ── Timing ────────────────────────────────────────────────────────────────
   #lastRafTime = null;
@@ -177,9 +176,9 @@ export default class BeltTrainingGame {
         break;
 
       case 'abort':
-        if (this.#state === STATE.READY || this.#state === STATE.COUNTDOWN ||
-            this.#state === STATE.TRAINING || this.#state === STATE.TEST ||
-            this.#state === STATE.PHOTO) {
+        // Only a running trial (its countdowns included) can be aborted.
+        if (this.#state === STATE.COUNTDOWN ||
+            this.#state === STATE.TRAINING || this.#state === STATE.TEST) {
           this.#abortTrial();
         }
         break;
@@ -265,21 +264,24 @@ export default class BeltTrainingGame {
     this.#completeCalibration(CONFIG.DEFAULT_CAL_RANGE, { fromData: false });
   }
 
-  #beginReadyForTrial() {
+  // `afterAbort`: always wait in READY, even with auto-proceed on, so the
+  // experimenter can sort out whatever made them abort before going on.
+  #beginReadyForTrial({ afterAbort = false } = {}) {
     this.#targetNormY = randBetween(CONFIG.TARGET_Y_MIN, CONFIG.TARGET_Y_MAX);
     this.#phase       = null;
     this.#segment     = null;
 
-    if (this.#autoProceed) {
+    if (this.#autoProceed && !afterAbort) {
       this.#beginCountdown('training');
       return;
     }
 
+    const prefix = afterAbort ? `trial ${this.#trialIndex} aborted — ` : '';
     this.#state = STATE.READY;
     this.#pushState({
-      stateText:    `ready — trial ${this.#trialIndex + 1} / ${CONFIG.NUM_TRIALS} — press Space or Start`,
+      stateText:    `${prefix}ready — trial ${this.#trialIndex + 1} / ${CONFIG.NUM_TRIALS} — press Space or Start`,
       nextVisible:  true,
-      abortVisible: true,
+      abortVisible: false,
       calFailed:    false,
     });
   }
@@ -350,7 +352,7 @@ export default class BeltTrainingGame {
     this.#pushState({
       stateText:    `trial ${this.#trialIndex + 1} / ${CONFIG.NUM_TRIALS} — here's how you did`,
       nextVisible:  !this.#autoProceed,
-      abortVisible: true,
+      abortVisible: false,
     });
   }
 
@@ -364,12 +366,21 @@ export default class BeltTrainingGame {
     this.#beginReadyForTrial();
   }
 
+  // Ends only the running trial; the session moves on to the next trial
+  // (or ends, if this was the last one). No photo for an aborted trial.
   #abortTrial() {
     this.#csv?.flushFrames(this.#trialIndex);
     this.#markers.send(`trial_abort_t${this.#trialIndex}`);
     this.#csv?.appendEvent(this.#trialIndex, this.#phase, 'trial_abort');
     this.#sound?.stopBlock();  // no-op if the soundscape wasn't playing
-    this.#endExperiment();
+    this.#pendingPhase = null;
+
+    this.#trialIndex++;
+    if (this.#trialIndex >= CONFIG.NUM_TRIALS) {
+      this.#endExperiment();
+      return;
+    }
+    this.#beginReadyForTrial({ afterAbort: true });
   }
 
   #endExperiment() {
@@ -416,7 +427,7 @@ export default class BeltTrainingGame {
 
     if (inGameplay) {
       this.#updatePhase(now, dt);
-      this.#recordFrame(now);
+      this.#recordFrame();
       this.#sound.setNoiseLevel(this.#avatarNormY);
     }
 
@@ -504,10 +515,8 @@ export default class BeltTrainingGame {
 
   // ── Frame data recording ──────────────────────────────────────────────────
 
-  #recordFrame(now) {
-    if (now - this.#lastFrameRecord < CONFIG.FRAME_INTERVAL_MS) return;
-    this.#lastFrameRecord = now;
-
+  // One row per drawn animation frame, with the state that frame is drawn with.
+  #recordFrame() {
     this.#csv.bufferFrame({
       t:        new Date().toISOString(),
       trialIndex: this.#trialIndex,

@@ -2,8 +2,7 @@
 //
 // Two file types written to CONFIG.DATA_DIR/<subjectCode>/:
 //   eventData.csv          — one row per event (session info, phase transitions, target enter/leave)
-//   frameData_trial0.csv    — 20-fps frame rows for trial 0
-//   frameData_trial1.csv    — 20-fps frame rows for trial 1, etc.
+//   frameData_trial<N>.csv  — one row per drawn animation frame of trial N
 //
 // Frame rows are buffered in memory and flushed every FRAME_FLUSH_COUNT rows
 // (and at each phase end) to avoid high-frequency IPC.

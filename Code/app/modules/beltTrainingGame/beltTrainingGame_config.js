@@ -67,8 +67,7 @@ export const CONFIG = {
   FISH_FADE_WIDTH_RATIO: 0.035,
 
   // ── Data recording ───────────────────────────────────────────────────────
-  FRAME_INTERVAL_MS: 50,    // 20 fps of frame data
-  FRAME_FLUSH_COUNT: 400,   // flush after this many buffered rows
+  FRAME_FLUSH_COUNT: 600,   // flush after this many buffered rows (frame rows: one per drawn frame, ~60/s)
 };
 
 export const STATE = {
