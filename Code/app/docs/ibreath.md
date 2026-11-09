@@ -43,6 +43,8 @@ Auto-advance, sync-detection questions, and the flashing-image stimulus are alwa
 - `←` — sync-detection response: yes (animation was in sync)
 - `→` — sync-detection response: no (not in sync)
 
+**Ending a session early:** close the window. A running trial's frame rows and its trial row (`aborted = true`, `response = session_closed`) — or a trial still waiting for its response — are written synchronously before it goes away. Everything else is already on disk.
+
 ---
 
 ## Session flow
@@ -150,8 +152,8 @@ One row per trial, appended after each trial ends (or after the response screen)
 | `ITI` | Inter-trial interval in ms |
 | `startTime` | ISO-8601 trial start time |
 | `endTime` | ISO-8601 trial end time |
-| `aborted` | `true` if experimenter pressed Abort |
-| `response` | One of that trial's question's two `answers` labels (e.g. `yes`/`no`, `left`/`right`, `pufferfish`/`starfish`), or `timeout` |
+| `aborted` | `true` if experimenter pressed Abort (or the window was closed mid-trial) |
+| `response` | One of that trial's question's two `answers` labels (e.g. `yes`/`no`, `left`/`right`, `pufferfish`/`starfish`), `timeout`, or `session_closed` if the window was closed during the trial or its question |
 | `flashImage` | Image name or empty — only when `FLASHING_IMAGE` is on |
 | `flashScheduledTime` | Seconds into trial when flash was scheduled |
 | `flashX`, `flashY` | Flash position (normalised 0–1) |

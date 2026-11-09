@@ -79,15 +79,7 @@ export class IBreathCSV {
 
   async flushFrameCSV(trial, frameRows) {
     if (!window.api || frameRows.length === 0) return;
-
-    const rows = frameRows.map(r =>
-      `${trial.trialIndex},${r.t},` +
-      `${r.raw.toFixed(6)},${r.stim.toFixed(6)}` +
-      (CONFIG.FLASHING_IMAGE ? `,${r.flash}` : '') +
-      (this.#gazeEnabled ? `,${r.gazeX ?? ''},${r.gazeY ?? ''}` : '')
-    ).join('\n') + '\n';
-
-    const result = await window.api.appendCSV(this.#framePath(trial.trialIndex), rows);
+    const result = await window.api.appendCSV(this.#framePath(trial.trialIndex), this.#frameRowsCSV(trial, frameRows));
     if (!result.ok) {
       this.#warn(`Could not write frameData_${trial.trialIndex}.csv: ${result.error}`);
     } else {
@@ -97,8 +89,40 @@ export class IBreathCSV {
 
   async appendTrialData(trial) {
     if (!window.api) return;
+    const result = await window.api.appendCSV(this.#trialPath, this.#trialRow(trial));
+    if (!result.ok) {
+      this.#warn(`Could not append to trialData.csv: ${result.error}`);
+    }
+  }
 
-    const row =
+  // ── Synchronous variants — only for the 'pagehide' handler (window
+  //    closing), where an async write might never arrive. ─────────────────
+
+  flushFrameCSVSync(trial, frameRows) {
+    if (!window.api || frameRows.length === 0) return;
+    const result = window.api.appendCSVSync(this.#framePath(trial.trialIndex), this.#frameRowsCSV(trial, frameRows));
+    if (!result.ok) console.error('[CSV] final frame flush failed:', result.error);
+  }
+
+  appendTrialDataSync(trial) {
+    if (!window.api) return;
+    const result = window.api.appendCSVSync(this.#trialPath, this.#trialRow(trial));
+    if (!result.ok) console.error('[CSV] could not append final trial row:', result.error);
+  }
+
+  // ── Row formatting ──────────────────────────────────────────────────────
+
+  #frameRowsCSV(trial, frameRows) {
+    return frameRows.map(r =>
+      `${trial.trialIndex},${r.t},` +
+      `${r.raw.toFixed(6)},${r.stim.toFixed(6)}` +
+      (CONFIG.FLASHING_IMAGE ? `,${r.flash}` : '') +
+      (this.#gazeEnabled ? `,${r.gazeX ?? ''},${r.gazeY ?? ''}` : '')
+    ).join('\n') + '\n';
+  }
+
+  #trialRow(trial) {
+    return (
       `${trial.trialIndex},` +
       `${this.#subjectCode},` +
       `${trial.questionType ?? ''},` +
@@ -116,15 +140,12 @@ export class IBreathCSV {
       (CONFIG.FLASHING_IMAGE
         ? `,${trial.flashImage ?? ''},${trial.flashTime ?? ''},` +
         `${trial.flashX ?? ''},${trial.flashY ?? ''},${trial.flashShown}`
-        : '') + '\n';
-
-    const result = await window.api.appendCSV(
-      `${CONFIG.DATA_DIR}/${this.#subjectCode}/trialData.csv`,
-      row
+        : '') + '\n'
     );
-    if (!result.ok) {
-      this.#warn(`Could not append to trialData.csv: ${result.error}`);
-    }
+  }
+
+  get #trialPath() {
+    return `${CONFIG.DATA_DIR}/${this.#subjectCode}/trialData.csv`;
   }
 
   #framePath(trialIndex) {

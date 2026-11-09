@@ -142,6 +142,7 @@ export default class IBreath {
     this.#sound = new IBreathSound();
     this.#sound.init().catch((e) => console.warn('[IBreath] sound init failed:', e));
     this.#bindKeys();
+    window.addEventListener('pagehide', () => this.#onWindowClose());
     setInterval(() => this.#update(), 16);
     requestAnimationFrame(() => this.#drawLoop());
   }
@@ -746,6 +747,35 @@ export default class IBreath {
     this.#hud.pauseVisible = false;
     this.#hud.stateText    = 'experiment complete';
     this.#hud.trialText    = `${this.#trials.length} / ${this.#trials.length}`;
+  }
+
+  // ── Window closing ─────────────────────────────────────────────────────
+  //
+  // Closing the window is how a session is ended early. Whatever is still
+  // only in memory is written synchronously (an async write might never
+  // arrive): a running trial's frame rows plus its trial row (aborted,
+  // response 'session_closed'), or a trial still waiting for its response.
+  // Everything else is already on disk.
+
+  #onWindowClose() {
+    if (!this.#csv) return;   // no session started
+    const interrupted = this.#state === STATE.PAUSED ? this.#pausedFromState : this.#state;
+    if (this.#state === STATE.TRIAL) {
+      const trial = this.#trials[this.#trialIndex];
+      trial.endTime    = new Date().toISOString();
+      trial.aborted    = true;
+      trial.flashShown = this.#flashShown;
+      trial.response   = 'session_closed';
+      this.#csv.flushFrameCSVSync(trial, this.#frameRows);
+      this.#frameRows = [];
+      this.#csv.appendTrialDataSync(trial);
+    } else if (interrupted === STATE.RESPONSE && this.#pendingTrial) {
+      this.#pendingTrial.response = 'session_closed';
+      this.#csv.appendTrialDataSync(this.#pendingTrial);
+      this.#pendingTrial = null;
+    }
+    // Best effort — the marker socket may already be gone.
+    if (this.#state !== STATE.DONE) this.#markers.send('session_closed');
   }
 
   // ── Update loop (setInterval, continues when window loses focus) ──────
