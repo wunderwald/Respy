@@ -30,6 +30,20 @@ export class SoundEngine {
   }
 
   /**
+   * Generate a mono white-noise AudioBuffer (uniform samples in [-1, 1]),
+   * for looping with LoopPlayer. Keep it several seconds long: a short noise
+   * loop repeats audibly ("frozen noise").
+   */
+  createWhiteNoise(secs = 10) {
+    if (!this.#ctx) return null;
+    const rate = this.#ctx.sampleRate;
+    const buf  = this.#ctx.createBuffer(1, Math.round(secs * rate), rate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    return buf;
+  }
+
+  /**
    * Load a URL into an AudioBuffer.
    * Returns null (with a console warning) if the file is missing or
    * undecodable — callers must handle null gracefully.
