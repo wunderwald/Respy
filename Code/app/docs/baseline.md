@@ -38,7 +38,10 @@ The scene window plays the resting-state video full-screen, or shows a countdown
 
 ## Data output
 
-Two files are written to `output_data/baseline/` when the recording ends (normally or via Abort). Aborted sessions save whatever was recorded up to that point.
+Two files are written to `output_data/baseline/`:
+
+- The raw signal CSV is written **during** the recording: its header at Start, then new rows every `FLUSH_INTERVAL_MS` (1 s). An abort, crash or closed window therefore loses at most the last second; if the window is closed mid-recording, the pending rows are flushed synchronously before it goes away.
+- The estimates CSV is written when the recording ends (normally or via Abort), from everything recorded up to that point. After a crash it's missing, but can be recomputed from the raw CSV.
 
 **`<SUBJECT_CODE>_baseline.csv`** — raw signal
 

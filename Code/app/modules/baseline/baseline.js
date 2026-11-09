@@ -4,7 +4,14 @@
  * Plays a resting-state video full-screen for a fixed duration (default
  * 7 min) while recording the resp signal in the background. Falls back to a
  * plain countdown display if the video file isn't present.
- * Writes the recording to CSV and sends LSL markers at start and end.
+ * Sends LSL markers at start and end.
+ *
+ * The raw signal is written to CSV *while* recording (header at Start, new
+ * rows appended every CONFIG.FLUSH_INTERVAL_MS), so an abort, crash or
+ * closed window loses at most the last flush interval. If the window is
+ * closed mid-recording, the pending rows are flushed synchronously from a
+ * 'pagehide' handler. The breathing-rate estimates are computed once at the
+ * end (normal end or Abort) from the full recording.
  *
  * State machine:  IDLE → PLAYING → DONE
  */
@@ -22,14 +29,20 @@ export default class Baseline {
   // Experimenter-supplied params (overridden on 'start' action)
   #subjectCode = CONFIG.SUBJECT_CODE;
 
-  // Recorded samples: [isoTimestamp, value]
-  #sampleBuffer = [];
+  // Recording: every value (for the end-of-recording estimates) plus the CSV
+  // rows not yet written to disk.
+  #values        = [];
+  #firstSampleMs = null;
+  #lastSampleMs  = null;
+  #pendingRows   = [];
+  #lastFlush     = 0;
+  #csvPath       = null;
 
   #canvas  = null;
   #ctx     = null;
   #video   = null;
   #videoAvailable = false;
-  #videoWarning   = null;   // persisted so it survives the experimenter window's 'ready' resync
+  #warning   = null;   // persisted so it survives the experimenter window's 'ready' resync
   #markers = null;
 
   constructor({ sceneContainer }) {
@@ -45,6 +58,9 @@ export default class Baseline {
       : { send() {} };
 
     window.api.frontend.onAction((action) => this.#onAction(action));
+    // Window closing / app quitting mid-recording: get the last rows onto
+    // disk before the renderer goes away (async IPC may never arrive).
+    window.addEventListener('pagehide', () => this.#flushRowsSync());
 
     this.#checkVideo();
     setInterval(() => this.#tick(), 100);
@@ -70,7 +86,7 @@ export default class Baseline {
       this.#video.load();
     } else {
       console.warn('[Baseline]', CONFIG.VIDEO_MISSING_WARNING);
-      this.#videoWarning = CONFIG.VIDEO_MISSING_WARNING;
+      this.#warning = CONFIG.VIDEO_MISSING_WARNING;
       this.#pushState();
     }
   }
@@ -79,7 +95,11 @@ export default class Baseline {
 
   pushSample(value) {
     if (this.#state !== STATE.PLAYING) return;
-    this.#sampleBuffer.push([new Date().toISOString(), value]);
+    const nowMs = Date.now();
+    this.#firstSampleMs ??= nowMs;
+    this.#lastSampleMs = nowMs;
+    this.#values.push(value);
+    this.#pendingRows.push(`${new Date(nowMs).toISOString()},${value.toFixed(6)}`);
   }
 
   setStatus({ type, text }) {
@@ -111,9 +131,14 @@ export default class Baseline {
   // ── State transitions ─────────────────────────────────────────────────────
 
   #begin() {
-    this.#startTime    = performance.now();
-    this.#sampleBuffer = [];
-    this.#state        = STATE.PLAYING;
+    this.#startTime     = performance.now();
+    this.#values        = [];
+    this.#firstSampleMs = null;
+    this.#lastSampleMs  = null;
+    this.#pendingRows   = [];
+    this.#lastFlush     = performance.now();
+    this.#state         = STATE.PLAYING;
+    this.#initCSV();
     this.#markers.send('baseline_start');
 
     if (this.#videoAvailable) {
@@ -148,58 +173,75 @@ export default class Baseline {
     }
 
     this.#pushState({ stateText: aborted ? 'aborted' : 'done', abortVisible: false });
-    this.#writeCSV();
+    this.#flushRows();
+    console.log(`[Baseline] recorded ${this.#values.length} samples → ${this.#csvPath}`);
+    this.#writeEstimates();
   }
 
-  // ── Tick (duration check) ─────────────────────────────────────────────────
+  // ── Tick (duration check, periodic flush) ─────────────────────────────────
 
   #tick() {
     if (this.#state !== STATE.PLAYING) return;
-    const elapsed = (performance.now() - this.#startTime) / 1000;
-    if (elapsed >= CONFIG.DURATION_SECS) this.#finish(false);
+    const now = performance.now();
+    if (now - this.#lastFlush >= CONFIG.FLUSH_INTERVAL_MS) this.#flushRows();
+    if ((now - this.#startTime) / 1000 >= CONFIG.DURATION_SECS) this.#finish(false);
   }
 
   // ── CSV output ────────────────────────────────────────────────────────────
+  //
+  // Main processes file IPC in order with synchronous fs calls, so the
+  // header written here always lands before the first appended rows.
 
-  async #writeCSV() {
-    if (!window.api || this.#sampleBuffer.length === 0) return;
-    const dir    = CONFIG.DATA_DIR;
-    const result = await window.api.ensureDir(dir);
-    if (!result.ok) {
-      console.error('[Baseline] could not create data dir:', result.error);
-      return;
-    }
-
-    const path   = `${dir}/${this.#subjectCode}_baseline.csv`;
-    const header = 'timestamp,value\n';
-    const rows   = this.#sampleBuffer
-      .map(([t, v]) => `${t},${v.toFixed(6)}`)
-      .join('\n') + '\n';
-    const write = await window.api.writeCSV(path, header + rows);
-    if (write.ok) {
-      console.log(`[Baseline] saved ${this.#sampleBuffer.length} samples → ${path}`);
-    } else {
-      console.error('[Baseline] CSV write failed:', write.error);
-    }
-
-    await this.#writeEstimates(dir);
+  #initCSV() {
+    this.#csvPath = `${CONFIG.DATA_DIR}/${this.#subjectCode}_baseline.csv`;
+    if (!window.api) return;
+    window.api.writeCSV(this.#csvPath, 'timestamp,value\n').then((res) => {
+      if (!res.ok) this.#csvError(`could not create ${this.#csvPath}: ${res.error}`);
+    });
   }
 
-  async #writeEstimates(dir) {
-    const buf = this.#sampleBuffer;
-    const n   = buf.length;
-    if (n < 2) return;
+  #takePendingRows() {
+    if (this.#pendingRows.length === 0) return null;
+    const content = this.#pendingRows.join('\n') + '\n';
+    this.#pendingRows = [];
+    return content;
+  }
 
-    // Extract signal values and derive sample rate from wall-clock timestamps
-    const values = new Float64Array(n);
-    for (let i = 0; i < n; i++) values[i] = buf[i][1];
+  #flushRows() {
+    this.#lastFlush = performance.now();
+    const content = this.#takePendingRows();
+    if (!content || !window.api) return;
+    window.api.appendCSV(this.#csvPath, content).then((res) => {
+      if (!res.ok) this.#csvError(`write failed: ${res.error}`);
+    });
+  }
 
-    const durationSecs = (new Date(buf[n - 1][0]) - new Date(buf[0][0])) / 1000;
+  #flushRowsSync() {
+    if (this.#state !== STATE.PLAYING) return;
+    const content = this.#takePendingRows();
+    if (!content || !window.api) return;
+    const res = window.api.appendCSVSync(this.#csvPath, content);
+    if (!res.ok) console.error('[Baseline] final flush failed:', res.error);
+  }
+
+  #csvError(msg) {
+    console.error('[Baseline] CSV', msg);
+    this.#warning = `⚠ CSV ${msg}`;
+    this.#pushState();
+  }
+
+  async #writeEstimates() {
+    const n = this.#values.length;
+    if (!window.api || n < 2) return;
+
+    // Sample rate from the wall-clock arrival times of the first/last sample
+    const values       = Float64Array.from(this.#values);
+    const durationSecs = (this.#lastSampleMs - this.#firstSampleMs) / 1000;
     const sampleRate   = durationSecs > 0 ? (n - 1) / durationSecs : n;
 
     const estimates = estimateBreathRate(values, sampleRate, { windowed: true });
 
-    const path   = `${dir}/${this.#subjectCode}_baseline_estimates.csv`;
+    const path   = `${CONFIG.DATA_DIR}/${this.#subjectCode}_baseline_estimates.csv`;
     const header = 'method,hz,bpm\n';
     const rows   = Object.entries(estimates)
       .map(([method, hz]) => {
@@ -269,7 +311,7 @@ export default class Baseline {
       stateText:    this.#state,
       startEnabled: this.#state === STATE.IDLE && this.#streamReady,
       abortVisible: false,
-      warning:      this.#videoWarning,   // included every push so it survives the 'ready' resync
+      warning:      this.#warning,   // included every push so it survives the 'ready' resync
       ...overrides,
     });
   }
