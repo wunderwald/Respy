@@ -65,27 +65,54 @@ export class BeltTrainingGameCSV {
   }
 
   async flushFrames(trialIndex) {
-    if (!window.api || this.#frameBuffer.length === 0) return;
-    const buf = this.#frameBuffer;
-    this.#frameBuffer = [];
-
-    const csv = buf.map(r =>
-      `${r.t},${r.trialIndex},${r.phase},${r.segment},${r.raw.toFixed(4)},${r.smoothed.toFixed(4)},` +
-      `${r.norm.toFixed(4)},${r.normMin.toFixed(6)},${r.normMax.toFixed(6)},` +
-      `${r.fishX.toFixed(4)},${r.fishY.toFixed(4)},${r.targetY.toFixed(4)}`
-    ).join('\n') + '\n';
-
+    const csv = this.#takeFrames();
+    if (!csv || !window.api) return;
     const res = await window.api.appendCSV(this.#framePath(trialIndex), csv);
     if (!res.ok) this.#warn(`Could not write frame data: ${res.error}`);
   }
 
   async appendEvent(trialIndex, phase, event, value1 = '', value2 = '') {
     if (!window.api) return;
-    const row = `${new Date().toISOString()},${trialIndex},${phase ?? ''},${event},${value1},${value2}\n`;
-    const res = await window.api.appendCSV(
-      `${CONFIG.DATA_DIR}/${this.#subjectCode}/eventData.csv`, row
-    );
+    const res = await window.api.appendCSV(this.#eventPath, this.#eventRow(trialIndex, phase, event, value1, value2));
     if (!res.ok) this.#warn(`Could not write event '${event}': ${res.error}`);
+  }
+
+  // ── Synchronous variants — only for the 'pagehide' handler (window
+  //    closing), where an async write might never arrive. ────────────────
+
+  flushFramesSync(trialIndex) {
+    const csv = this.#takeFrames();
+    if (!csv || !window.api) return;
+    const res = window.api.appendCSVSync(this.#framePath(trialIndex), csv);
+    if (!res.ok) console.error('[CSV] final frame flush failed:', res.error);
+  }
+
+  appendEventSync(trialIndex, phase, event, value1 = '', value2 = '') {
+    if (!window.api) return;
+    const res = window.api.appendCSVSync(this.#eventPath, this.#eventRow(trialIndex, phase, event, value1, value2));
+    if (!res.ok) console.error(`[CSV] could not write event '${event}':`, res.error);
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  // Empties the buffer and returns its rows as CSV text (null if empty).
+  #takeFrames() {
+    if (this.#frameBuffer.length === 0) return null;
+    const buf = this.#frameBuffer;
+    this.#frameBuffer = [];
+    return buf.map(r =>
+      `${r.t},${r.trialIndex},${r.phase},${r.segment},${r.raw.toFixed(4)},${r.smoothed.toFixed(4)},` +
+      `${r.norm.toFixed(4)},${r.normMin.toFixed(6)},${r.normMax.toFixed(6)},` +
+      `${r.fishX.toFixed(4)},${r.fishY.toFixed(4)},${r.targetY.toFixed(4)}`
+    ).join('\n') + '\n';
+  }
+
+  #eventRow(trialIndex, phase, event, value1, value2) {
+    return `${new Date().toISOString()},${trialIndex},${phase ?? ''},${event},${value1},${value2}\n`;
+  }
+
+  get #eventPath() {
+    return `${CONFIG.DATA_DIR}/${this.#subjectCode}/eventData.csv`;
   }
 
   #framePath(trialIndex) {

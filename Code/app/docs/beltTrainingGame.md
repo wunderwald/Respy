@@ -77,6 +77,8 @@ The photo starts blank and "develops" in over `PHOTO_DEVELOP_MS` (default 2000ms
 | Abort trial | Ends only the running trial (available during either countdown and either phase) — also bound to **Escape**. The aborted trial gets no photo; the session moves on to the next trial's READY screen (always waits there, even with auto-proceed on), or ends if it was the last trial |
 | **Press SPACE to continue** badge | Mirrors the **Next trial** button's visibility |
 
+**Ending a session early:** close the window. Buffered frame rows and a `session_closed` event are written synchronously before it goes away.
+
 The resp stream selector is never locked, even once other controls lock, so the experimenter can recover from a dropped stream mid-session (see [stream.md](stream.md)).
 
 There is no scene or group selector — the scene is fixed to "ocean."
@@ -94,6 +96,7 @@ Sent to `MARKER_STREAM_URL` (default `ws://localhost:9001`), one per trial index
 - `target_enter_tN` / `target_leave_tN` — fired once per phase (so twice per trial); which phase it belongs to is inferred from its position relative to the `training_*`/`test_*` markers around it
 - `trial_abort_tN` (on Abort trial — the session continues with trial N+1)
 - `experiment_done`
+- `session_closed` (window closed mid-session — best effort, the marker connection may already be gone)
 
 ---
 
@@ -105,6 +108,7 @@ Written to `output_data/belt_training_game/<subjectCode>/`:
   - `session_start` (value1 = scene id)
   - `target_leave` (value1 = fraction of the target-crossing segment spent inside the green band, `0`–`1`)
   - `trial_end`, `trial_abort`
+  - `session_closed` (value1 = state the window was closed in, e.g. `training`)
 - **`frameData_trial<N>.csv`** — one file per trial, one row per drawn animation frame, `timestamp,trialIndex,phase,segment,breathRaw,breathSmoothed,breathNorm,normMin,normMax,fishX,fishY,targetY`
   - `phase` is `training` or `test`; `segment` is `approach`, `target`, or `exit`
   - `fishX`/`fishY` and `targetY` are normalized canvas fractions (`targetY` is the trial's fixed target centre, repeated on every row for convenience)

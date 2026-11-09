@@ -55,6 +55,7 @@ export default class BeltTrainingGame {
   #state        = STATE.IDLE;
   #streamReady  = false;
   #inputsLocked = false;
+  #stateText    = 'waiting for stream…';   // last status line sent to the experimenter
 
   // ── Experiment settings (overridden by experimenter on start) ─────────────
   #subjectCode     = CONFIG.SUBJECT_CODE;
@@ -128,6 +129,7 @@ export default class BeltTrainingGame {
       : { send() {} };
 
     window.api.frontend.onAction((action) => this.#onAction(action));
+    window.addEventListener('pagehide', () => this.#onWindowClose());
 
     setInterval(() => this.#tick(), 100);
     requestAnimationFrame((t) => this.#rafLoop(t));
@@ -168,6 +170,7 @@ export default class BeltTrainingGame {
 
       case 'setAutoProceed':
         this.#autoProceed = !!autoProceed;
+        this.#pushState();   // Next's visibility on the photo screen depends on it
         break;
 
       case 'next':
@@ -383,6 +386,16 @@ export default class BeltTrainingGame {
     this.#beginReadyForTrial({ afterAbort: true });
   }
 
+  // Closing the window is how a session is ended early: write the buffered
+  // frame rows and a 'session_closed' event (value1 = state it was closed
+  // in) synchronously — an async write might never arrive.
+  #onWindowClose() {
+    if (!this.#csv || this.#state === STATE.DONE) return;   // no session running
+    this.#csv.flushFramesSync(this.#trialIndex);
+    this.#csv.appendEventSync(this.#trialIndex, this.#phase, 'session_closed', this.#state);
+    this.#markers.send('session_closed');   // best effort — the socket may already be gone
+  }
+
   #endExperiment() {
     this.#state = STATE.DONE;
     this.#markers.send('experiment_done');
@@ -570,16 +583,21 @@ export default class BeltTrainingGame {
 
   // ── Experimenter state push ───────────────────────────────────────────────
 
+  // Every push is a full snapshot. Button visibility is derived from the
+  // state, so a partial update (e.g. a CSV warning) can't hide them; the
+  // status line repeats the last one sent unless overridden.
   #pushState(overrides = {}) {
+    if (overrides.stateText !== undefined) this.#stateText = overrides.stateText;
+    const s = this.#state;
     window.api.frontend.sendState({
-      stateText:    this.#state,
-      startEnabled: this.#streamReady && this.#state === STATE.IDLE,
+      startEnabled: this.#streamReady && s === STATE.IDLE,
       startText:    'Start',
-      nextVisible:  false,
-      abortVisible: false,
-      calFailed:    false,
+      nextVisible:  s === STATE.READY || (s === STATE.PHOTO && !this.#autoProceed),
+      abortVisible: s === STATE.COUNTDOWN || s === STATE.TRAINING || s === STATE.TEST,
+      calFailed:    s === STATE.CALIBRATING && this.#calFailed,
       inputsLocked: this.#inputsLocked,
       ...overrides,
+      stateText:    this.#stateText,
     });
   }
 
