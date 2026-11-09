@@ -101,7 +101,7 @@ ipcMain.handle("write-csv", (_event, filePath, content) => {
  * rather than buffering the whole trial in memory.
  * Returns { ok: true } or { ok: false, error: string }.
  */
-ipcMain.handle("append-csv", (_event, filePath, content) => {
+function appendCSV(filePath, content) {
   try {
     const resolved = path.isAbsolute(filePath)
       ? filePath
@@ -113,6 +113,17 @@ ipcMain.handle("append-csv", (_event, filePath, content) => {
     console.error("[fs] append-csv failed:", err.message);
     return { ok: false, error: err.message };
   }
+}
+ipcMain.handle("append-csv", (_event, filePath, content) => appendCSV(filePath, content));
+
+/**
+ * append-csv-sync
+ * Same as append-csv, but the renderer blocks until the data is on disk.
+ * Only for last-moment flushes from a 'pagehide' handler (window closing /
+ * app quitting), where an async invoke might never be delivered.
+ */
+ipcMain.on("append-csv-sync", (event, filePath, content) => {
+  event.returnValue = appendCSV(filePath, content);
 });
 
 /**

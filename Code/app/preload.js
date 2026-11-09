@@ -19,6 +19,10 @@
  *     Appends content to filePath.  Creates the file if it does not exist.
  *     Use this to write frame-data rows incrementally during a trial.
  *
+ *   window.api.appendCSVSync(filePath, content)
+ *     Synchronous variant of appendCSV: returns { ok, error? } directly and
+ *     blocks until written. Only for final flushes in a 'pagehide' handler.
+ *
  * All paths may be absolute or relative to the electron/ app directory.
  *
  * Usage example (renderer):
@@ -26,13 +30,13 @@
  *   // Write a header row when a trial starts
  *   await window.api.writeCSV(
  *     'iBreathData/P01/frameData_1.csv',
- *     'trialIndex,timestamp,gaze_x,gaze_y,breathLevel_input,breathLevel_scaled,stimulusLevel\n'
+ *     'trialIndex,timestamp,breathLevel_input,stimulusLevel\n'
  *   );
  *
  *   // Append one row per frame during the trial
  *   await window.api.appendCSV(
  *     'iBreathData/P01/frameData_1.csv',
- *     `1,2024-01-01T12:00:00.000Z,640,400,0.42,0.61,0.55\n`
+ *     `1,2024-01-01T12:00:00.000Z,0.42,0.55\n`
  *   );
  *
  *   // Write the trial summary after the trial ends
@@ -71,6 +75,14 @@ contextBridge.exposeInMainWorld("api", {
    */
   appendCSV: (filePath, content) =>
     ipcRenderer.invoke("append-csv", filePath, content),
+
+  /**
+   * Synchronous appendCSV — blocks the renderer until written. Only for the
+   * last flush in a 'pagehide' handler, where an async call may be lost.
+   * @returns {{ ok: boolean, error?: string }}
+   */
+  appendCSVSync: (filePath, content) =>
+    ipcRenderer.sendSync("append-csv-sync", filePath, content),
 
   // HUD IPC — used by both the scene window (RemoteHud) and experimenter window
   hud: {
