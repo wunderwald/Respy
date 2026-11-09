@@ -13,7 +13,9 @@
  *
  * trialFadeGain ramps 0→1 on startTrial and 1→0 on stopTrial, so both
  * trial sounds fade in and out together as one unit.
- * noiseGain is updated in real-time via setNoiseLevel().
+ * noiseGain is updated in real-time via setNoiseLevel(). The noise is
+ * generated white noise unless CFG.NOISE names a sample file.
+ * The ambience is skipped entirely while CFG.AMBIENCE_VOLUME is 0 (muted).
  * The jingle handles its own fade via LoopPlayer.start/stop.
  */
 
@@ -38,8 +40,10 @@ export class IBreathSound {
   async init() {
     await this.#engine.init();
     const [ambience, noise, jingle] = await Promise.all([
-      this.#engine.loadBuffer(CFG.AMBIENCE),
-      this.#engine.loadBuffer(CFG.NOISE),
+      CFG.AMBIENCE_VOLUME > 0 ? this.#engine.loadBuffer(CFG.AMBIENCE) : null,
+      CFG.NOISE === 'white'
+        ? this.#engine.createWhiteNoise(CFG.WHITE_NOISE_SECS)
+        : this.#engine.loadBuffer(CFG.NOISE),
       this.#engine.loadBuffer(CFG.JINGLE),
     ]);
     this.#buf = { ambience, noise, jingle };
@@ -63,6 +67,7 @@ export class IBreathSound {
     fg.gain.linearRampToValueAtTime(1, t + CFG.FADE_SECS);
     this.#trialFadeGain = fg;
 
+    // A null buffer (muted / not loaded) makes the LoopPlayer a silent no-op.
     this.#ambience = new LoopPlayer(this.#engine.ctx, this.#buf.ambience);
     this.#ambience.start(fg, { gain: CFG.AMBIENCE_VOLUME });
 
