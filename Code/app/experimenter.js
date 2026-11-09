@@ -137,6 +137,7 @@ if (frontend === 'ibreath') {
     <span class="label">trials</span>
     <input id="s-num-trials" type="number" class="settings-num" min="1" step="1"
            value="${CONFIG.MAX_NUM_TRIALS}" title="Number of trials — set by the preset if it defines numTrials" />
+    <span id="s-trials-warning" class="preset-warning" style="display:none"></span>
     <span class="label">preset</span>
     <select id="s-preset" class="stream-select">
       <option value="">None (sync only)</option>
@@ -179,6 +180,7 @@ if (frontend === 'ibreath') {
 
   const signalTypeSelect  = document.getElementById('s-signal-type');
   const numTrialsInput    = document.getElementById('s-num-trials');
+  const trialsWarningEl   = document.getElementById('s-trials-warning');
   const presetSelect      = document.getElementById('s-preset');
   const presetStatusEl    = document.getElementById('s-preset-status');
   const presetWarningEl   = document.getElementById('ib-preset-warning');
@@ -274,8 +276,8 @@ if (frontend === 'ibreath') {
 
   startBtn.addEventListener('click', () => {
     const numTrials = parseTrialCount(numTrialsInput.value);
-    if (numTrials == null) {   // the field is editable in that case — let the experimenter fix it
-      presetStatusEl.textContent = '⚠ trials must be a whole number ≥ 1';
+    if (numTrials == null) {   // the field is editable then; the warning next to it says why
+      updateTrialsWarning();
       numTrialsInput.focus();
       return;
     }
@@ -333,6 +335,22 @@ if (frontend === 'ibreath') {
     return Number.isInteger(n) && n >= 1 ? n : null;
   }
 
+  // Trial attributes are balanced in shuffled blocks — left/right and
+  // pufferfish/starfish in blocks of 4 (sync/async in blocks of 2) — so
+  // only a multiple of 4 gives exactly balanced counts. Not blocking: the
+  // session runs either way.
+  function updateTrialsWarning() {
+    const n = parseTrialCount(numTrialsInput.value);
+    const msg = n == null
+      ? '⚠ trials must be a whole number ≥ 1'
+      : n % 4 !== 0
+        ? `⚠ ${n} is not a multiple of 4: trial params won't be exactly balanced`
+        : '';
+    trialsWarningEl.textContent   = msg;
+    trialsWarningEl.style.display = msg ? '' : 'none';
+  }
+  numTrialsInput.addEventListener('input', updateTrialsWarning);
+
   function updateSyncWarning(questions) {
     const list = questions?.length ? questions : CONFIG.QUESTIONS;
     const hasSync = list.some(q => q.id === 'sync');
@@ -372,6 +390,7 @@ if (frontend === 'ibreath') {
     } else {
       numTrialsInput.disabled = false;
     }
+    updateTrialsWarning();
 
     updateSyncWarning(preset?.questions);
   }
