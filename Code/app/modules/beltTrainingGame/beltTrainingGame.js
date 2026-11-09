@@ -4,9 +4,10 @@
  * Gets children used to controlling the on-screen fish with a respiration
  * belt before they play the main BioGame.
  *
- * State machine:
- *   IDLE → CALIBRATING → READY → COUNTDOWN → TRAINING → COUNTDOWN → TEST → PHOTO → READY → … → DONE
- *                           ↑________________________________________________________|
+ * State machine (one trial; CONFIG.TRAINING_PASSES = 2 training phases):
+ *   IDLE → CALIBRATING → READY → COUNTDOWN → TRAINING (1) → COUNTDOWN → TRAINING (2)
+ *                          ↑      → COUNTDOWN → TEST → PHOTO → READY → … → DONE
+ *                          |_____________________________________|
  *                        (one READY per trial, waits for Space/Next — the fish is
  *                         live breath-driven here too, so the child can see the
  *                         connection before the trial starts; skipped entirely if
@@ -16,13 +17,16 @@
  *                         auto-advances if "auto-proceed" is on, otherwise also
  *                         waits for Space/Next.)
  *
- * Each trial reuses the same random target y-position for both its training
- * and test phases. In both phases the fish travels left→right through three
- * segments, timed by APPROACH/TARGET_AREA/EXIT_DURATION_MS: approach the
- * target zone, cross it slowly, then exit quickly. In the training phase the
- * red/yellow/green target bands and the fish are visible; in the test phase
- * the target zone is covered by a bubble overlay and the fish disappears
- * while crossing it — the child must reproduce the same breath level blind.
+ * Each trial reuses the same random target y-position for all its phases.
+ * In every phase the fish travels left→right through three segments, timed
+ * by APPROACH/TARGET_AREA/EXIT_DURATION_MS: approach the target zone, cross
+ * it slowly, then exit quickly. In the training phases the red/yellow/green
+ * target bands and the fish are visible; in the test phase the target zone
+ * is covered by a bubble overlay and the fish disappears while crossing it —
+ * the child must reproduce the same breath level blind.
+ *
+ * Phases are labelled 'training1', 'training2', …, 'test' in the CSVs and
+ * markers (see #phaseLabel), so the training passes can be told apart.
  *
  * No scoring/feedback UI during gameplay (by design) — the only feedback is
  * the post-test photo, which is purely celebratory (best moment, not a
@@ -77,8 +81,9 @@ export default class BeltTrainingGame {
 
   // ── Trial / phase state ───────────────────────────────────────────────────
   #trialIndex      = 0;
-  #targetNormY     = 0.5;   // random per trial, reused for both phases
-  #phase           = null;  // 'training' | 'test' | null
+  #targetNormY     = 0.5;   // random per trial, reused for all its phases
+  #phaseStep       = null;  // 0 … TRAINING_PASSES-1 = training passes, TRAINING_PASSES = test
+  #phase           = null;  // 'training' | 'test' | null — the kind of #phaseStep
   #segment         = null;  // 'approach' | 'target' | 'exit' | null
   #phaseStartTime  = null;
   #fishXRatio      = CONFIG.SPAWN_X_RATIO;
@@ -98,7 +103,7 @@ export default class BeltTrainingGame {
 
   // ── Countdown (3-2-1-GO before each phase) ────────────────────────────────
   #countdownStartTime = null;
-  #pendingPhase       = null;  // phase the countdown is leading into: 'training' | 'test'
+  #pendingStep        = null;  // phase step the countdown is leading into
 
   // ── Data / frame recording ───────────────────────────────────────────────
   #csv             = null;
@@ -173,7 +178,7 @@ export default class BeltTrainingGame {
         break;
 
       case 'next':
-        if (this.#state === STATE.READY) this.#beginCountdown('training');
+        if (this.#state === STATE.READY) this.#beginCountdown(0);
         else if (this.#state === STATE.PHOTO) this.#finishPhotoReview();
         break;
 
@@ -270,11 +275,12 @@ export default class BeltTrainingGame {
   // experimenter can sort out whatever made them abort before going on.
   #beginReadyForTrial({ afterAbort = false } = {}) {
     this.#targetNormY = randBetween(CONFIG.TARGET_Y_MIN, CONFIG.TARGET_Y_MAX);
+    this.#phaseStep   = null;
     this.#phase       = null;
     this.#segment     = null;
 
     if (this.#autoProceed && !afterAbort) {
-      this.#beginCountdown('training');
+      this.#beginCountdown(0);
       return;
     }
 
@@ -288,38 +294,55 @@ export default class BeltTrainingGame {
     });
   }
 
-  #beginCountdown(phase) {
-    this.#pendingPhase       = phase;
+  // ── Phase steps ───────────────────────────────────────────────────────────
+  //
+  // A trial is TRAINING_PASSES training phases followed by one test phase,
+  // numbered as steps 0 … TRAINING_PASSES (the last step is the test).
+
+  static #kindOf(step) {
+    return step < CONFIG.TRAINING_PASSES ? 'training' : 'test';
+  }
+
+  // 'training1', 'training2', … or 'test' — used in CSVs, markers and status.
+  static #labelOf(step) {
+    if (step == null) return '';
+    return step < CONFIG.TRAINING_PASSES ? `training${step + 1}` : 'test';
+  }
+
+  get #phaseLabel() {
+    return BeltTrainingGame.#labelOf(this.#phaseStep);
+  }
+
+  #beginCountdown(step) {
+    this.#pendingStep        = step;
     this.#countdownStartTime = performance.now();
     this.#state              = STATE.COUNTDOWN;
     this.#pushState({
-      stateText:    `trial ${this.#trialIndex + 1} / ${CONFIG.NUM_TRIALS} — starting ${phase}…`,
+      stateText:    `trial ${this.#trialIndex + 1} / ${CONFIG.NUM_TRIALS} — starting ${BeltTrainingGame.#labelOf(step)}…`,
       nextVisible:  false,
       abortVisible: true,
     });
   }
 
-  #beginTrialPhase(phase) {
-    this.#phase          = phase;
+  #beginTrialPhase(step) {
+    this.#phaseStep      = step;
+    this.#phase          = BeltTrainingGame.#kindOf(step);
     this.#segment        = 'approach';
     this.#phaseStartTime = performance.now();
     this.#fishXRatio     = CONFIG.SPAWN_X_RATIO;
     this.#segGreenTime   = 0;
     this.#segTotalTime   = 0;
 
-    if (phase === 'training') {
+    if (step === 0) {
       this.#markers.send(`trial_start_t${this.#trialIndex}`);
-      this.#markers.send(`training_start_t${this.#trialIndex}`);
       this.#csv.initTrialCSV(this.#trialIndex);
-      this.#state = STATE.TRAINING;
-      this.#sound.startBlock();  // spans the whole trial — training through test
-    } else {
-      this.#markers.send(`test_start_t${this.#trialIndex}`);
-      this.#state = STATE.TEST;
+      this.#sound.startBlock();  // spans the whole trial — first training through test
     }
+    this.#markers.send(`${this.#phaseLabel}_start_t${this.#trialIndex}`);
+    this.#state = this.#phase === 'training' ? STATE.TRAINING : STATE.TEST;
 
     this.#pushState({
-      stateText:    `trial ${this.#trialIndex + 1} / ${CONFIG.NUM_TRIALS} — ${phase}`,
+      stateText:    `trial ${this.#trialIndex + 1} / ${CONFIG.NUM_TRIALS} — ${this.#phaseLabel}`,
       nextVisible:  false,
       abortVisible: true,
     });
@@ -327,16 +350,15 @@ export default class BeltTrainingGame {
 
   #endPhase() {
     this.#csv.flushFrames(this.#trialIndex);
+    this.#markers.send(`${this.#phaseLabel}_end_t${this.#trialIndex}`);
 
     if (this.#phase === 'training') {
-      this.#markers.send(`training_end_t${this.#trialIndex}`);
-      this.#beginCountdown('test');
+      this.#beginCountdown(this.#phaseStep + 1);   // next training pass, or the test
       return;
     }
 
-    this.#markers.send(`test_end_t${this.#trialIndex}`);
     this.#markers.send(`trial_end_t${this.#trialIndex}`);
-    this.#csv.appendEvent(this.#trialIndex, 'test', 'trial_end');
+    this.#csv.appendEvent(this.#trialIndex, this.#phaseLabel, 'trial_end');
     this.#sound.stopBlock();
 
     this.#beginPhotoReview();
@@ -373,9 +395,9 @@ export default class BeltTrainingGame {
   #abortTrial() {
     this.#csv?.flushFrames(this.#trialIndex);
     this.#markers.send(`trial_abort_t${this.#trialIndex}`);
-    this.#csv?.appendEvent(this.#trialIndex, this.#phase, 'trial_abort');
+    this.#csv?.appendEvent(this.#trialIndex, this.#phaseLabel, 'trial_abort');
     this.#sound?.stopBlock();  // no-op if the soundscape wasn't playing
-    this.#pendingPhase = null;
+    this.#pendingStep = null;
 
     this.#trialIndex++;
     if (this.#trialIndex >= CONFIG.NUM_TRIALS) {
@@ -391,7 +413,7 @@ export default class BeltTrainingGame {
   #onWindowClose() {
     if (!this.#csv || this.#state === STATE.DONE) return;   // no session running
     this.#csv.flushFramesSync(this.#trialIndex);
-    this.#csv.appendEventSync(this.#trialIndex, this.#phase, 'session_closed', this.#state);
+    this.#csv.appendEventSync(this.#trialIndex, this.#phaseLabel, 'session_closed', this.#state);
     this.#markers.send('session_closed');   // best effort — the socket may already be gone
   }
 
@@ -414,9 +436,9 @@ export default class BeltTrainingGame {
 
     if (this.#state === STATE.COUNTDOWN) {
       if ((performance.now() - this.#countdownStartTime) / 1000 >= CONFIG.COUNTDOWN_SECS) {
-        const phase = this.#pendingPhase;
-        this.#pendingPhase = null;
-        this.#beginTrialPhase(phase);
+        const step = this.#pendingStep;
+        this.#pendingStep = null;
+        this.#beginTrialPhase(step);
       }
     }
 
@@ -504,7 +526,7 @@ export default class BeltTrainingGame {
       if (this.#segment === 'target' && newSegment !== 'target') {
         const greenFraction = this.#segTotalTime > 0 ? this.#segGreenTime / this.#segTotalTime : 0;
         this.#markers.send(`target_leave_t${this.#trialIndex}`);
-        this.#csv.appendEvent(this.#trialIndex, this.#phase, 'target_leave', greenFraction.toFixed(3));
+        this.#csv.appendEvent(this.#trialIndex, this.#phaseLabel, 'target_leave', greenFraction.toFixed(3));
       }
       this.#segment = newSegment;
     }
@@ -534,7 +556,7 @@ export default class BeltTrainingGame {
     this.#csv.bufferFrame({
       t:        new Date().toISOString(),
       trialIndex: this.#trialIndex,
-      phase:    this.#phase ?? '',
+      phase:    this.#phaseLabel,   // 'training1' | 'training2' | 'test'
       segment:  this.#segment ?? '',
       raw:      this.#lastRaw,
       smoothed: this.#smoother.value,

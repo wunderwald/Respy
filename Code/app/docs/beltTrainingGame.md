@@ -16,16 +16,16 @@ Or select **Belt Training Game** from the start screen (`npm start`).
 
 ## Trial structure
 
-The game runs `NUM_TRIALS` trials (default **9**). Each trial has two phases, both using the **same randomly chosen target y-position**:
+The game runs `NUM_TRIALS` trials (default **9**). Each trial has three phases — **two training phases, then one test phase** (`TRAINING_PASSES`, default 2) — all using the **same randomly chosen target y-position**:
 
-1. **Training phase** — the target zone (red/yellow/green/yellow/red bands, see screenshot concept) is visible, and so is the fish. The player's goal is to hold their breath level inside the **green** band for the duration of the target crossing.
-2. **Test phase** — the target zone is covered by a drifting bubble overlay, and the fish **fades out** as it enters that zone and fades back in as it leaves (`FISH_FADE_WIDTH_RATIO`, a smooth opacity ramp rather than an instant toggle), reproducing the same breath level as in the training phase, blind.
+1. **Training phases** (`training1`, `training2`) — identical; the target zone (red/yellow/green/yellow/red bands, see screenshot concept) is visible, and so is the fish. The player's goal is to hold their breath level inside the **green** band for the duration of the target crossing.
+2. **Test phase** — the target zone is covered by a drifting bubble overlay, and the fish **fades out** as it enters that zone and fades back in as it leaves (`FISH_FADE_WIDTH_RATIO`, a smooth opacity ramp rather than an instant toggle), reproducing the same breath level as in the training phases, blind.
 
-Before each trial there is a **READY** screen: the fish is driven live by the participant's own breath (exactly like gameplay — `AVATAR_SIZE_MIN/MAX`-sized, tilt and all), with the caption "See how your breath moves the fish!", so the child sees the connection before the trial starts. The experimenter must press **Space** (or click **Next trial**) to continue — once per trial, not once per phase — unless **auto-proceed** is on (see below), in which case this screen is skipped entirely. A **3-2-1-GO countdown** (`COUNTDOWN_SECS`, default 3.75s) automatically precedes *each* phase — both right after READY and again between the training and test phase — showing the same "three fish bopping" animation iBreath shows before its trials (see [`animationDisplay.js`](../modules/ibreath/animationDisplay.js)) with the countdown number overlaid on top. The transition from the training phase to the test phase within a trial is otherwise automatic (no extra Space press).
+Before each trial there is a **READY** screen: the fish is driven live by the participant's own breath (exactly like gameplay — `AVATAR_SIZE_MIN/MAX`-sized, tilt and all), with the caption "See how your breath moves the fish!", so the child sees the connection before the trial starts. The experimenter must press **Space** (or click **Next trial**) to continue — once per trial, not once per phase — unless **auto-proceed** is on (see below), in which case this screen is skipped entirely. A **3-2-1-GO countdown** (`COUNTDOWN_SECS`, default 3.75s) automatically precedes *each* phase — right after READY and again before every following phase (so three per trial) — showing the same "three fish bopping" animation iBreath shows before its trials (see [`animationDisplay.js`](../modules/ibreath/animationDisplay.js)) with the countdown number overlaid on top. The transitions between the phases of a trial are otherwise automatic (no extra Space press).
 
-During each phase, a caption reminds the participant what to do: **"Hold your breath in the green area!"** in the training phase, **"Hold your breath just like before!"** in the test phase (where the target is hidden).
+During each phase, a caption reminds the participant what to do: **"Hold your breath in the green area!"** in both training phases, **"Hold your breath just like before!"** in the test phase (where the target is hidden).
 
-In both phases the fish travels left → right through three timed segments:
+In every phase the fish travels left → right through three timed segments:
 
 | Segment | Duration constant | Behaviour |
 |---|---|---|
@@ -41,7 +41,7 @@ After each test phase, a **polaroid photo review** appears (see below) — the o
 
 ## Target geometry
 
-The target centre y-position is randomized per trial (uniformly within `[TARGET_Y_MIN, TARGET_Y_MAX]`, default `[0.25, 0.75]` of the play area) and reused for both phases of that trial. Three nested bands are drawn around that centre, by half-height:
+The target centre y-position is randomized per trial (uniformly within `[TARGET_Y_MIN, TARGET_Y_MAX]`, default `[0.25, 0.75]` of the play area) and reused for all three phases of that trial. Three nested bands are drawn around that centre, by half-height:
 
 - `TARGET_HEIGHT` (green, default 0.090) — the "hold" zone
 - `TARGET_HEIGHT_YELLOW` (default 0.135)
@@ -91,9 +91,9 @@ Sent to `MARKER_STREAM_URL` (default `ws://localhost:9001`), one per trial index
 
 - `calibration_start` / `calibration_end` / `calibration_failed` / `calibration_default_used`
 - `trial_start_tN` / `trial_end_tN`
-- `training_start_tN` / `training_end_tN`
+- `training1_start_tN` / `training1_end_tN`, `training2_start_tN` / `training2_end_tN` (one pair per training pass)
 - `test_start_tN` / `test_end_tN`
-- `target_enter_tN` / `target_leave_tN` — fired once per phase (so twice per trial); which phase it belongs to is inferred from its position relative to the `training_*`/`test_*` markers around it
+- `target_enter_tN` / `target_leave_tN` — fired once per phase (so three times per trial); which phase it belongs to is inferred from its position relative to the `training1_*`/`training2_*`/`test_*` markers around it
 - `trial_abort_tN` (on Abort trial — the session continues with trial N+1)
 - `experiment_done`
 - `session_closed` (window closed mid-session — best effort, the marker connection may already be gone)
@@ -108,9 +108,9 @@ Written to `output_data/belt_training_game/<subjectCode>/`:
   - `session_start` (value1 = scene id)
   - `target_leave` (value1 = fraction of the target-crossing segment spent inside the green band, `0`–`1`)
   - `trial_end`, `trial_abort`
-  - `session_closed` (value1 = state the window was closed in, e.g. `training`)
+  - `session_closed` (value1 = state the window was closed in, e.g. `training`; the `phase` column says which pass)
 - **`frameData_trial<N>.csv`** — one file per trial, one row per drawn animation frame, `timestamp,trialIndex,phase,segment,breathRaw,breathSmoothed,breathNorm,normMin,normMax,fishX,fishY,targetY`
-  - `phase` is `training` or `test`; `segment` is `approach`, `target`, or `exit`
+  - `phase` is `training1`, `training2` or `test` (also in `eventData.csv`'s `phase` column); `segment` is `approach`, `target`, or `exit`
   - `fishX`/`fishY` and `targetY` are normalized canvas fractions (`targetY` is the trial's fixed target centre, repeated on every row for convenience)
 
 ---
@@ -119,5 +119,5 @@ Written to `output_data/belt_training_game/<subjectCode>/`:
 
 - Calibration and range-adaptation (`RespCalibration`, `AdaptiveRange`) are the same classes BioGame uses, with the same config fields (`RANGE_ADAPT`, `RANGE_WINDOW_SECS`, etc.) — see [calibration.md](calibration.md).
 - Visuals (background texture, fish sprite) are drawn via the shared [`SceneRenderer`](../modules/bioGame/sceneRenderer.js), also used by BioGame's renderer — changes to the ocean scenery or fish sprite apply to both frontends automatically.
-- Sound reuses BioGame's ocean soundscape as-is via [`BioGameSound`](../modules/bioGame/bioGame_sound.js): a steady ambience loop plus a noise layer whose volume tracks the live breath signal in real time (`setNoiseLevel`). It spans the whole trial — starting when the training phase begins, fading out when the test phase ends (or on Abort) — so it keeps playing through the brief countdown between the two phases. Volumes/fades are in [`bioGame_sound_config.js`](../modules/bioGame/bioGame_sound_config.js); the curve-cue/collect sounds from BioGame aren't used here, since there are no items or a target curve.
+- Sound reuses BioGame's ocean soundscape as-is via [`BioGameSound`](../modules/bioGame/bioGame_sound.js): a steady ambience loop plus a noise layer whose volume tracks the live breath signal in real time (`setNoiseLevel`). It spans the whole trial — starting when the first training phase begins, fading out when the test phase ends (or on Abort) — so it keeps playing through the brief countdowns between the phases. Volumes/fades are in [`bioGame_sound_config.js`](../modules/bioGame/bioGame_sound_config.js); the curve-cue/collect sounds from BioGame aren't used here, since there are no items or a target curve.
 - All config is in [`beltTrainingGame_config.js`](../modules/beltTrainingGame/beltTrainingGame_config.js).

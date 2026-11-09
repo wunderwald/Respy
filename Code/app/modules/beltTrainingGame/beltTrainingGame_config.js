@@ -7,6 +7,7 @@ export const CONFIG = {
 
   // ── Trials ───────────────────────────────────────────────────────────────
   NUM_TRIALS:            9,
+  TRAINING_PASSES:       2,     // training phases per trial (target visible), followed by one test phase
   CALIBRATION_SECS:      30,
   // TODO: measure real min/max from pilot recordings and replace these placeholders
   DEFAULT_CAL_RANGE:     [0.2, 0.8],  // used if the experimenter chooses "use default" after a failed calibration
