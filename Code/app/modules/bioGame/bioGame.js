@@ -3,9 +3,18 @@
  * =============================================
  * State machine:  IDLE → CALIBRATING → READY → COUNTDOWN → PLAYING
  *                                                 ↑              ↓
- *                                          INTERMISSION ← (block 1 end)
- *                                                 ↓
+ *                                          INTERMISSION ← (block end / abort,
+ *                                                 ↓        unless last block)
  *                                           COUNTDOWN → PLAYING → DONE
+ *
+ * Abort only ends the running block; the session continues with the next
+ * one (or ends, if it was the last block).
+ *
+ * Gameplay runs on a fixed-step simulation clock (CONFIG.SIM_FPS): block
+ * time is frameIndex / SIM_FPS, items, curve, markers and block end all use
+ * it, and every step writes one frame-data row. Steps are caught up to the
+ * wall clock from both the rAF loop and the 100 ms tick, so the game stays
+ * in sync with real time even if rendering stalls or drops frames.
  *
  * Implements the standard frontend interface:
  *   pushSample(value: number) → void
@@ -56,8 +65,12 @@ export default class BioGame {
 
   // ── Block management ──────────────────────────────────────────────────────
   #blockIndex       = 0;
-  #blockStartTime   = null;
-  #scoreBlock       = [0, 0];
+  #blockStartTime   = null;   // performance.now() at block start — anchors the sim clock
+  #scoreBlock       = new Array(CONFIG.NUM_BLOCKS).fill(0);
+
+  // ── Fixed-step simulation ─────────────────────────────────────────────────
+  #simFrame = 0;   // steps simulated in the current block
+  static #STEP = 1 / CONFIG.SIM_FPS;   // seconds per step
 
   // ── Trial markers ─────────────────────────────────────────────────────────
   #trialIndex    = 0;
@@ -85,7 +98,7 @@ export default class BioGame {
 
   // ── Items ─────────────────────────────────────────────────────────────────
   #items         = [];
-  #nextSpawnTime = 0;
+  #nextSpawnTime = 0;   // block time (s) of the next spawn
 
   // ── Countdown ────────────────────────────────────────────────────────────
   #countdownStartTime = null;
@@ -95,7 +108,6 @@ export default class BioGame {
 
   // ── Data / frame recording ───────────────────────────────────────────────
   #csv             = null;
-  #lastFrameRecord = 0;
 
   // ── Timing ────────────────────────────────────────────────────────────────
   #lastRafTime = null;
@@ -226,7 +238,7 @@ export default class BioGame {
     this.#smoother.reset();
     this.#inputsLocked = true;
     this.#blockIndex   = 0;
-    this.#scoreBlock   = [0, 0];
+    this.#scoreBlock   = new Array(CONFIG.NUM_BLOCKS).fill(0);
     this.#trialIndex   = 0;
 
     this.#csv = new BioGameCSV(
@@ -288,10 +300,10 @@ export default class BioGame {
 
   #startBlock() {
     this.#blockStartTime  = performance.now();
-    this.#lastFrameRecord = performance.now();
+    this.#simFrame        = 0;
     this.#items           = [];
-    this.#nextSpawnTime   = performance.now() +
-      randBetween(CONFIG.ITEM_SPAWN_MIN_MS, CONFIG.ITEM_SPAWN_MAX_MS);
+    this.#particles       = [];
+    this.#nextSpawnTime   = randBetween(CONFIG.ITEM_SPAWN_MIN_MS, CONFIG.ITEM_SPAWN_MAX_MS) / 1000;
     this.#avatarStressNorm = CONFIG.AVATAR_STRESS_INIT;
     this.#speedNorm        = CONFIG.SCROLL_SPEED_INIT;
 
@@ -317,16 +329,18 @@ export default class BioGame {
     this.#csv.appendEvent(this.#blockIndex, aborted ? 'block_abort' : 'block_end',
       this.#scoreBlock[this.#blockIndex]);
 
-    if (aborted || this.#blockIndex >= CONFIG.NUM_BLOCKS - 1) {
+    // An aborted block only ends that block — the session goes on.
+    if (this.#blockIndex >= CONFIG.NUM_BLOCKS - 1) {
       this.#endExperiment();
       return;
     }
 
+    const finished = this.#blockIndex;
     this.#blockIndex++;
     this.#state = STATE.INTERMISSION;
     this.#pushState({
-      stateText:    'intermission',
-      score:        this.#scoreBlock[0],
+      stateText:    `intermission${aborted ? ` — game ${finished + 1} aborted` : ''}`,
+      score:        this.#scoreBlock[finished],
       abortVisible: false,
       nextVisible:  true,
     });
@@ -335,7 +349,7 @@ export default class BioGame {
   #endExperiment() {
     this.#state = STATE.DONE;
     this.#markers.send('experiment_done');
-    const total = this.#scoreBlock[0] + this.#scoreBlock[1];
+    const total = this.#scoreBlock.reduce((a, b) => a + b, 0);
     this.#pushState({ stateText: 'done', abortVisible: false, nextVisible: false, score: total });
   }
 
@@ -356,11 +370,44 @@ export default class BioGame {
       }
     }
 
-    if (this.#state === STATE.PLAYING) {
-      if ((now - this.#blockStartTime) / 1000 >= CONFIG.BLOCK_DURATION_SECS) {
-        this.#endBlock(false);
-      }
+    // Keeps the simulation (and block end) on time even while rAF stalls.
+    this.#advanceSim(now);
+  }
+
+  // ── Fixed-step simulation ─────────────────────────────────────────────────
+
+  get #blockTime() {
+    return this.#simFrame * BioGame.#STEP;
+  }
+
+  // Runs every step that is due by `now`, so sim time never lags real time
+  // by more than one step. Steps are cheap, so even a long stall is fully
+  // caught up in one go (those rows share a timestamp in the frame CSV).
+  #advanceSim(now) {
+    if (this.#state !== STATE.PLAYING) return;
+    const due = Math.floor((now - this.#blockStartTime) / 1000 / BioGame.#STEP);
+    if (this.#simFrame >= due) return;
+    while (this.#simFrame < due && this.#state === STATE.PLAYING) {
+      this.#simFrame++;
+      this.#stepSim();
     }
+    this.#sound.setNoiseLevel(this.#avatarNormY);
+  }
+
+  #stepSim() {
+    const dt = BioGame.#STEP;
+    const t  = this.#blockTime;
+    this.#updateSignal(dt);
+    this.#bgScrollX += this.#scrollSpeed * CONFIG.BG_SCROLL_FACTOR * dt;
+    this.#updateItems(t, dt);
+    this.#updateParticles(dt);
+    this.#updateAvatarBump(dt);
+    this.#checkTrialMarker(t);
+    this.#checkCurveCue(t);
+    this.#recordFrame(t);
+    // Compare frame counts, not float seconds, so a block is exactly
+    // BLOCK_DURATION_SECS × SIM_FPS steps long.
+    if (this.#simFrame >= Math.round(CONFIG.BLOCK_DURATION_SECS * CONFIG.SIM_FPS)) this.#endBlock(false);
   }
 
   // ── RAF loop ──────────────────────────────────────────────────────────────
@@ -369,23 +416,12 @@ export default class BioGame {
     const dt = this.#lastRafTime != null ? clamp((now - this.#lastRafTime) / 1000, 0, 0.05) : 0;
     this.#lastRafTime = now;
 
-    if (this.#state === STATE.PLAYING || this.#state === STATE.CALIBRATING) {
-      this.#updateSignal(dt);
-    }
-
-    if (this.#state === STATE.PLAYING) {
-      this.#sound.setNoiseLevel(this.#avatarNormY);
-      this.#bgScrollX += this.#scrollSpeed * CONFIG.BG_SCROLL_FACTOR * dt;
-      this.#updateItems(now, dt);
-      this.#updateParticles(dt);
-      this.#updateAvatarBump(dt);
-      this.#checkTrialMarker((now - this.#blockStartTime) / 1000);
-      this.#checkCurveCue((now - this.#blockStartTime) / 1000);
-      this.#recordFrame(now);
-    }
+    // Calibration preview: no sim, the avatar just follows the signal.
+    if (this.#state === STATE.CALIBRATING) this.#updateSignal(dt);
+    this.#advanceSim(now);
 
     try {
-      this.#renderer.draw(this.#buildRenderData(now, dt));
+      this.#renderer.draw(this.#buildRenderData(now));
     } catch (e) {
       console.error('[BioGame] draw error:', e);
     }
@@ -413,12 +449,11 @@ export default class BioGame {
 
   // ── Item spawning and movement ────────────────────────────────────────────
 
-  #updateItems(now, dt) {
-    const blockTime = (now - this.#blockStartTime) / 1000;
+  #updateItems(blockTime, dt) {
     const bpm   = this.#activeBpm;
     const speed = this.#scrollSpeed;
 
-    if (now >= this.#nextSpawnTime) {
+    if (blockTime >= this.#nextSpawnTime) {
       const tOffAtRightEdge = (1.0 - CONFIG.AVATAR_X_RATIO) / speed;
       this.#items.push({
         xRatio:    1.0,
@@ -429,7 +464,7 @@ export default class BioGame {
         collectT:  null,
         missT:     null,
       });
-      this.#nextSpawnTime = now + randBetween(CONFIG.ITEM_SPAWN_MIN_MS, CONFIG.ITEM_SPAWN_MAX_MS);
+      this.#nextSpawnTime = blockTime + randBetween(CONFIG.ITEM_SPAWN_MIN_MS, CONFIG.ITEM_SPAWN_MAX_MS) / 1000;
     }
 
     for (const item of this.#items) {
@@ -520,28 +555,28 @@ export default class BioGame {
 
   // ── Frame data recording ──────────────────────────────────────────────────
 
-  #recordFrame(now) {
-    if (now - this.#lastFrameRecord < CONFIG.FRAME_INTERVAL_MS) return;
-    this.#lastFrameRecord = now;
-
+  // One row per simulation step (= game frame) at a fixed SIM_FPS.
+  #recordFrame(blockTime) {
     this.#csv.bufferFrame({
       t:         new Date().toISOString(),
       block:     this.#blockIndex,
+      frame:     this.#simFrame,
+      blockTime,
       raw:       this.#lastRaw,
       smoothed:  this.#smoother.value,
       norm:      this.#avatarNormY,
       normMin:   this.#normRange[0],
       normMax:   this.#normRange[1],
       avatarY:   this.#avatarNormY,
-      targetY:   targetCurveY((now - this.#blockStartTime) / 1000, this.#activeBpm),
+      targetY:   targetCurveY(blockTime, this.#activeBpm),
       itemCount: this.#items.filter(s => !s.checked).length,
     });
   }
 
   // ── Render data builder ───────────────────────────────────────────────────
 
-  #buildRenderData(now, dt) {
-    const blockTime  = this.#blockStartTime != null ? (now - this.#blockStartTime) / 1000 : 0;
+  #buildRenderData(now) {
+    const blockTime = this.#blockStartTime != null ? this.#blockTime : 0;
 
     let countdownValue = 3, countdownProgress = 0;
     if (this.#countdownStartTime != null) {
@@ -566,8 +601,7 @@ export default class BioGame {
       particles:         this.#particles,
       score:             this.#scoreBlock[this.#blockIndex],
       blockIndex:        this.#blockIndex,
-      scoreBlock1:       this.#scoreBlock[0],
-      scoreBlock2:       this.#scoreBlock[1],
+      scoreBlocks:       this.#scoreBlock,
       group:             this.#group,
       showCurve:         this.#showCurve,
       scrollSpeed:       this.#scrollSpeed,

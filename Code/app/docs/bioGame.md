@@ -32,11 +32,17 @@ Two windows open:
 | **Score** | Live count of starfish collected in the current game. |
 | **Start** | Begins calibration. Requires a connected resp stream. |
 | **Start Game 2** | Appears after Game 1 ends. Starts the second block (also triggered by Space). |
-| **Abort** | Ends the current game immediately and saves data. |
+| **Abort game** | Ends only the current game and saves its data (`block_abort` event / marker). The session continues with the intermission before the next game, or ends if it was the last one. |
 
 **Keyboard shortcuts** (experimenter window focused):
 - `Space` — advance (start Game 2 / confirm ready state)
 - `Escape` — abort current game
+
+---
+
+## Timing
+
+Gameplay runs on a **fixed-step simulation** at `SIM_FPS` (60) steps per second: game time is `frame / SIM_FPS`, and item movement, the target curve, `trial_<N>` markers, curve cues and the block end all use that clock. Steps are caught up to the wall clock from both the render loop and a 100 ms timer, so the game stays in real time even if rendering stalls or drops frames, and a game is always exactly `BLOCK_DURATION_SECS × SIM_FPS` steps. Set `SIM_FPS` to the participant display's refresh rate.
 
 ---
 
@@ -86,33 +92,35 @@ cd resp && python mouse_y_to_lsl.py
 
 ## Data output
 
-Saved to `bioGameData/<SUBJECT_CODE>/` (or your chosen data dir).
+Saved to `output_data/bio_game/<SUBJECT_CODE>/`.
 
-### Frame data — `block_<N>_frames.csv`
+### Frame data — `frameData_block<N>.csv`
 
-One row every 50 ms during a game.
+One row per simulation frame (`SIM_FPS`, 60 per second) during game N.
 
 | Column | Description |
 |---|---|
-| `timestamp` | ISO-8601 wall-clock time |
-| `blockIndex` | 0 = Game 1, 1 = Game 2 |
+| `timestamp` | ISO-8601 wall-clock time the frame was simulated (frames caught up after a stall share a timestamp) |
+| `blockIndex` | 0 = Game 1, 1 = Game 2, … |
+| `frame` | Simulation frame number within the game (1, 2, …) |
+| `blockTime` | Game time in seconds, `frame / SIM_FPS` |
 | `breathRaw` | Raw LSL sample |
 | `breathSmoothed` | Gaussian-smoothed sample |
 | `breathNorm` | Normalized to the current signal range, `[0, 1]` |
 | `normMin`, `normMax` | Signal range (native units) used for `breathNorm` at this frame — calibrated, then drift-tracked (`RANGE_ADAPT`, see [calibration](calibration.md#adaptiverange)) |
-| `fishY` | Fish vertical position `[0 = bottom, 1 = top]` |
-| `targetY` | Target curve value at this moment |
-| `starfishCount` | Starfish currently on screen (uncollected) |
+| `avatarY` | Avatar vertical position `[0 = bottom, 1 = top]` |
+| `targetY` | Target curve value at this frame |
+| `itemCount` | Items currently on screen (not yet passed the avatar) |
 
-### Events — `block_<N>_events.csv`
+### Events — `eventData.csv`
 
 | Column | Description |
 |---|---|
 | `timestamp` | ISO-8601 wall-clock time |
-| `blockIndex` | 0 / 1 |
-| `event` | `star_collect`, `star_miss`, `block_end`, `block_abort` |
-| `value1` | Score at collect / miss — otherwise empty |
-| `value2` | Block time in seconds at the event |
+| `blockIndex` | 0 / 1 / … |
+| `event` | `session_start`, `item_collect`, `item_miss`, `block_end`, `block_abort` |
+| `value1` | Score at collect / block end — group for `session_start` |
+| `value2` | Block time in seconds at the event — scene for `session_start` |
 
 ---
 
@@ -133,8 +141,8 @@ MARKER_STREAM_URL: 'ws://localhost:8765',
 | `countdown_start_block0` / `countdown_start_block1` | countdown before each game |
 | `block_start_0` / `block_start_1` | game begins |
 | `block_end_0` / `block_end_1` | game ends normally |
-| `block_abort_0` / `block_abort_1` | game aborted |
+| `block_abort_0` / `block_abort_1` | game aborted (session continues with the next game) |
 | `trial_<N>` | target curve minimum — inhale onset; N increments from 1 across both blocks |
-| `star_collect_b<N>_s<score>` | starfish collected |
-| `star_miss_b<N>` | starfish missed |
-| `experiment_done` | both games complete |
+| `item_collect_b<N>_s<score>` | item collected |
+| `item_miss_b<N>` | item missed |
+| `experiment_done` | last game finished (or aborted) |

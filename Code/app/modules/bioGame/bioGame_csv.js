@@ -2,8 +2,7 @@
 //
 // Two file types written to CONFIG.DATA_DIR/<subjectCode>/:
 //   eventData.csv          — one row per event (session info, state changes, collects, misses)
-//   frameData_block0.csv   — 20-fps frame rows for block 0
-//   frameData_block1.csv   — 20-fps frame rows for block 1
+//   frameData_block<N>.csv — one row per simulation frame (CONFIG.SIM_FPS) of block N
 //
 // Frame rows are buffered in memory and flushed every FRAME_FLUSH_COUNT rows
 // to avoid high-frequency IPC.
@@ -19,7 +18,7 @@ export class BioGameCSV {
   #frameBuffer       = [];
   #currentBlockIndex = 0;
 
-  #frameHeader = 'timestamp,blockIndex,breathRaw,breathSmoothed,breathNorm,' +
+  #frameHeader = 'timestamp,blockIndex,frame,blockTime,breathRaw,breathSmoothed,breathNorm,' +
                  'normMin,normMax,avatarY,targetY,itemCount\n';
   #eventHeader = 'timestamp,blockIndex,event,value1,value2\n';
 
@@ -73,7 +72,7 @@ export class BioGameCSV {
     this.#frameBuffer = [];
 
     const csv = buf.map(r =>
-      `${r.t},${r.block},${r.raw.toFixed(4)},${r.smoothed.toFixed(4)},` +
+      `${r.t},${r.block},${r.frame},${r.blockTime.toFixed(4)},${r.raw.toFixed(4)},${r.smoothed.toFixed(4)},` +
       `${r.norm.toFixed(4)},${r.normMin.toFixed(6)},${r.normMax.toFixed(6)},${r.avatarY.toFixed(4)},${r.targetY.toFixed(4)},${r.itemCount}`
     ).join('\n') + '\n';
 

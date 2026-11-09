@@ -81,12 +81,15 @@ export class BioGameRenderer {
         this.#drawPlaying(ctx, w, h, renderData, dt);
         break;
 
-      case STATE.INTERMISSION:
-        this.#drawIntermission(ctx, w, h, renderData.scoreBlock1 ?? 0);
+      case STATE.INTERMISSION: {
+        // blockIndex already points at the upcoming block.
+        const finished = (renderData.blockIndex ?? 1) - 1;
+        this.#drawIntermission(ctx, w, h, finished, renderData.scoreBlocks?.[finished] ?? 0);
         break;
+      }
 
       case STATE.DONE:
-        this.#drawDone(ctx, w, h, renderData.scoreBlock1 ?? 0, renderData.scoreBlock2 ?? 0);
+        this.#drawDone(ctx, w, h, renderData.scoreBlocks ?? []);
         break;
     }
   }
@@ -440,13 +443,13 @@ export class BioGameRenderer {
     ctx.restore();
   }
 
-  #drawIntermission(ctx, w, h, score) {
+  #drawIntermission(ctx, w, h, finishedIndex, score) {
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.fillRect(0, 0, w, h);
 
     const cy = h / 2;
 
-    this.#drawCenter(ctx, w, cy - 80, 'Game 1 complete  ·  Good job!', 'rgba(255,255,255,0.85)', 30, '300');
+    this.#drawCenter(ctx, w, cy - 80, `Game ${finishedIndex + 1} complete  ·  Good job!`, 'rgba(255,255,255,0.85)', 30, '300');
 
     const scoreStr = `★  ${score}  ★`;
     ctx.fillStyle    = '#ffd060';
@@ -463,12 +466,12 @@ export class BioGameRenderer {
     this.#drawCenter(ctx, w, cy + 110, 'Press Space', 'rgba(255,255,255,0.28)', 15);
   }
 
-  #drawDone(ctx, w, h, score1, score2) {
+  #drawDone(ctx, w, h, scores) {
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.fillRect(0, 0, w, h);
 
     const cy    = h / 2;
-    const total = score1 + score2;
+    const total = scores.reduce((a, b) => a + b, 0);
 
     this.#drawCenter(ctx, w, cy - 90, 'Experiment complete!', 'rgba(255,255,255,0.85)', 28, '300');
 
@@ -481,7 +484,8 @@ export class BioGameRenderer {
     ctx.fillText(`★  ${total}  ★`, w / 2, cy);
     ctx.shadowBlur   = 0;
 
-    this.#drawCenter(ctx, w, cy + 65, `Game 1: ${score1}  ·  Game 2: ${score2}`, 'rgba(255,255,255,0.42)', 16);
+    const perGame = scores.map((s, i) => `Game ${i + 1}: ${s}`).join('  ·  ');
+    this.#drawCenter(ctx, w, cy + 65, perGame, 'rgba(255,255,255,0.42)', 16);
   }
 
   // ── Canvas helpers ────────────────────────────────────────────────────────

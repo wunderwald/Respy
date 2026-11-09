@@ -62,9 +62,12 @@ export const CONFIG = {
   BG_TEX_WIDTH:          2048,  // offscreen texture width (seamlessly tiling)
   BG_TEX_HEIGHT:         512,
 
-  // ── Data recording ───────────────────────────────────────────────────────
-  FRAME_INTERVAL_MS:     50,    // 20 fps of frame data
-  FRAME_FLUSH_COUNT:     400,   // flush after this many buffered rows
+  // ── Simulation / data recording ──────────────────────────────────────────
+  // Gameplay advances in fixed steps of 1/SIM_FPS s, kept in sync with the
+  // wall clock; each step is one frame-data row. Match the participant
+  // display's refresh rate so every drawn frame shows exactly one new step.
+  SIM_FPS:               60,
+  FRAME_FLUSH_COUNT:     600,   // flush after this many buffered rows (10 s at 60 fps)
 };
 
 export const STATE = {
