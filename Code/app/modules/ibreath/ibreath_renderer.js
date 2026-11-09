@@ -48,7 +48,7 @@ export class IBreathRenderer {
       case STATE.DISPLAY:     this.#drawDisplayState(ctx, w, h, data.displayElapsed); break;
       case STATE.TRIAL:       this.#drawTrial(ctx, w, h, data.trial, data.stimLevel, data.flashActive); break;
       case STATE.RESPONSE:    this.#drawResponse(ctx, w, h, now, data.responseStartTime, data.questionType); break;
-      case STATE.ITI:         this.#drawITI(ctx, w, h, now, data.itiStartTime, data.itiDuration); break;
+      case STATE.ITI:         break;   // background only — no text between trials
       case STATE.PAUSED:      this.#drawPaused(ctx, w, h, now); break;
       case STATE.EYETRACK_CAL: this.#drawEyeCal(ctx, w, h); break;
       case STATE.DONE:        this.#drawDone(ctx, w, h, data.trialCount, data.subjectCode); break;
@@ -275,12 +275,6 @@ export class IBreathRenderer {
     this.#centerText(ctx, x, y, text, color, size, weight);
   }
 
-  #drawITI(ctx, w, h, now, itiStartTime, itiDuration) {
-    const remaining = Math.max(0, itiDuration - (now - itiStartTime));
-    const secs = (remaining / 1000).toFixed(1);
-    this.#centerText(ctx, w / 2, h / 2,
-      `Next trial in ${secs}s`, 'rgba(255,255,255,0.2)', 16);
-  }
 
   #drawPaused(ctx, w, h, now) {
     const t    = now / 1000;
