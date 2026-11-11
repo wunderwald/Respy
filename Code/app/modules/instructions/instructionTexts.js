@@ -9,9 +9,7 @@ export const INSTRUCTIONS = {
   // Before the breathing calibration (iBreath, bioGame, beltTrainingGame).
   // `signal`: 'physiological' (breath) or 'peaksOnly' (heartbeat, iBeat).
   calibration({ signal = 'physiological' } = {}) {
-    const lines = signal === 'peaksOnly'
-      ? ['Sitz ruhig und entspann dich.']
-      : ['Sitz ruhig und atme ganz entspannt.'];
+    const lines = ['Sitz ruhig und entspannt.']
     return { title: 'Mach dich bereit!', lines };
   },
 
