@@ -30,11 +30,26 @@ def channel_labels(info):
     return labels
 
 
+def slice_stream(stream, t_start, t_end):
+    """Return a copy of the stream holding only the samples with t_start <= timestamp <= t_end."""
+    time_stamps = np.asarray(stream["time_stamps"])
+    mask = (time_stamps >= t_start) & (time_stamps <= t_end)
+    time_series = stream["time_series"]
+    if isinstance(time_series, np.ndarray):
+        time_series = time_series[mask]
+    else:
+        time_series = [sample for sample, keep in zip(time_series, mask) if keep]
+    return {**stream, "time_series": time_series, "time_stamps": time_stamps[mask]}
+
+
 """
 SUMMARY
 """
-def summarize_streams(streams):
-    """Return the per-stream summary (name, type, format, shape, srate, ...) as a list of text lines."""
+def summarize_streams(streams, warn_empty=False):
+    """Return the per-stream summary (name, type, format, shape, srate, ...) as a list of text lines.
+
+    warn_empty: add a WARNING line for streams without any samples.
+    """
     lines = []
 
     def out(msg, *args):
