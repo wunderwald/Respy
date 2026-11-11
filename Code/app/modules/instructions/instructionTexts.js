@@ -56,7 +56,7 @@ export const INSTRUCTIONS = {
       title: '',   // no title — just the two lines
       lines: [
         'Wir zeigen dir jetzt ein Video.',
-        'Lehn dich zurück, entspann dich und genieß es!',
+        'Lehn dich zurück, entspann dich und viel Spaß!',
       ],
     };
   },
