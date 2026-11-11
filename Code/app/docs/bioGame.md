@@ -31,15 +31,15 @@ Two windows open:
 | **Data dir** | Folder where CSV files are saved. Click **…** to pick a different folder. Default: `bioGameData/` inside the app folder. |
 | **Score** | Live count of starfish collected in the current game. |
 | **Start** | Begins calibration. Requires a connected resp stream. |
-| **Start game N** | Appears on the ready screen and after each game. Starts the next game (also triggered by Space). |
-| **Abort game** | Shown throughout every game (both groups). Ends only the current game and saves its data (`block_abort` event / marker). The session continues with the intermission before the next game, or ends if it was the last one. Also triggered by Escape. |
+| **Start game 1** | Appears on the explanation screen after calibration. Starts the game (also triggered by Space). |
+| **Abort game** | Shown throughout the game (both groups). Ends the game and saves its data (`block_abort` event / marker); with one game that ends the task (`task_end_biogame`). Also triggered by Escape. |
 
 There is only one scene, the ocean: it's always used (`bioGame_scene.js`, shared with beltTrainingGame).
 
 **On screen during a game:** the time-left bar (top right) is shown in both groups; the score counter (top left) only in the slow/target group.
 
 **Keyboard shortcuts** (experimenter window focused):
-- `Space` — advance (start Game 2 / confirm ready state)
+- `Space` — advance (explanation screens → calibration / game)
 - `Escape` — abort current game
 
 **Ending a session early:** close the window. Buffered frame rows and a `session_closed` event are written synchronously before it goes away (see [Data output](#data-output)).
@@ -69,14 +69,12 @@ stream ready → [Start] → Explanation: "Let's get ready!"  → [Space / Next]
                               ↓
                          Countdown (3-2-1-GO)
                               ↓
-                       Game 1  (5 min)
-                              ↓
-                   Intermission screen  → [Space]
-                              ↓
-                       Game 2  (5 min)
+                         Game  (5 min)
                               ↓
                           Done screen
 ```
+
+The task is **one game** (`NUM_BLOCKS: 1` in `bioGame_config.js`). The code still supports more: with `NUM_BLOCKS` > 1, an intermission screen (score of the finished game, Space / Next to continue) comes between the games, and the end screen adds a per-game breakdown.
 
 Explanation screens for the child (large text, simple words) come before the calibration and before the task. They always wait for the experimenter (**Space** / **Next**), so the text can be read aloud. All wording is German, in [instructionTexts.js](../modules/instructions/instructionTexts.js); the game's other screen texts are in [bioGame_texts.js](../modules/bioGame/bioGame_texts.js).
 
@@ -117,7 +115,7 @@ One row per simulation frame (`SIM_FPS`, 60 per second) during game N.
 | Column | Description |
 |---|---|
 | `timestamp` | ISO-8601 wall-clock time the frame was simulated (frames caught up after a stall share a timestamp) |
-| `blockIndex` | 1 = Game 1, 2 = Game 2, … (1-based) |
+| `blockIndex` | Game number, 1-based — always `1` with one game |
 | `frame` | Simulation frame number within the game (1, 2, …) |
 | `blockTime` | Game time in seconds, `frame / SIM_FPS` |
 | `drawn` | `1` if a rendered frame showed this step as its newest state, `0` if the display skipped it (slow rendering, a stall, or the game's last step). At display rate ≈ `SIM_FPS`, an occasional `0` from timing jitter is normal. |
@@ -159,11 +157,11 @@ MARKER_STREAM_URL: 'ws://localhost:8765',
 | `calibration_start` / `calibration_end` | calibration phase (re-sent for each retry attempt) |
 | `calibration_failed` | calibration recorded no samples — experimenter is prompted to retry or use defaults |
 | `calibration_default_used` | experimenter chose to skip to `CONFIG.DEFAULT_CAL_RANGE` after a failed calibration |
-| `countdown_start_block1` / `countdown_start_block2` | countdown before each game (game numbers are 1-based) |
-| `block_start_1` / `block_start_2` | game begins |
-| `block_end_1` / `block_end_2` | game ends normally |
-| `block_abort_1` / `block_abort_2` | game aborted (session continues with the next game) |
-| `trial_<N>` | target curve minimum — inhale onset; N increments from 1 across both blocks |
+| `countdown_start_block1` | countdown before the game (game numbers are 1-based) |
+| `block_start_1` | game begins |
+| `block_end_1` | game ends normally |
+| `block_abort_1` | game aborted (ends the task) |
+| `trial_<N>` | target curve minimum — inhale onset; N increments from 1 |
 | `item_collect_b<N>_s<score>` | item collected |
 | `item_miss_b<N>` | item missed |
 | `task_start_biogame` | Start pressed — session begins (before the calibration explanation) |

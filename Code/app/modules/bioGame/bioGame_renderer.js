@@ -436,8 +436,12 @@ export class BioGameRenderer {
     ctx.fillText(`★  ${total}  ★`, w / 2, cy);
     ctx.shadowBlur   = 0;
 
-    const perGame = scores.map((s, i) => TEXTS.perGame(i + 1, s)).join('  ·  ');
-    this.#drawCenter(ctx, w, cy + 65, perGame, 'rgba(255,255,255,0.42)', 16);
+    // Per-game breakdown only with several games — with one it would just
+    // repeat the total.
+    if (scores.length > 1) {
+      const perGame = scores.map((s, i) => TEXTS.perGame(i + 1, s)).join('  ·  ');
+      this.#drawCenter(ctx, w, cy + 65, perGame, 'rgba(255,255,255,0.42)', 16);
+    }
   }
 
   // ── Canvas helpers ────────────────────────────────────────────────────────

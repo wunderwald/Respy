@@ -10,7 +10,7 @@ export const CONFIG = {
 
   // ── Timing ───────────────────────────────────────────────────────────────
   BLOCK_DURATION_SECS:   300,   // 5 minutes per block
-  NUM_BLOCKS:            2,
+  NUM_BLOCKS:            1,     // one game = the whole task (the code still supports more: intermission between games)
   CALIBRATION_SECS:      30,
   COUNTDOWN_SECS:        3.75,  // 3 + 2 + 1 + GO! each 1s, GO 0.75s
 
