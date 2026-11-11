@@ -189,6 +189,7 @@ export default class Baseline {
   // to happen. Space/Next then starts the recording (#begin).
   #showInstructions() {
     this.#state = STATE.INSTRUCTIONS;
+    this.#markers.send('task_start_baseline');
     this.#markers.send('instructions_start');
     this.#pushState({ stateText: 'explaining — press Space or Next', inputsLocked: true });
   }
@@ -208,7 +209,7 @@ export default class Baseline {
                         :                       this.#customSecs;
 
     this.#initCSV();
-    this.#markers.send('baseline_start');
+    this.#markers.send('recording_start');   // video + recording begin (task_start_baseline was at Start)
     this.#markers.send(`baseline_name_${this.#name.slug}`);
 
     if (this.#videoAvailable) {
@@ -251,7 +252,7 @@ export default class Baseline {
 
   #finish(aborted = false) {
     this.#state = STATE.DONE;
-    this.#markers.send(aborted ? 'baseline_abort' : 'baseline_end');
+    this.#markers.send(aborted ? 'task_abort_baseline' : 'task_end_baseline');
 
     if (this.#videoAvailable) {
       this.#video.pause();
@@ -308,8 +309,11 @@ export default class Baseline {
   }
 
   #flushRowsSync() {
+    // Closed during the explanation or the recording = session aborted (like
+    // the games). Best effort — the marker socket may already be gone.
+    if (this.#state === STATE.INSTRUCTIONS) this.#markers.send('task_abort_baseline');
     if (this.#state !== STATE.PLAYING) return;
-    this.#markers.send('session_closed');   // best effort — the socket may already be gone
+    this.#markers.send('task_abort_baseline');
     const content = this.#takePendingRows();
     if (!content || !window.api) return;
     const res = window.api.appendCSVSync(this.#csvPath, content);

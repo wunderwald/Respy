@@ -166,5 +166,6 @@ MARKER_STREAM_URL: 'ws://localhost:8765',
 | `trial_<N>` | target curve minimum — inhale onset; N increments from 1 across both blocks |
 | `item_collect_b<N>_s<score>` | item collected |
 | `item_miss_b<N>` | item missed |
-| `experiment_done` | last game finished (or aborted) |
-| `session_closed` | window closed before the session was done (best effort — the marker connection may already be gone) |
+| `task_start_biogame` | Start pressed — session begins (before the calibration explanation) |
+| `task_end_biogame` | last game finished (or aborted) — session complete |
+| `task_abort_biogame` | window closed before the session was done (best effort — the marker connection may already be gone) |

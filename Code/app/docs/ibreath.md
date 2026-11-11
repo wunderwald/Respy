@@ -222,7 +222,10 @@ Sent to `MARKER_STREAM_URL` (default `ws://localhost:9001`).
 | `flash_start_t<N>` | Flash stimulus appears |
 | `flash_end_t<N>` | Flash stimulus disappears |
 | `iti_start_t<N>` | ITI begins after trial N |
-| `experiment_done` | All trials complete |
+| `task_start_<task>` | Start pressed — session begins (before the calibration explanation). `<task>` is `ibreath`, or `ibeat` with the *Peaks only* signal type — the same for all `task_*` markers |
+| `task_pause_<task>` / `task_resume_<task>` | Experimenter paused / resumed |
+| `task_end_<task>` | All trials complete — session complete |
+| `task_abort_<task>` | Window closed before the session was done (best effort — the marker connection may already be gone) |
 
 ---
 

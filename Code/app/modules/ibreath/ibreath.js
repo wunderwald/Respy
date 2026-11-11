@@ -162,6 +162,12 @@ export default class IBreath {
       : this.#smoother.value;
   }
 
+  // Task name for the session markers (task_start_/task_end_/task_abort_/
+  // task_pause_/task_resume_<task>): the same frontend runs iBreath and iBeat.
+  get #taskName() {
+    return this.#inputSignalType === 'peaksOnly' ? 'ibeat' : 'ibreath';
+  }
+
   // Current adaptive-delay value in ms, looked up from CONFIG.DELAY_VALUES_MS.
   get #currentDelayMs() {
     return CONFIG.DELAY_VALUES_MS[this.#delayIndex];
@@ -319,6 +325,7 @@ export default class IBreath {
       { signalType: this.#inputSignalType, preset: presetName ?? '' },
       (msg) => this.#showWarning(`CSV: ${msg}`));
     this.#csv.init();
+    this.#markers.send(`task_start_${this.#taskName}`);
     this.#markers.send('instructions_cal_start');
   }
 
@@ -591,7 +598,7 @@ export default class IBreath {
     this.#pausedAt        = performance.now();
     this.#state           = STATE.PAUSED;
 
-    this.#markers.send('experiment_pause');
+    this.#markers.send(`task_pause_${this.#taskName}`);
 
     this.#hud.abortVisible = false;
     this.#hud.pauseVisible = false;
@@ -606,7 +613,7 @@ export default class IBreath {
     const stateText = this.#pausedStateText;
     this.#pausedFromState = null;
     this.#pausedStateText = null;
-    this.#markers.send('experiment_resume');
+    this.#markers.send(`task_resume_${this.#taskName}`);
 
     switch (from) {
       case STATE.DISPLAY:
@@ -790,7 +797,7 @@ export default class IBreath {
   }
 
   #endExperiment() {
-    this.#markers.send('experiment_done');
+    this.#markers.send(`task_end_${this.#taskName}`);
     this.#state = STATE.DONE;
     this.#hud.stateTimer   = { startedAt: Date.now(), duration: null };
     this.#hud.nextVisible  = false;
@@ -841,7 +848,7 @@ export default class IBreath {
       this.#pendingTrial = null;
     }
     // Best effort — the marker socket may already be gone.
-    if (this.#state !== STATE.DONE) this.#markers.send('session_closed');
+    if (this.#state !== STATE.DONE) this.#markers.send(`task_abort_${this.#taskName}`);
   }
 
   // ── Update loop (setInterval, continues when window loses focus) ──────

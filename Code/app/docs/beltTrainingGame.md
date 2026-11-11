@@ -99,8 +99,9 @@ Sent to `MARKER_STREAM_URL` (default `ws://localhost:9001`), one per trial numbe
 - `test_start_tN` / `test_end_tN`
 - `target_enter_tN` / `target_leave_tN` — fired once per phase (so three times per trial); which phase it belongs to is inferred from its position relative to the `training1_*`/`training2_*`/`test_*` markers around it
 - `trial_abort_tN` (on Abort trial — the session continues with trial N+1)
-- `experiment_done`
-- `session_closed` (window closed mid-session — best effort, the marker connection may already be gone)
+- `task_start_belttraining` (Start pressed — session begins, before the calibration explanation)
+- `task_end_belttraining` (last trial done — session complete)
+- `task_abort_belttraining` (window closed mid-session — best effort — the marker connection may already be gone)
 
 ---
 

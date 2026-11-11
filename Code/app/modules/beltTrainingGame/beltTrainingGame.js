@@ -243,6 +243,7 @@ export default class BeltTrainingGame {
     this.#csv.init();
 
     this.#state = STATE.INSTRUCTIONS_CAL;
+    this.#markers.send('task_start_belttraining');
     this.#markers.send('instructions_cal_start');
     this.#pushState({ stateText: 'explaining calibration — press Space or Next', inputsLocked: true });
   }
@@ -462,12 +463,12 @@ export default class BeltTrainingGame {
     if (!this.#csv || this.#state === STATE.DONE) return;   // no session running
     this.#csv.flushFramesSync(this.#trialNo);
     this.#csv.appendEventSync(this.#trialNo, this.#phaseLabel, 'session_closed', this.#state);
-    this.#markers.send('session_closed');   // best effort — the socket may already be gone
+    this.#markers.send('task_abort_belttraining');   // best effort — the socket may already be gone
   }
 
   #endExperiment() {
     this.#state = STATE.DONE;
-    this.#markers.send('experiment_done');
+    this.#markers.send('task_end_belttraining');
     this.#pushState({ stateText: 'done', nextVisible: false, abortVisible: false });
     // All final writes were dispatched at phase end / abort → experimenter may go back to the menu.
     window.api.session.ended();

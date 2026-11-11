@@ -266,6 +266,7 @@ export default class BioGame {
     this.#csv.init();
 
     this.#state = STATE.INSTRUCTIONS_CAL;
+    this.#markers.send('task_start_biogame');
     this.#markers.send('instructions_cal_start');
     this.#pushState({ stateText: 'explaining calibration — press Space or Next', inputsLocked: true });
   }
@@ -408,12 +409,12 @@ export default class BioGame {
     this.#csv.flushFramesSync(this.#blockNo);
     this.#csv.appendEventSync(this.#blockNo, 'session_closed', this.#state,
       playing ? this.#blockTime.toFixed(2) : '');
-    this.#markers.send('session_closed');   // best effort — the socket may already be gone
+    this.#markers.send('task_abort_biogame');   // best effort — the socket may already be gone
   }
 
   #endExperiment() {
     this.#state = STATE.DONE;
-    this.#markers.send('experiment_done');
+    this.#markers.send('task_end_biogame');
     const total = this.#scoreBlock.reduce((a, b) => a + b, 0);
     this.#pushState({ stateText: 'done', abortVisible: false, nextVisible: false, score: total });
     // All final writes were dispatched by #endBlock → experimenter may go back to the menu.
