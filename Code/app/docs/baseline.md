@@ -21,7 +21,7 @@ Or select **Baseline** from the start screen (`npm start`).
 | **Resp stream** | Select the LSL resp stream. Required before pressing Start. |
 | **Subject** | Subject code — first part of the file names. Locked once recording begins. Only letters, digits, `-` and `_` (empty = `TEST`); anything else shows a red hint under the field and disables Start. If data for this code already exists, an amber hint warns that Start will overwrite it (Start stays enabled). The existing-data check uses the selected **Name**. |
 | **Name** | *Resting*, *Post natural*, *Post slow*, *Post stressor* or *Post slow post stressor* (`NAMES` in `baseline_config.js`). Written to both CSVs' `name` column, into the file names and as a `baseline_name_<slug>` marker. Locked once recording begins. |
-| **Play full video** (settings bar) | On by default: the recording ends when the video ends. Off: the **secs** field becomes editable and the recording ends after that many seconds (the video is paused then). The hint next to it shows the video's length, and warns if the entered time is longer than the video — its last frame then stays on screen until the time is up. Locked once recording begins. |
+| **Play full video** (settings bar) | On by default: the recording ends when the video ends. Off: the **secs** field becomes editable and the recording ends after that many seconds (the video is paused then). The hint next to it shows the video's length, and notes if the entered time is longer than the video — the video then loops until the time is up. Locked once recording begins. |
 | **Start** | Locks the settings and shows the explanation screen to the child (`instructions_start` marker). Requires a connected resp stream (and a duration > 0 when "play full video" is off). |
 | **Start video** | Shown on the explanation screen (also **Space**): begins the recording. Sends `recording_start` and `baseline_name_<slug>`. |
 | **Abort** | Stops early and sends `task_abort_baseline`. Also triggered by `Escape`. |
@@ -107,5 +107,5 @@ VIDEO_MISSING_WARNING: '...',
 - Checked for existence once at startup (before Start is enabled), so the file can start buffering (`preload="auto"` + `load()`) well ahead of time and starts playing smoothly the moment recording begins. Its length is reported to the experimenter window once the metadata has loaded.
 - **Play full video** ends the recording on the video's `ended` event; with a set duration, a timer ends it (independently of the video).
 - **If the video file is missing** (or can't be loaded), the experimenter HUD shows a persistent warning and the session falls back to the plain countdown display.
-- The video is not looped.
+- With **play full video** the video plays once. With a set duration it loops, so a duration longer than the video keeps it playing until the time is up; a shorter one stops it mid-video.
 - Autoplay is enabled app-wide via the `autoplay-policy=no-user-gesture-required` Electron switch (in `main.js`), since playback is started by an IPC action from the experimenter window rather than a click inside the scene window itself.

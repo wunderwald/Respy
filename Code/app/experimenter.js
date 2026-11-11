@@ -758,7 +758,7 @@ if (frontend === 'ibreath') {
       hint = `video length: ${fmtTime(blVideoSecs)}`;
       const custom = blCustomSecs();
       if (!blFullVideoEl.checked && custom != null && custom > blVideoSecs) {
-        hint += ' — longer than the video: its last frame stays on screen';
+        hint += ' — longer than the video: it loops until the time is up';
       }
     }
     if (!blFullVideoEl.checked && blCustomSecs() == null) hint = 'enter a duration > 0 secs';

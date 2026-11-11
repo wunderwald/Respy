@@ -9,7 +9,7 @@
  *   - name:       one of CONFIG.NAMES — written to the CSVs and file names
  *   - fullVideo:  true  → the recording ends when the video ends
  *                 false → it ends after `durationSecs` (the video is paused
- *                         then; if it's shorter, its last frame stays up)
+ *                         then; if it's shorter, it loops until the time is up)
  *   Without a playable video, "full video" means CONFIG.DURATION_SECS.
  *
  * The raw signal is written to CSV *while* recording (header at Start, new
@@ -218,6 +218,10 @@ export default class Baseline {
       this.#canvas.style.display = 'none';
       this.#video.style.display  = 'block';
       this.#video.currentTime = 0;
+      // Set duration: loop, so a duration longer than the video keeps it
+      // playing until the timer ends it (#tick). Full video: play once and
+      // end on its 'ended' event (which doesn't fire while looping).
+      this.#video.loop = !this.#endsWithVideo;
       this.#video.play().catch((err) => this.#onVideoFailed(`playback failed: ${err.message ?? err}`));
     }
 
