@@ -582,7 +582,8 @@ if (frontend === 'ibreath') {
   // Natural breathing rate = the subject's *Resting* baseline estimates (see
   // modules/baseline/baselineFiles.js — shared with the baseline writer).
   // An average outside BG.NATURAL_BPM_RANGE is not used: the field gets
-  // BG.NATURAL_BPM_FALLBACK and an amber warning says so.
+  // the default BG.NATURAL_BPM (same value as with no baseline at all) and an
+  // amber warning says so.
   //
   // Where the BPM came from is sent with Start and recorded in eventData.csv
   // (`natural_bpm_source`: baseline | fallback | manual | default, and
@@ -606,13 +607,13 @@ if (frontend === 'ibreath') {
 
     if (res.status === 'missing') {
       noBaseline();
-      bgBpmSrcEl.textContent = `no ${RESTING.label} baseline for ${subjectCode} — enter manually`;
+      bgBpmSrcEl.textContent = `no ${RESTING.label} baseline for ${subjectCode}${bpmSource === 'manual' ? '' : ` — using default ${BG.NATURAL_BPM} BPM`}`;
       bgBpmSrcEl.style.color = '';
       return;
     }
     if (res.status === 'invalid') {
       noBaseline();
-      bgBpmSrcEl.textContent = 'no valid BPM in file — enter manually';
+      bgBpmSrcEl.textContent = `no valid BPM in ${RESTING.label} baseline file${bpmSource === 'manual' ? '' : ` — using default ${BG.NATURAL_BPM} BPM`}`;
       bgBpmSrcEl.style.color = WARN_COLOR;
       return;
     }
@@ -623,8 +624,8 @@ if (frontend === 'ibreath') {
     baselineBpm = bpm;
     if (bpm < lo || bpm > hi) {
       bpmSource = 'fallback';
-      bgNatBpmEl.value       = BG.NATURAL_BPM_FALLBACK;
-      bgBpmSrcEl.textContent = `⚠ ${RESTING.label} baseline avg ${bpm.toFixed(1)} BPM is outside ${lo}–${hi} — using default ${BG.NATURAL_BPM_FALLBACK} BPM`;
+      bgNatBpmEl.value       = BG.NATURAL_BPM;
+      bgBpmSrcEl.textContent = `⚠ ${RESTING.label} baseline avg ${bpm.toFixed(1)} BPM is outside ${lo}–${hi} — using default ${BG.NATURAL_BPM} BPM`;
       bgBpmSrcEl.style.color = WARN_COLOR;
       bgBpmSrcEl.style.opacity = '1';
       return;
