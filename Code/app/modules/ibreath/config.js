@@ -2,11 +2,9 @@ export const CONFIG = {
   // Subject / experiment
   SUBJECT_CODE: "TEST",
 
-  // Smoothing
-  SMOOTH_WINDOW: 64,        // samples (matches smoothBreathRT.m windowSize) — physiological signal only
-
   // Input signal type — set by the experimenter's "signal type" control, locked once a session starts.
-  // 'physiological': continuous breath-like signal, smoothed via SMOOTH_WINDOW (default).
+  // 'physiological': continuous breath-like signal, smoothed by the shared breath filter
+  //                  (modules/signal/breathFilter.js) (default).
   // 'peaksOnly':     sparse ECG-peak signal (e.g. AD Instruments fast-response output) — every
   //                  detected peak triggers a swell/fade pulse instead (see PEAK_* below). From
   //                  there on (calibration, sync/async trials, CSV) both types are identical.

@@ -19,7 +19,8 @@
  *   csv.js         — file output
  */
 
-import { GaussianSmoother, SignalDelayLine, PeakEnvelopeFollower, mapRange, validSmoothWindow } from '../signal/signalUtils.js';
+import { GaussianSmoother, SignalDelayLine, PeakEnvelopeFollower, mapRange } from '../signal/signalUtils.js';
+import { BREATH_FILTER, createBreathFilter, StreamRate } from '../signal/breathFilter.js';
 import { RespCalibration, AdaptiveRange } from '../calibration/calibration.js';
 import { IBreathSound } from './ibreath_sound.js';
 import { CONFIG, CONFIG_DEFAULTS, STATE } from './config.js';
@@ -66,7 +67,8 @@ export default class IBreath {
   // #buildSignalPipeline() from the *current* CONFIG — in the constructor,
   // and again at every session start after a preset's configOverrides have
   // been applied.
-  #smoother = null;
+  #smoother = null;     // breath filter (modules/signal/breathFilter.js)
+  #streamRate = new StreamRate();   // resp stream's sample rate, for the filter
   #peakEnvelope = null;
   #delayLine = null;   // async's real-time delay buffer
   #delayIndex = 0;     // index into DELAY_VALUES_MS — adaptive staircase, see #onResponse
@@ -174,10 +176,10 @@ export default class IBreath {
   }
 
   // Builds the smoothing / peak-envelope / delay-line objects from the
-  // current CONFIG, so preset overrides of SMOOTH_WINDOW, PEAK_* and
+  // current CONFIG, so preset overrides of PEAK_* and
   // DELAY_VALUES_MS actually take effect. Starts every buffer empty.
   #buildSignalPipeline() {
-    this.#smoother = new GaussianSmoother(CONFIG.SMOOTH_WINDOW);
+    this.#smoother = createBreathFilter(this.#streamRate.current.hz);
     this.#peakEnvelope = new PeakEnvelopeFollower({
       swellMs: CONFIG.PEAK_SWELL_MS,
       fadeMs: CONFIG.PEAK_FADE_MS,
@@ -224,6 +226,7 @@ export default class IBreath {
 
   pushSample(rawValue) {
     this.#lastRawSample = rawValue;
+    this.#streamRate.tick();
     const now = performance.now();
     if (this.#inputSignalType === 'peaksOnly') {
       this.#peakEnvelope.push(now, rawValue);
@@ -245,7 +248,9 @@ export default class IBreath {
     }
   }
 
-  setStatus({ type, text }) {
+  setStatus(event) {
+    const { type, text } = event;
+    this.#streamRate.setStatus(event);
     this.#streamReady = (type === 'connected');
     this.#respStatusText = text;
     this.#updateIdleReadiness();
@@ -275,7 +280,7 @@ export default class IBreath {
 
   // ── State machine ──────────────────────────────────────────────────────
 
-  #beginCalibration({ debugGaze, inputSignalType, calibrationSecs, numTrials, smoothWindow, presetName, questions, configOverrides } = {}) {
+  #beginCalibration({ debugGaze, inputSignalType, calibrationSecs, numTrials, presetName, questions, configOverrides } = {}) {
     // Reset to the hardcoded defaults first so a previous session's preset
     // (configOverrides) never silently lingers into a session that loads no
     // preset, or a different one that doesn't mention the same keys.
@@ -290,10 +295,6 @@ export default class IBreath {
     // numTrials, or the experimenter's own value). Takes precedence over a
     // configOverrides MAX_NUM_TRIALS; invalid values keep the default.
     if (Number.isInteger(numTrials) && numTrials >= 1) CONFIG.MAX_NUM_TRIALS = numTrials;
-    // Smoothing window from the experimenter's "smoothing" control — set
-    // before #buildSignalPipeline() below, which builds the smoother with it.
-    // (Physiological signal only; peaksOnly uses the peak envelope instead.)
-    if (smoothWindow !== undefined) CONFIG.SMOOTH_WINDOW = validSmoothWindow(smoothWindow, CONFIG.SMOOTH_WINDOW);
 
     this.#subjectCode = this.#hud.subjectCode;
     this.#trials = makeTrialParams(CONFIG.MAX_NUM_TRIALS);
@@ -322,7 +323,9 @@ export default class IBreath {
     // Gaze columns follow the "use eye tracking" setting, not whether a gaze
     // sample happened to have arrived by the time Start was pressed.
     this.#csv = new IBreathCSV(this.#subjectCode, this.#useEyeTracking || this.#gazeEnabled,
-      { signalType: this.#inputSignalType, preset: presetName ?? '' },
+      { signalType: this.#inputSignalType, preset: presetName ?? '',
+        // peaksOnly doesn't use the breath filter (peak envelope instead).
+        breathFilter: this.#inputSignalType === 'peaksOnly' ? 'none' : this.#smoother.label },
       (msg) => this.#showWarning(`CSV: ${msg}`));
     this.#csv.init();
     this.#markers.send(`task_start_${this.#taskName}`);
@@ -425,10 +428,13 @@ export default class IBreath {
     this.#flashStartTime = null;
     this.#flashEndSent = false;
 
-    if (this.#inputSignalType !== 'peaksOnly') {
+    // Gaussian filter (if switched back to it): restart its window per
+    // trial, pre-filled with the last sample (matching the MATLAB
+    // pre-buffer). The Butterworth filter just carries on — its state is
+    // always valid, and a reset would jump to one unfiltered sample.
+    if (this.#inputSignalType !== 'peaksOnly' && this.#smoother instanceof GaussianSmoother) {
       this.#smoother.reset();
-      // Pre-fill the smoother window (matching the MATLAB pre-buffer)
-      for (let i = 0; i < CONFIG.SMOOTH_WINDOW; i++) {
+      for (let i = 0; i < BREATH_FILTER.GAUSSIAN_WINDOW; i++) {
         this.#smoother.push(this.#lastRawSample);
       }
     }

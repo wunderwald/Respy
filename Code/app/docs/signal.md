@@ -1,11 +1,45 @@
 # signal — Signal Processing Utilities
 
-Two modules:
+Three modules:
 
 | Module | Purpose |
 |---|---|
-| [signalUtils.js](../modules/signal/signalUtils.js) | Real-time utilities: smoothing, delay line, range mapping |
+| [breathFilter.js](../modules/signal/breathFilter.js) | The live breath filter shared by iBreath, bioGame and beltTrainingGame |
+| [signalUtils.js](../modules/signal/signalUtils.js) | Real-time utilities: Gaussian smoothing, delay line, range mapping |
 | [breathRateEstimators.js](../modules/signal/breathRateEstimators.js) | Offline breath rate estimation from recordings |
+
+---
+
+## Breath filter
+
+[breathFilter.js](../modules/signal/breathFilter.js) decides how every task smooths the live breath signal. Settings in `BREATH_FILTER`:
+
+| Key | Default | |
+|---|---|---|
+| `TYPE` | `'butterworth'` | `'butterworth'` or `'gaussian'` (switch back to the old filter) |
+| `CUTOFF_HZ` | `1.5` | Butterworth cut-off. Breathing is below 1 Hz, so the breath curve passes unchanged; faster noise is removed |
+| `GAUSSIAN_WINDOW` | `64` | Window in samples, only with `TYPE: 'gaussian'` |
+| `DEFAULT_SAMPLE_RATE` | `100` | Used if the stream's rate is unknown |
+
+**Why Butterworth:** the Gaussian window is centred, so its output is always half a window old — 31.5 samples at 64, ≈ 0.3–0.37 s at 85–100 Hz. That lag made the games feel delayed, and made iBreath's "sync" trials ≈ 0.35 s late (with the async delays on top). The 2nd-order Butterworth low-pass is causal and removes noise about as well, with ≈ 0.13–0.15 s delay at 1.5 Hz (measured on a recorded session and a 15 BPM test signal).
+
+**Sample rate:** the Butterworth coefficients depend on the stream's rate. Each task tracks it with `StreamRate`: the LSL stream's nominal rate from the bridge's `connected` status, else the rate counted from incoming samples (last 5 s), else `DEFAULT_SAMPLE_RATE`. The filter is built at Start with that rate.
+
+**Recorded:** the filter's `label` — e.g. `butterworth2_1.5Hz_fs100` (type, cut-off, sample rate) or `gaussian_w64` — goes into the data (`breathFilter` column / `breath_filter` setting), plus `sample_rate_source` (`nominal` / `measured` / `default`) in the games' event data.
+
+```js
+import { createBreathFilter, StreamRate } from './modules/signal/breathFilter.js';
+
+const rate = new StreamRate();
+rate.setStatus(statusEvent);           // on every stream status
+rate.tick();                           // on every sample
+const filter = createBreathFilter(rate.current.hz);   // at Start
+filter.push(rawSample);
+const smoothed = filter.value;
+filter.label;                          // 'butterworth2_1.5Hz_fs100'
+```
+
+The Butterworth filter starts at the first sample's value (no swing up from 0) and ignores non-finite samples. iBreath doesn't reset it between trials (its state is always valid); with `TYPE: 'gaussian'`, iBreath restarts the window per trial as before.
 
 ---
 
@@ -13,7 +47,7 @@ Two modules:
 
 ### GaussianSmoother
 
-Real-time Gaussian low-pass filter over a sliding window. Matches `applyGaussianLPF.m` + `smoothBreathRT.m`.
+Real-time Gaussian low-pass filter over a sliding window. Matches `applyGaussianLPF.m` + `smoothBreathRT.m`. No longer the default (see [Breath filter](#breath-filter)): kept for `BREATH_FILTER.TYPE = 'gaussian'`.
 
 ```js
 import { GaussianSmoother } from './modules/signal/signalUtils.js';

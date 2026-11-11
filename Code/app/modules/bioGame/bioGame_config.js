@@ -32,13 +32,13 @@ export const CONFIG = {
   // ── Breath target ────────────────────────────────────────────────────────
   SLOW_BPM:              6,
 
-  // ── Signal processing ────────────────────────────────────────────────────
-  SMOOTH_WINDOW:         64,    // GaussianSmoother window
-
   // ── Avatar ───────────────────────────────────────────────────────────────
   AVATAR_X_RATIO:        0.20,  // fixed x as fraction of canvas width
   AVATAR_SIZE_MIN:       0.10,  // height as fraction of canvas height (full inhale)
   AVATAR_SIZE_MAX:       0.17,  // height as fraction of canvas height (full exhale)
+  // Nose tilt follows the fish's vertical speed, eased with this time
+  // constant. Short, so the fish turns as soon as the breath turns (was 0.18).
+  AVATAR_TILT_SECS:      0.05,
 
   // ── Stress mechanic ───────────────────────────────────────────────────────
   AVATAR_STRESS_SIZE_MIN: 0.03,  // smallest avatar height (all misses)

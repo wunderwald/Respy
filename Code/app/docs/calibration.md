@@ -66,7 +66,7 @@ narrows it (more sensitive, saturates sooner), `> 1` widens it (headroom for
 deeper breaths than during calibration). The default `1` leaves it unchanged.
 
 `RespCalibration` only records samples and computes the range — it does not
-smooth the signal (use [`GaussianSmoother`](signal.md) beforehand if needed)
+smooth the signal (use the [breath filter](signal.md#breath-filter) beforehand if needed)
 or apply the scaling itself (use [`mapRange`](signal.md) with the returned
 `[min, max]`).
 

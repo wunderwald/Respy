@@ -24,7 +24,6 @@ Two windows open:
 |---|---|
 | **Subject** | Subject code written to the CSV filename. Locked once calibration begins. Only letters, digits, `-` and `_` (empty = `TEST`); anything else shows a red hint under the field and disables Start. If data for this code already exists, an amber hint warns that Start will overwrite it (Start stays enabled). |
 | **Cal secs** | Calibration recording duration (default 10 s). |
-| **Smoothing** | Breath-smoothing window in samples: 64 (default), 128, 256, 512 or 1024. Locked once the session starts; recorded in the data. Larger = smoother fish but more delay — about half the window, so its length in seconds depends on the stream's sample rate (e.g. 1024 at 100 Hz ≈ 10 s window, ≈ 5 s delay). Only used for the *Physiological* signal type (*Peaks only* uses the peak envelope). Overrides a preset's `SMOOTH_WINDOW` config override. |
 | **Trials** | Number of trials in the session (default `MAX_NUM_TRIALS`, 80). Pre-filled and locked when the loaded preset defines `numTrials`; otherwise editable (whole number ≥ 1). Locked once calibration begins. A warning appears next to it if the number isn't a multiple of 4: left/right and pufferfish/starfish are balanced in blocks of 4, so other counts aren't exactly balanced (the session still runs). |
 | **Retry calibration** | Appears only if calibration fails (no signal received, or the signal was flat). Restarts the calibration recording. |
 | **Use default calibration** | Appears only if calibration fails. Skips ahead using `CONFIG.DEFAULT_CAL_RANGE` instead of a measured range. |
@@ -80,7 +79,7 @@ The `[READY]` step between trials is skipped when `AUTO_ADVANCE` is on. The `[DI
 ## Trial design
 
 - **80 trials** per session, balanced in blocks of 2: 1 sync, 1 async.
-- **Synchronous trials** — cloud animation tracks the Gaussian-smoothed breath signal, rescaled into `[0, 1]` using the current signal range — taken from calibration, then drift-tracked (see [Signal range](#signal-range) below).
+- **Synchronous trials** — cloud animation tracks the filtered breath signal (low-latency [breath filter](signal.md#breath-filter), ≈ 0.13–0.15 s behind the breath), rescaled into `[0, 1]` using the current signal range — taken from calibration, then drift-tracked (see [Signal range](#signal-range) below).
 - **Asynchronous trials** — cloud tracks the participant's own real-time breath signal, delayed by the current adaptive delay (see [Async delay staircase](#async-delay-staircase) below), then rescaled the same way as sync trials.
 - **Flash stimulus** (`FLASHING_IMAGE`) — a lightning image appears on 50 % of trials at a random time between `FLASH_TIME_MIN` and `FLASH_TIME_MAX` seconds into the trial.
 - **Post-trial question** (`CONFIG.QUESTIONS`) — after each non-aborted trial, a question is shown for up to `RESPONSE_TIMEOUT_SECS` seconds. Non-responses are recorded as `timeout`. Which question(s) can appear, in what mix, is defined by `CONFIG.QUESTIONS` — either the built-in default (100% `sync`) or a loaded preset's `questions` list. See [Presets](#presets) for the full mechanism.
@@ -169,7 +168,7 @@ One row per trial, appended after each trial ends (or after the response screen)
 | `stimX1`, `stimY1` | Cloud end position (normalised 0–1) |
 | `delayMs` | Async delay applied to this trial (ms), or empty (sync trials) — see [Async delay staircase](#async-delay-staircase) |
 | `rangeMin`, `rangeMax` | Signal range (native units) mapped to stimulus `[0, 1]` for this trial — see [Signal range](#signal-range) |
-| `smoothWindow` | Breath-smoothing window (samples) used in this session — the **Smoothing** control (not used with *Peaks only*) |
+| `breathFilter` | Breath filter used in this session, e.g. `butterworth2_1.5Hz_fs100` — see [breath filter](signal.md#breath-filter); `none` with *Peaks only* |
 | `signalType` | `physiological` (iBreath) or `peaksOnly` (iBeat) |
 | `preset` | Name of the loaded preset (its `name` field, or the file name for a browsed file without one); empty without a preset |
 | `calibration` | `measured` (range from the calibration recording) or `default` (`DEFAULT_CAL_RANGE` after a failed calibration) |
@@ -245,11 +244,11 @@ An optional second gaze stream is read from `GAZE_STREAM_URL` (`ws://localhost:8
 
 The experimenter's **Signal type** control selects how the raw stream is turned into the real-time value that calibration, the sync display, and the async delay line all read — everything *after* that point (calibration, trial logic, CSV columns, markers) is identical for both types.
 
-- **Physiological** (default) — a continuous breath-like signal, Gaussian-smoothed over the **Smoothing** window (default `SMOOTH_WINDOW`, 64 samples).
+- **Physiological** (default) — a continuous breath-like signal, smoothed by the shared [breath filter](signal.md#breath-filter) (2nd-order Butterworth low-pass, 1.5 Hz).
 - **Peaks only** — for a sparse signal that's a constant baseline with brief, distinct spikes (e.g. AD Instruments' fast-response/peak-detect ECG output from LabChart, streamed to LSL). Every detected peak triggers a short swell-then-fade pulse instead of running the raw signal through the Gaussian smoother, so it reads as one plucky "heartbeat" per peak:
   - **Peak detection** is an adaptive rising-edge threshold: it tracks the lowest and highest raw values seen so far and fires on every upward crossing of the point `PEAK_CROSS_FRACTION` of the way between them — no fixed voltage/unit threshold needed, and no refractory period. Assumes a genuinely clean signal (constant baseline, distinct peaks); if that doesn't hold in practice, the detector needs rework, not just retuning.
   - **The pulse shape**: `PEAK_SWELL_MS` (default 80 ms) to rise to full level, then `PEAK_FADE_MS` (default 260 ms) to decay back to 0. A peak that arrives before the previous pulse has fully faded simply restarts the swell from the envelope's current level — no special-casing, since the signal is assumed clean enough that this shouldn't normally happen.
-  - Unlike the Gaussian smoother, the envelope is **not** reset between trials (there's no window to re-seed, and resetting could clip a pulse mid-trial-transition) — it runs continuously across the whole session, only reset at Start.
+  - Like the Butterworth breath filter, the envelope is **not** reset between trials (there's no window to re-seed, and resetting could clip a pulse mid-trial-transition) — it runs continuously across the whole session, only reset at Start.
   - All three constants live in [config.js](./modules/ibreath/config.js) and can be retuned without touching the detection/envelope logic itself.
 
 ---
@@ -283,7 +282,7 @@ Every field is optional except `questions`' internal shape (if `questions` is pr
 | `useEyeTracking` | `true` or `false` — pre-fills and locks the **Use eye tracking** checkbox (and applies it immediately, same as checking it by hand). Omit (or `null`) to leave it to the experimenter. |
 | `numTrials` | Whole number ≥ 1 — pre-fills and locks the **Trials** field. Omit to leave it to the experimenter (default 80). An invalid value isn't locked in: the field stays editable and a warning appears next to the preset selector. All bundled presets set `80`. |
 | `questions` | Replaces `CONFIG.QUESTIONS` wholesale for the session (applied at Start). Omit to keep the built-in default (100% `sync`). |
-| `configOverrides` | Arbitrary `key: value` pairs applied directly onto `CONFIG` at Start (after resetting CONFIG to its hardcoded defaults, so a previous session's preset never silently lingers). Any key in [config.js](./modules/ibreath/config.js) can be overridden this way — this is how the iBeat presets carry their peak-envelope timings. The signal pipeline (smoother, peak envelope, async delay buffer) is rebuilt after the overrides are applied, so `SMOOTH_WINDOW`, `PEAK_*` and `DELAY_VALUES_MS` overrides take effect too. |
+| `configOverrides` | Arbitrary `key: value` pairs applied directly onto `CONFIG` at Start (after resetting CONFIG to its hardcoded defaults, so a previous session's preset never silently lingers). Any key in [config.js](./modules/ibreath/config.js) can be overridden this way — this is how the iBeat presets carry their peak-envelope timings. The signal pipeline (smoother, peak envelope, async delay buffer) is rebuilt after the overrides are applied, so `PEAK_*` and `DELAY_VALUES_MS` overrides take effect too. |
 
 **Question entries** (`questions[i]`):
 

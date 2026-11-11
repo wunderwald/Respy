@@ -20,9 +20,6 @@ export const CONFIG = {
   RANGE_TIME_CONSTANT_SECS: 10,
   RANGE_MIN_SPAN_FRACTION:  0.3,
 
-  // ── Signal processing ────────────────────────────────────────────────────
-  SMOOTH_WINDOW:         64,    // GaussianSmoother window
-
   // ── Phase timing ─────────────────────────────────────────────────────────
 
   APPROACH_DURATION_MS:    4000,  // spawn → target zone (halved from the original 8000ms)
@@ -58,6 +55,9 @@ export const CONFIG = {
   // ── Avatar ───────────────────────────────────────────────────────────────
   AVATAR_SIZE_MIN: 0.09,  // height as fraction of canvas height
   AVATAR_SIZE_MAX: 0.15,
+  // Nose tilt follows the fish's vertical speed, eased with this time
+  // constant. Short, so the fish turns as soon as the breath turns (was 0.18).
+  AVATAR_TILT_SECS: 0.05,
 
   // ── Test-phase cover ─────────────────────────────────────────────────────
   BUBBLE_COUNT: 24,

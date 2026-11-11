@@ -26,17 +26,17 @@ export class IBreathCSV {
   #onWarn;
   #frameHeader;
   #trialHeader;
-  #smoothWindow;
+  #breathFilter;
   #signalType;
   #preset;
   #calibration = '';   // 'measured' | 'default' — set once calibration completes
 
-  // session: { signalType, preset } — repeated on every trial row.
+  // session: { signalType, preset, breathFilter } — repeated on every trial row.
   constructor(subjectCode, gazeEnabled, session, onWarn) {
     this.#subjectCode = subjectCode;
     this.#gazeEnabled = gazeEnabled;
     this.#onWarn      = onWarn;
-    this.#smoothWindow = CONFIG.SMOOTH_WINDOW;   // session's value (set before the CSV is created)
+    this.#breathFilter = session.breathFilter ?? '';   // filter label, e.g. butterworth2_1.5Hz_fs100
     this.#signalType   = session.signalType;
     this.#preset       = session.preset;
 
@@ -47,7 +47,7 @@ export class IBreathCSV {
 
     this.#trialHeader =
       'trialIndex,subject,questionType,synchronous,img,lr,stimX0,stimY0,stimX1,stimY1,delayMs,' +
-      'rangeMin,rangeMax,smoothWindow,signalType,preset,calibration,ITI,startTime,endTime,aborted' +
+      'rangeMin,rangeMax,breathFilter,signalType,preset,calibration,ITI,startTime,endTime,aborted' +
       (CONFIG.SHOW_QUESTIONS ? ',response' : '') +
       (CONFIG.FLASHING_IMAGE ? ',flashImage,flashScheduledTime,flashX,flashY,flashShown' : '') + '\n';
   }
@@ -138,7 +138,7 @@ export class IBreathCSV {
       `${trial.stimX0},${trial.stimY0},${trial.stimX1},${trial.stimY1},` +
       `${trial.delayMs ?? ''},` +
       `${trial.rangeMin ?? ''},${trial.rangeMax ?? ''},` +
-      `${this.#smoothWindow},` +
+      `${this.#breathFilter},` +
       `${this.#signalType},${this.#preset},${this.#calibration},` +
       `${trial.ITI},` +
       `${trial.startTime ?? ''},` +

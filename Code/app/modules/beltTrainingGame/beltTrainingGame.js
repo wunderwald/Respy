@@ -38,7 +38,7 @@
  *   setStatus({ type, text })  → void
  */
 
-import { GaussianSmoother, validSmoothWindow } from '../signal/signalUtils.js';
+import { createBreathFilter, StreamRate } from '../signal/breathFilter.js';
 import { RespCalibration, AdaptiveRange } from '../calibration/calibration.js';
 import { MarkerStream } from '../stream/markerStream.js';
 import { CONFIG, STATE } from './beltTrainingGame_config.js';
@@ -67,11 +67,13 @@ export default class BeltTrainingGame {
   // ── Experiment settings (overridden by experimenter on start) ─────────────
   #subjectCode     = CONFIG.SUBJECT_CODE;
   #calibrationSecs = CONFIG.CALIBRATION_SECS;
-  #smoothWindow    = CONFIG.SMOOTH_WINDOW;   // samples; experimenter's "smoothing" control
   #autoProceed     = false;  // when true, READY screens are skipped — trials chain automatically
 
   // ── Signal processing ─────────────────────────────────────────────────────
-  #smoother     = new GaussianSmoother(CONFIG.SMOOTH_WINDOW);
+  // Breath filter (see modules/signal/breathFilter.js): built at session
+  // start for the stream's sample rate, recorded in the data via its label.
+  #streamRate   = new StreamRate();
+  #smoother     = createBreathFilter(this.#streamRate.current.hz);
   #lastRaw      = 0;
   #calibration  = null;
   #calFailed    = false;
@@ -147,6 +149,7 @@ export default class BeltTrainingGame {
 
   pushSample(rawValue) {
     this.#lastRaw = rawValue;
+    this.#streamRate.tick();
     this.#smoother.push(rawValue);
     this.#rangeTracker?.push(performance.now(), this.#smoother.value);
 
@@ -155,7 +158,9 @@ export default class BeltTrainingGame {
     }
   }
 
-  setStatus({ type, text }) {
+  setStatus(event) {
+    const { type, text } = event;
+    this.#streamRate.setStatus(event);
     this.#streamReady = (type === 'connected');
     if (this.#state === STATE.IDLE) {
       this.#pushState({
@@ -167,15 +172,14 @@ export default class BeltTrainingGame {
 
   // ── Action handler ────────────────────────────────────────────────────────
 
-  #onAction({ type, subjectCode, calibrationSecs, smoothWindow, autoProceed }) {
+  #onAction({ type, subjectCode, calibrationSecs, autoProceed }) {
     switch (type) {
       case 'start':
         // Settings only count for a session that actually starts now, so the
-        // recorded values (e.g. smoothWindow) always match what's in use.
+        // recorded values always match what's in use.
         if (this.#state !== STATE.IDLE || !this.#streamReady) break;
         if (subjectCode     !== undefined) this.#subjectCode     = subjectCode;
         if (calibrationSecs !== undefined) this.#calibrationSecs = calibrationSecs;
-        if (smoothWindow    !== undefined) this.#smoothWindow    = validSmoothWindow(smoothWindow, CONFIG.SMOOTH_WINDOW);
         if (autoProceed     !== undefined) this.#autoProceed     = autoProceed;
         this.#beginSession();
         break;
@@ -225,7 +229,9 @@ export default class BeltTrainingGame {
   // Both explanation screens always wait for Space/Next, even with
   // auto-proceed on.
   #beginSession() {
-    this.#smoother = new GaussianSmoother(this.#smoothWindow);   // fresh, with the chosen window
+    // Fresh filter for the stream's current sample rate.
+    const rate = this.#streamRate.current;
+    this.#smoother = createBreathFilter(rate.hz);
     this.#inputsLocked = true;
     this.#trialIndex   = 0;
 
@@ -233,7 +239,8 @@ export default class BeltTrainingGame {
       this.#subjectCode, SCENE.id,
       {
         calibration_secs: this.#calibrationSecs,
-        smooth_window:    this.#smoothWindow,
+        breath_filter:    this.#smoother.label,   // e.g. butterworth2_1.5Hz_fs100
+        sample_rate_source: rate.source,         // nominal | measured | default
         auto_proceed:     this.#autoProceed,   // can change mid-session → later `setting` rows
         num_trials:       CONFIG.NUM_TRIALS,
         training_passes:  CONFIG.TRAINING_PASSES,
@@ -545,7 +552,7 @@ export default class BeltTrainingGame {
 
     const vel = dt > 0 ? (norm - this.#prevAvatarNormY) / dt : 0;
     const tgt = clamp(-vel * 1.8, -Math.PI / 6, Math.PI / 6);
-    this.#avatarTilt = lerp(this.#avatarTilt, tgt, 1 - Math.exp(-dt / 0.18));
+    this.#avatarTilt = lerp(this.#avatarTilt, tgt, 1 - Math.exp(-dt / CONFIG.AVATAR_TILT_SECS));
   }
 
   // ── Phase / segment timing ────────────────────────────────────────────────
@@ -626,7 +633,7 @@ export default class BeltTrainingGame {
       fishX:    this.#fishXRatio,
       fishY:    this.#avatarNormY,
       targetY:  this.#targetNormY,
-      smoothWindow: this.#smoothWindow,
+      breathFilter: this.#smoother.label,
     });
   }
 

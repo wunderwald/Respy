@@ -25,7 +25,6 @@ Two windows open:
 | **Natural BPM** | Only visible in the natural condition. Sets the target curve frequency. Filled in automatically from the subject's **Resting** baseline (the average of the methods in `output_data/baseline/<subject>_baseline_resting_estimates.csv` within 4–25 BPM; older recordings without a name: `<subject>_baseline_estimates.csv`), re-checked whenever the subject code changes. Other baselines (Post slow, …) are never used. If that average is outside `NATURAL_BPM_RANGE` (currently **7–15 BPM**), it is not used: the field is set to the default `NATURAL_BPM` (currently **11 BPM**) and an amber ⚠ warning next to it shows the rejected average. Without a Resting baseline, the field also starts at `NATURAL_BPM`; enter the value manually if needed (a typed value is kept when the subject code changes and no baseline is found). |
 | **Show target curve** | Overlays the sinusoidal target curve on screen (for debugging / operator monitoring). |
 | **Cal secs** | How many seconds to calibrate the breath signal (default 10 s). Calibration captures the participant's breathing range. |
-| **Smoothing** | Breath-smoothing window in samples: 64 (default), 128, 256, 512 or 1024. Locked once the session starts; recorded in the data. Larger = smoother fish but more delay — about half the window, so its length in seconds depends on the stream's sample rate (e.g. 1024 at 100 Hz ≈ 10 s window, ≈ 5 s delay). |
 | **Retry calibration** | Appears only if calibration fails (no signal received, or the signal was flat). Restarts the calibration recording. |
 | **Use default calibration** | Appears only if calibration fails. Skips to the ready state using `CONFIG.DEFAULT_CAL_RANGE` instead of a measured range. |
 | **Data dir** | Folder where CSV files are saved. Click **…** to pick a different folder. Default: `bioGameData/` inside the app folder. |
@@ -120,17 +119,17 @@ One row per simulation frame (`SIM_FPS`, 60 per second) during game N.
 | `blockTime` | Game time in seconds, `frame / SIM_FPS` |
 | `drawn` | `1` if a rendered frame showed this step as its newest state, `0` if the display skipped it (slow rendering, a stall, or the game's last step). At display rate ≈ `SIM_FPS`, an occasional `0` from timing jitter is normal. |
 | `breathRaw` | Raw LSL sample |
-| `breathSmoothed` | Gaussian-smoothed sample |
+| `breathSmoothed` | Sample after the [breath filter](signal.md#breath-filter) (low-latency low-pass) |
 | `breathNorm` | Normalized to the current signal range, `[0, 1]` |
 | `normMin`, `normMax` | Signal range (native units) used for `breathNorm` at this frame — calibrated, then drift-tracked (`RANGE_ADAPT`, see [calibration](calibration.md#adaptiverange)) |
 | `avatarY` | Avatar vertical position `[0 = bottom, 1 = top]` |
 | `targetY` | Target curve value at this frame |
 | `itemCount` | Items currently on screen (not yet passed the avatar) |
-| `smoothWindow` | Breath-smoothing window (samples) used in this session — the **Smoothing** control |
+| `breathFilter` | Breath filter used in this session, e.g. `butterworth2_1.5Hz_fs100` (type, cut-off, stream sample rate) — see [breath filter](signal.md#breath-filter) |
 
 ### Events — `eventData.csv`
 
-Session settings rows: `target_bpm` (6 in the slow group, else the entered natural BPM), `natural_bpm_source` (where the natural-BPM field's value came from: `baseline` = Resting average, `fallback` = average outside `NATURAL_BPM_RANGE` so `NATURAL_BPM` was used, `manual` = typed by the experimenter, `default` = no usable baseline found, so `NATURAL_BPM` was used), `baseline_bpm` (the Resting average, empty if none was found; recorded even when out of range or overridden), `show_curve`, `calibration_secs`, `smooth_window`, `num_blocks`, `block_duration_secs`, `sim_fps`.
+Session settings rows: `target_bpm` (6 in the slow group, else the entered natural BPM), `natural_bpm_source` (where the natural-BPM field's value came from: `baseline` = Resting average, `fallback` = average outside `NATURAL_BPM_RANGE` so `NATURAL_BPM` was used, `manual` = typed by the experimenter, `default` = no usable baseline found, so `NATURAL_BPM` was used), `baseline_bpm` (the Resting average, empty if none was found; recorded even when out of range or overridden), `show_curve`, `calibration_secs`, `breath_filter` (as the `breathFilter` column), `sample_rate_source` (where the filter's sample rate came from: `nominal` = the LSL stream's declared rate, `measured` = counted from incoming samples, `default` = neither known, 100 Hz assumed), `num_blocks`, `block_duration_secs`, `sim_fps`.
 
 | Column | Description |
 |---|---|

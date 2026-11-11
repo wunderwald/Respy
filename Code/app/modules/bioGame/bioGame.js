@@ -21,7 +21,7 @@
  *   setStatus({ type, text })  → void
  */
 
-import { GaussianSmoother, validSmoothWindow } from '../signal/signalUtils.js';
+import { createBreathFilter, StreamRate } from '../signal/breathFilter.js';
 import { RespCalibration, AdaptiveRange } from '../calibration/calibration.js';
 import { MarkerStream }     from '../stream/markerStream.js';
 import { CONFIG, STATE }    from './bioGame_config.js';
@@ -63,7 +63,6 @@ export default class BioGame {
   #baselineBpm      = '';          // averaged Resting-baseline estimate, '' = none
   #showCurve        = CONFIG.SHOW_CURVE;
   #calibrationSecs  = CONFIG.CALIBRATION_SECS;
-  #smoothWindow     = CONFIG.SMOOTH_WINDOW;   // samples; experimenter's "smoothing" control
 
   // ── Block management ──────────────────────────────────────────────────────
   #blockIndex       = 0;
@@ -94,7 +93,10 @@ export default class BioGame {
   #nextCueTime = null;
 
   // ── Signal processing ─────────────────────────────────────────────────────
-  #smoother         = new GaussianSmoother(CONFIG.SMOOTH_WINDOW);
+  // Breath filter (see modules/signal/breathFilter.js): built at session
+  // start for the stream's sample rate, recorded in the data via its label.
+  #streamRate       = new StreamRate();
+  #smoother         = createBreathFilter(this.#streamRate.current.hz);
   #lastRaw          = 0;
   #calibration      = null;
   #calFailed        = false;
@@ -182,6 +184,7 @@ export default class BioGame {
 
   pushSample(rawValue) {
     this.#lastRaw = rawValue;
+    this.#streamRate.tick();
     this.#smoother.push(rawValue);
     this.#rangeTracker?.push(performance.now(), this.#smoother.value);
 
@@ -190,7 +193,9 @@ export default class BioGame {
     }
   }
 
-  setStatus({ type, text }) {
+  setStatus(event) {
+    const { type, text } = event;
+    this.#streamRate.setStatus(event);
     this.#streamReady = (type === 'connected');
     if (this.#state === STATE.IDLE) {
       this.#pushState({
@@ -202,11 +207,11 @@ export default class BioGame {
 
   // ── Action handler ────────────────────────────────────────────────────────
 
-  #onAction({ type, subjectCode, group, naturalBpm, naturalBpmSource, baselineBpm, showCurve, calibrationSecs, smoothWindow }) {
+  #onAction({ type, subjectCode, group, naturalBpm, naturalBpmSource, baselineBpm, showCurve, calibrationSecs }) {
     switch (type) {
       case 'start':
         // Settings only count for a session that actually starts now, so the
-        // recorded values (e.g. smoothWindow) always match what's in use.
+        // recorded values always match what's in use.
         if (this.#state !== STATE.IDLE || !this.#streamReady) break;
         if (subjectCode     !== undefined) this.#subjectCode     = subjectCode;
         if (group           !== undefined) this.#group           = group;
@@ -215,7 +220,6 @@ export default class BioGame {
         if (baselineBpm     !== undefined) this.#baselineBpm     = baselineBpm;
         if (showCurve       !== undefined) this.#showCurve       = showCurve;
         if (calibrationSecs !== undefined) this.#calibrationSecs = calibrationSecs;
-        if (smoothWindow    !== undefined) this.#smoothWindow    = validSmoothWindow(smoothWindow, CONFIG.SMOOTH_WINDOW);
         this.#beginSession();
         break;
 
@@ -248,7 +252,9 @@ export default class BioGame {
   // Start pressed: set the session up, then explain the calibration to the
   // child. The calibration itself starts on Space/Next (#startCalibration).
   #beginSession() {
-    this.#smoother = new GaussianSmoother(this.#smoothWindow);   // fresh, with the chosen window
+    // Fresh filter for the stream's current sample rate.
+    const rate = this.#streamRate.current;
+    this.#smoother = createBreathFilter(rate.hz);
     this.#inputsLocked = true;
     this.#blockIndex   = 0;
     this.#scoreBlock   = new Array(CONFIG.NUM_BLOCKS).fill(0);
@@ -262,7 +268,8 @@ export default class BioGame {
         baseline_bpm:        this.#baselineBpm,        // Resting-baseline average ('' = none found)
         show_curve:          this.#showCurve,
         calibration_secs:    this.#calibrationSecs,
-        smooth_window:       this.#smoothWindow,
+        breath_filter:       this.#smoother.label,   // e.g. butterworth2_1.5Hz_fs100
+        sample_rate_source:  rate.source,            // nominal | measured | default
         num_blocks:          CONFIG.NUM_BLOCKS,
         block_duration_secs: CONFIG.BLOCK_DURATION_SECS,
         sim_fps:             CONFIG.SIM_FPS,
@@ -570,7 +577,7 @@ export default class BioGame {
 
     const vel = dt > 0 ? (norm - this.#prevAvatarNormY) / dt : 0;
     const tgt = clamp(-vel * 1.8, -Math.PI / 6, Math.PI / 6);
-    this.#avatarTilt = lerp(this.#avatarTilt, tgt, 1 - Math.exp(-dt / 0.18));
+    this.#avatarTilt = lerp(this.#avatarTilt, tgt, 1 - Math.exp(-dt / CONFIG.AVATAR_TILT_SECS));
   }
 
   // ── Item spawning and movement ────────────────────────────────────────────
@@ -699,7 +706,7 @@ export default class BioGame {
       avatarY:   this.#avatarNormY,
       targetY:   targetCurveY(blockTime, this.#activeBpm),
       itemCount: this.#items.filter(s => !s.checked).length,
-      smoothWindow: this.#smoothWindow,
+      breathFilter: this.#smoother.label,
     };
     this.#csv.bufferFrame(this.#lastFrameRow);
   }

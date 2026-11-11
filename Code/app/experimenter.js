@@ -7,7 +7,6 @@ import { CONFIG as BG }  from './modules/bioGame/bioGame_config.js';
 import { CONFIG as BTG } from './modules/beltTrainingGame/beltTrainingGame_config.js';
 import { CONFIG as BL }  from './modules/baseline/baseline_config.js';
 import { loadNaturalBpm, RESTING, baselineFileStem } from './modules/baseline/baselineFiles.js';
-import { SMOOTH_WINDOW_OPTIONS } from './modules/signal/signalUtils.js';
 import { attachSubjectCheck } from './modules/subjectCheck.js';
 
 // ── Frontend detection ────────────────────────────────────────────────────────
@@ -62,18 +61,6 @@ if (frontend === 'ibreath') {
 
 if (!['ibreath', 'baseline'].includes(frontend)) {
   document.getElementById('timer-bar').style.display = 'none';
-}
-
-// Breath-smoothing window dropdown (samples) — same control in every
-// frontend that smooths the breath. Lives in the settings bar, so it locks
-// with the other settings once the session starts.
-function smoothWindowSelect(id, defaultValue, note = '') {
-  const options = SMOOTH_WINDOW_OPTIONS.map((n) =>
-    `<option value="${n}" ${n === defaultValue ? 'selected' : ''}>${n}</option>`).join('');
-  return `
-    <span class="label">smoothing</span>
-    <select id="${id}" class="stream-select"
-            title="Breath smoothing window in samples — larger = smoother but more delayed (≈ half the window)${note}">${options}</select>`;
 }
 
 function fmtTime(secs) {
@@ -152,7 +139,6 @@ if (frontend === 'ibreath') {
     <input id="s-num-trials" type="number" class="settings-num" min="1" step="1"
            value="${CONFIG.MAX_NUM_TRIALS}" title="Number of trials — set by the preset if it defines numTrials" />
     <span id="s-trials-warning" class="preset-warning" style="display:none"></span>
-    ${smoothWindowSelect('s-smooth-window', CONFIG.SMOOTH_WINDOW, '. Physiological signal only (not used for Peaks only).')}
     <span class="label">preset</span>
     <select id="s-preset" class="stream-select">
       <option value="">None (sync only)</option>
@@ -309,7 +295,6 @@ if (frontend === 'ibreath') {
       inputSignalType: signalTypeSelect.value,
       calibrationSecs: parseInt(document.getElementById('s-cal-secs').value) || CONFIG.CALIBRATION_SECS,
       numTrials,
-      smoothWindow:    Number(document.getElementById('s-smooth-window').value),
       questions:       activePreset?.questions ?? null,
       configOverrides: activePreset?.configOverrides ?? null,
     });
@@ -551,7 +536,6 @@ if (frontend === 'ibreath') {
     <span class="label">cal secs</span>
     <input id="bg-cal-secs" type="number" class="settings-num" min="5" max="120" step="5"
            value="${BG.CALIBRATION_SECS}" />
-    ${smoothWindowSelect('bg-smooth-window', BG.SMOOTH_WINDOW)}
   `;
 
   const bgStatusEl   = document.getElementById('bg-status');
@@ -705,7 +689,6 @@ if (frontend === 'ibreath') {
       baselineBpm,
       showCurve:       document.getElementById('bg-show-curve').checked,
       calibrationSecs: parseInt(document.getElementById('bg-cal-secs').value) || BG.CALIBRATION_SECS,
-      smoothWindow:    Number(document.getElementById('bg-smooth-window').value),
     });
   });
   bgNextBtn.addEventListener('click',  () => window.api.frontend.sendAction({ type: 'next' }));
@@ -937,7 +920,6 @@ if (frontend === 'ibreath') {
     <span class="label">cal secs</span>
     <input id="btg-cal-secs" type="number" class="settings-num" min="5" max="120" step="5"
            value="${BTG.CALIBRATION_SECS}" />
-    ${smoothWindowSelect('btg-smooth-window', BTG.SMOOTH_WINDOW)}
   `;
 
   const btgStatusEl      = document.getElementById('btg-status');
@@ -983,7 +965,6 @@ if (frontend === 'ibreath') {
       type:            'start',
       subjectCode:     btgSubjectCheck.code(),
       calibrationSecs: parseInt(document.getElementById('btg-cal-secs').value) || BTG.CALIBRATION_SECS,
-      smoothWindow:    Number(document.getElementById('btg-smooth-window').value),
       autoProceed:     btgAutoProceedEl.checked,
     });
   });
