@@ -1,4 +1,6 @@
+import csv
 import logging
+import re
 from pathlib import Path
 import numpy as np
 import pyxdf
@@ -7,6 +9,8 @@ import pyxdf
 I/O
 """
 XDF_DIR = "./xdf"
+
+TASK_MARKER_RE = re.compile(r"^task_(start|end|abort)_(.+)$")
 
 """
 LOGGING
@@ -43,6 +47,62 @@ def _channel_labels(info):
     return labels
 
 
+def _marker_values(stream):
+    """Yield (timestamp, marker string) for each sample of a marker stream (first channel)."""
+    for ts, sample in zip(stream["time_stamps"], stream["time_series"]):
+        value = sample[0] if len(sample) else ""
+        yield float(ts), str(value)
+
+
+def _pair_task_markers(markers):
+    """Pair task_start_<name> with the next task_end_<name> / task_abort_<name>.
+
+    markers: (timestamp, marker) tuples. Only task_<start|end|abort>_<name> markers are considered;
+    a pair must not have any other task marker between its start and end/abort.
+    Returns (pairs, unmatched): pairs as dicts with a per-task 1-based index,
+    unmatched as (timestamp, marker) tuples.
+    """
+    task_markers = []
+    for ts, marker in sorted(markers, key=lambda m: m[0]):
+        match = TASK_MARKER_RE.match(marker)
+        if match:
+            task_markers.append((ts, marker, match.group(1), match.group(2)))
+
+    pairs, unmatched = [], []
+    counts = {}
+    open_start = None  # (ts, marker, kind, task) of the most recent unpaired start
+
+    for ts, marker, kind, task in task_markers:
+        if kind == "start":
+            if open_start:
+                unmatched.append(open_start[:2])
+            open_start = (ts, marker, kind, task)
+        elif open_start and open_start[3] == task:
+            counts[task] = counts.get(task, 0) + 1
+            pairs.append({
+                "task_name": task,
+                "index": counts[task],
+                "start_marker": open_start[1],
+                "end_marker": marker,
+                "start_time": open_start[0],
+                "end_time": ts,
+            })
+            open_start = None
+        else:
+            # end/abort without a matching start directly before it; any open start
+            # of another task can no longer be paired either.
+            if open_start:
+                unmatched.append(open_start[:2])
+                open_start = None
+            unmatched.append((ts, marker))
+
+    if open_start:
+        unmatched.append(open_start[:2])
+
+    unmatched.sort(key=lambda m: m[0])
+    return pairs, unmatched
+
+
 def summarize_xdf(path):
     path = Path(path)
 
@@ -52,10 +112,16 @@ def summarize_xdf(path):
         log.error("Could not load %s: %s", path, e)
         return
 
-    log.info("=" * 70)
-    log.info("Folder: %s", path.parent.name)
-    log.info("%s  (%d stream%s)", path, len(streams), "" if len(streams) == 1 else "s")
+    lines = []
 
+    def out(msg, *args):
+        lines.append(msg % args if args else msg)
+
+    out("=" * 70)
+    out("Folder: %s", path.parent.name)
+    out("%s  (%d stream%s)", path, len(streams), "" if len(streams) == 1 else "s")
+
+    marker_streams = []
     for stream in streams:
         info = stream["info"]
         name = _info_value(info, "name")
@@ -70,21 +136,58 @@ def summarize_xdf(path):
         # string streams come back as lists of lists, not arrays
         shape = time_series.shape if isinstance(time_series, np.ndarray) else (len(time_series), channel_count)
 
-        log.info("-" * 70)
-        log.info("Stream:     %s", name)
-        log.info("  type:     %s", stream_type)
-        log.info("  format:   %s", channel_format)
-        log.info("  channels: %s", channel_count)
-        log.info("  shape:    %s", shape)
-        log.info("  samples:  %d", n_samples)
-        log.info("  srate:    %s", "irregular" if nominal_srate == 0 else f"{nominal_srate:g} Hz")
+        out("-" * 70)
+        out("Stream:     %s", name)
+        out("  type:     %s", stream_type)
+        out("  format:   %s", channel_format)
+        out("  channels: %s", channel_count)
+        out("  shape:    %s", shape)
+        out("  samples:  %d", n_samples)
+        out("  srate:    %s", "irregular" if nominal_srate == 0 else f"{nominal_srate:g} Hz")
         if n_samples > 1:
             duration = time_stamps[-1] - time_stamps[0]
-            log.info("  duration: %.2f s (effective srate %.2f Hz)", duration, (n_samples - 1) / duration if duration else 0)
+            out("  duration: %.2f s (effective srate %.2f Hz)", duration, (n_samples - 1) / duration if duration else 0)
 
         labels = _channel_labels(info)
         if labels:
-            log.info("  labels:   %s", ", ".join(labels))
+            out("  labels:   %s", ", ".join(labels))
+
+        if "marker" in str(name).lower():
+            marker_streams.append(stream)
+
+    summary_path = path.with_name(f"summary_{path.stem}.txt")
+    csv_path = path.with_name(f"task_markers_{path.stem}.csv")
+
+    if marker_streams:
+        markers = [m for stream in marker_streams for m in _marker_values(stream)]
+        pairs, unmatched = _pair_task_markers(markers)
+
+        out("-" * 70)
+        out("Task markers (%d pair%s, %d unmatched) -> %s",
+            len(pairs), "" if len(pairs) == 1 else "s", len(unmatched), csv_path.name)
+        if pairs:
+            task_width = max(len("task_name"), *(len(p["task_name"]) for p in pairs))
+            out("  %-*s | %5s | %s", task_width, "task_name", "index", "markers")
+            for p in pairs:
+                out("  %-*s | %5d | %s, %s", task_width, p["task_name"], p["index"], p["start_marker"], p["end_marker"])
+        if unmatched:
+            out("  Unmatched task markers:")
+            for ts, marker in unmatched:
+                out("    %.3f  %s", ts, marker)
+
+        fields = ["task_name", "index", "start_marker", "end_marker", "start_time", "end_time"]
+        with csv_path.open("w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fields)
+            writer.writeheader()
+            writer.writerows(pairs)
+
+    for line in lines:
+        log.info("%s", line)
+
+    summary_path.write_text("\n".join(lines) + "\n")
+    log.info("Wrote %s", summary_path)
+    if marker_streams:
+        log.info("Wrote %s", csv_path)
 
 
 def main():
