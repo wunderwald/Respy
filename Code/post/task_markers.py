@@ -78,7 +78,7 @@ def pair_task_markers(streams):
 """
 OUTPUT
 """
-def summarize_task_markers(pairs, unmatched):
+def summarize_task_markers(pairs, unmatched, csv_name=None):
     """Return the task marker pairs and unmatched markers as a list of text lines."""
     lines = []
 
@@ -86,7 +86,8 @@ def summarize_task_markers(pairs, unmatched):
         lines.append(msg % args if args else msg)
 
     out("-" * 70)
-    out("Task markers (%d pair%s, %d unmatched)", len(pairs), "" if len(pairs) == 1 else "s", len(unmatched))
+    out("Task markers (%d pair%s, %d unmatched)%s", len(pairs), "" if len(pairs) == 1 else "s", len(unmatched),
+        f" -> {csv_name}" if csv_name else "")
     if pairs:
         task_width = max(len("task_name"), *(len(p["task_name"]) for p in pairs))
         out("  %-*s | %5s | %s", task_width, "task_name", "index", "markers")

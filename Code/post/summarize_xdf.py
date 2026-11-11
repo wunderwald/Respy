@@ -38,7 +38,7 @@ def summarize_xdf(path):
     markers = marker_streams(streams)
     if markers:
         pairs, unmatched = pair_task_markers(markers)
-        lines += summarize_task_markers(pairs, unmatched)
+        lines += summarize_task_markers(pairs, unmatched, csv_path.name)
         write_task_markers_csv(pairs, csv_path)
 
     for line in lines:
