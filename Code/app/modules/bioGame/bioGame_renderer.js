@@ -56,8 +56,7 @@ export class BioGameRenderer {
     this.#drawBg(ctx, w, h, renderData.bgScrollX ?? 0);
 
     switch (state) {
-      case STATE.IDLE:
-        this.#drawCenter(ctx, w, h, TEXTS.waiting, 'rgba(255,255,255,0.38)', 20);
+      case STATE.IDLE:   // before Start: background only
         break;
 
       case STATE.CALIBRATING:
@@ -417,7 +416,6 @@ export class BioGameRenderer {
 
     const label = TEXTS.starsCollected(score);
     this.#drawCenter(ctx, w, cy + 60, label, 'rgba(255,255,255,0.55)', 18);
-    this.#drawCenter(ctx, w, cy + 110, TEXTS.continueSoon, 'rgba(255,255,255,0.28)', 15);
   }
 
   #drawDone(ctx, w, h, scores) {

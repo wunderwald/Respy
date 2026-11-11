@@ -379,11 +379,6 @@ export default class Baseline {
     if (this.#state === STATE.INSTRUCTIONS) {
       drawInstructions(ctx, w, h, INSTRUCTIONS.baseline());
 
-    } else if (this.#state === STATE.IDLE) {
-      ctx.font      = '200 28px Nunito, sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.15)';
-      ctx.fillText(TEXTS.waiting, w / 2, h / 2);
-
     } else if (this.#state === STATE.PLAYING) {
       // Only drawn without a playing video, i.e. always on a timer.
       const remaining = Math.max(0, (this.#targetSecs ?? CONFIG.DURATION_SECS) - (now - this.#startTime) / 1000);

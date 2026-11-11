@@ -63,8 +63,7 @@ export class BeltTrainingGameRenderer {
     this.#sceneRenderer.drawBg(ctx, w, h, 0);
 
     switch (state) {
-      case STATE.IDLE:
-        this.#drawCenter(ctx, w, h / 2, TEXTS.waiting, 'rgba(255,255,255,0.38)', 20);
+      case STATE.IDLE:   // before Start: background only
         break;
 
       case STATE.INSTRUCTIONS_CAL:

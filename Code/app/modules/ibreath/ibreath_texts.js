@@ -4,8 +4,6 @@
 // labels come from CONFIG.QUESTIONS / the loaded preset.
 
 export const TEXTS = {
-  waiting: "Gleich geht's los …",          // before Start
-  ready:   "Gleich geht's weiter!",        // READY between trials (only with AUTO_ADVANCE off)
   paused:  'Kurze Pause',
   eyeCal:  'Einen Moment bitte …',         // eye-tracker calibration (scene usually minimized)
   done:    'Geschafft! Super gemacht!',    // end screen

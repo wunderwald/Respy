@@ -44,11 +44,11 @@ export class IBreathRenderer {
     if (state !== STATE.EYETRACK_CAL) this.#caustics.draw(ctx, w, h, now / 1000);
 
     switch (state) {
-      case STATE.IDLE:        this.#drawIdle(ctx, w, h); break;
+      case STATE.IDLE:        break;   // before Start: background only
       case STATE.INSTRUCTIONS_CAL:
       case STATE.INSTRUCTIONS_TASK: drawInstructions(ctx, w, h, data.instructions); break;
       case STATE.CALIBRATING: this.#drawCalibrating(ctx, w, h, data.calProgress, data.calRemaining); break;
-      case STATE.READY:       this.#drawReady(ctx, w, h); break;
+      case STATE.READY:       break;   // between trials (AUTO_ADVANCE off): background only
       case STATE.DISPLAY:     this.#drawDisplayState(ctx, w, h, data.displayElapsed); break;
       case STATE.TRIAL:       this.#drawTrial(ctx, w, h, data.trial, data.stimLevel, data.flashActive); break;
       case STATE.RESPONSE:    this.#drawResponse(ctx, w, h, now, data.responseStartTime, data.questionType); break;
@@ -82,9 +82,6 @@ export class IBreathRenderer {
 
   // ── State draw methods ─────────────────────────────────────────────────
 
-  #drawIdle(ctx, w, h) {
-    this.#centerText(ctx, w / 2, h / 2, TEXTS.waiting, 'rgba(255,255,255,0.4)', 18);
-  }
 
   #drawCalibrating(ctx, w, h, progress, remaining) {
     const cx = w / 2, cy = h / 2;
@@ -113,11 +110,6 @@ export class IBreathRenderer {
     drawDisplay(ctx, w, h, elapsed, this.#images);
   }
 
-  #drawReady(ctx, w, h) {
-    this.#centerText(ctx, w / 2, h / 2,
-      TEXTS.ready,
-      'rgba(255,255,255,0.35)', 18);
-  }
 
   #drawTrial(ctx, w, h, trial, stimLevel, flashActive) {
     const halfW = w / 2;
