@@ -76,6 +76,8 @@ def summarize_streams(streams, warn_empty=False):
         out("  channels: %s", channel_count)
         out("  shape:    %s", shape)
         out("  samples:  %d", n_samples)
+        if warn_empty and n_samples == 0:
+            out("  WARNING:  stream is empty")
         out("  srate:    %s", "irregular" if nominal_srate == 0 else f"{nominal_srate:g} Hz")
         if n_samples > 1:
             duration = time_stamps[-1] - time_stamps[0]
@@ -84,5 +86,28 @@ def summarize_streams(streams, warn_empty=False):
         labels = channel_labels(info)
         if labels:
             out("  labels:   %s", ", ".join(labels))
+
+    return lines
+
+
+def summarize_trials(streams, pairs):
+    """Return a stream summary per trial (task marker pair, see task_markers.pair_task_markers) as text lines.
+
+    Each stream is cut to [start_time, end_time] of the trial; streams without samples in that window get a warning.
+    """
+    lines = []
+    for p in pairs:
+        trial_streams = [slice_stream(s, p["start_time"], p["end_time"]) for s in streams]
+        n_empty = sum(len(s["time_stamps"]) == 0 for s in trial_streams)
+
+        lines.append("=" * 70)
+        lines.append(f"Trial: {p['task_name']} #{p['index']}")
+        lines.append(f"  markers:  {p['start_marker']} -> {p['end_marker']}")
+        lines.append(f"  start:    {p['start_time']:.3f} s")
+        lines.append(f"  end:      {p['end_time']:.3f} s")
+        lines.append(f"  duration: {p['end_time'] - p['start_time']:.2f} s")
+        if n_empty:
+            lines.append(f"  WARNING:  {n_empty} of {len(trial_streams)} stream(s) empty in this trial")
+        lines += summarize_streams(trial_streams, warn_empty=True)
 
     return lines
