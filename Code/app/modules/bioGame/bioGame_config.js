@@ -3,6 +3,11 @@ export const CONFIG = {
   SUBJECT_CODE:          'TEST',
   GROUP:                 'slow',   // 'slow' | 'natural'
   NATURAL_BPM:           10,
+  // Natural group: the Resting-baseline estimate is only used inside this
+  // range (BPM); outside it the experimenter UI falls back to
+  // NATURAL_BPM_FALLBACK and shows a warning.
+  NATURAL_BPM_RANGE:     [7, 15],
+  NATURAL_BPM_FALLBACK:  11,
   SHOW_CURVE:            false,
   DATA_DIR:              'output_data/bio_game', // do not change
   SEND_MARKERS:          true,

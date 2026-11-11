@@ -581,24 +581,69 @@ if (frontend === 'ibreath') {
 
   // Natural breathing rate = the subject's *Resting* baseline estimates (see
   // modules/baseline/baselineFiles.js — shared with the baseline writer).
+  // An average outside BG.NATURAL_BPM_RANGE is not used: the field gets
+  // BG.NATURAL_BPM_FALLBACK and an amber warning says so.
+  //
+  // Where the BPM came from is sent with Start and recorded in eventData.csv
+  // (`natural_bpm_source`: baseline | fallback | manual | default, and
+  // `baseline_bpm`: the Resting average, '' if none was found).
+  const WARN_COLOR = 'rgba(255,190,60,0.95)';
+  let bpmSource   = 'default';
+  let baselineBpm = '';
+
+  // No usable baseline: back to the config default, unless the experimenter
+  // typed a value (kept, so changing the subject code doesn't wipe it).
+  function noBaseline() {
+    baselineBpm = '';
+    if (bpmSource === 'manual') return;
+    bpmSource = 'default';
+    bgNatBpmEl.value = BG.NATURAL_BPM;
+  }
+
   async function tryLoadBaseline(subjectCode) {
     const res = await loadNaturalBpm(subjectCode, window.api.readFile);
+    bgBpmSrcEl.style.opacity = '';
 
     if (res.status === 'missing') {
+      noBaseline();
       bgBpmSrcEl.textContent = `no ${RESTING.label} baseline for ${subjectCode} — enter manually`;
       bgBpmSrcEl.style.color = '';
       return;
     }
     if (res.status === 'invalid') {
+      noBaseline();
       bgBpmSrcEl.textContent = 'no valid BPM in file — enter manually';
-      bgBpmSrcEl.style.color = 'rgba(255,190,60,0.85)';
+      bgBpmSrcEl.style.color = WARN_COLOR;
       return;
     }
 
-    bgNatBpmEl.value       = res.bpm.toFixed(1);
-    bgBpmSrcEl.textContent = `auto from ${RESTING.label} baseline (${res.count} estimates, avg ${res.bpm.toFixed(1)} BPM)`;
+    // Round first, so the value checked is the value shown.
+    const bpm = Math.round(res.bpm * 10) / 10;
+    const [lo, hi] = BG.NATURAL_BPM_RANGE;
+    baselineBpm = bpm;
+    if (bpm < lo || bpm > hi) {
+      bpmSource = 'fallback';
+      bgNatBpmEl.value       = BG.NATURAL_BPM_FALLBACK;
+      bgBpmSrcEl.textContent = `⚠ ${RESTING.label} baseline avg ${bpm.toFixed(1)} BPM is outside ${lo}–${hi} — using default ${BG.NATURAL_BPM_FALLBACK} BPM`;
+      bgBpmSrcEl.style.color = WARN_COLOR;
+      bgBpmSrcEl.style.opacity = '1';
+      return;
+    }
+    bpmSource = 'baseline';
+    bgNatBpmEl.value       = bpm.toFixed(1);
+    bgBpmSrcEl.textContent = `auto from ${RESTING.label} baseline (${res.count} estimates, avg ${bpm.toFixed(1)} BPM)`;
     bgBpmSrcEl.style.color = 'rgba(100,220,130,0.9)';
   }
+
+  // Typing a value overrides whatever was loaded.
+  bgNatBpmEl.addEventListener('input', () => {
+    bpmSource = 'manual';
+    bgBpmSrcEl.textContent = baselineBpm === ''
+      ? 'entered manually'
+      : `entered manually (${RESTING.label} baseline avg ${baselineBpm.toFixed(1)} BPM)`;
+    bgBpmSrcEl.style.color   = '';
+    bgBpmSrcEl.style.opacity = '';
+  });
 
   // Trigger on subject change (debounced) and immediately on init
   let bpmLoadTimer = null;
@@ -655,6 +700,8 @@ if (frontend === 'ibreath') {
       subjectCode:     bgSubjectCheck.code(),
       group:           bgGroupEl.value,
       naturalBpm:      parseFloat(bgNatBpmEl.value) || BG.NATURAL_BPM,
+      naturalBpmSource: bpmSource,
+      baselineBpm,
       showCurve:       document.getElementById('bg-show-curve').checked,
       calibrationSecs: parseInt(document.getElementById('bg-cal-secs').value) || BG.CALIBRATION_SECS,
       smoothWindow:    Number(document.getElementById('bg-smooth-window').value),

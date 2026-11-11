@@ -59,6 +59,8 @@ export default class BioGame {
   #subjectCode      = CONFIG.SUBJECT_CODE;
   #group            = CONFIG.GROUP;
   #naturalBpm       = CONFIG.NATURAL_BPM;
+  #naturalBpmSource = 'default';   // where the natural BPM came from (see experimenter.js)
+  #baselineBpm      = '';          // averaged Resting-baseline estimate, '' = none
   #showCurve        = CONFIG.SHOW_CURVE;
   #calibrationSecs  = CONFIG.CALIBRATION_SECS;
   #smoothWindow     = CONFIG.SMOOTH_WINDOW;   // samples; experimenter's "smoothing" control
@@ -200,7 +202,7 @@ export default class BioGame {
 
   // ── Action handler ────────────────────────────────────────────────────────
 
-  #onAction({ type, subjectCode, group, naturalBpm, showCurve, calibrationSecs, smoothWindow }) {
+  #onAction({ type, subjectCode, group, naturalBpm, naturalBpmSource, baselineBpm, showCurve, calibrationSecs, smoothWindow }) {
     switch (type) {
       case 'start':
         // Settings only count for a session that actually starts now, so the
@@ -209,6 +211,8 @@ export default class BioGame {
         if (subjectCode     !== undefined) this.#subjectCode     = subjectCode;
         if (group           !== undefined) this.#group           = group;
         if (naturalBpm      !== undefined) this.#naturalBpm      = naturalBpm;
+        if (naturalBpmSource !== undefined) this.#naturalBpmSource = naturalBpmSource;
+        if (baselineBpm     !== undefined) this.#baselineBpm     = baselineBpm;
         if (showCurve       !== undefined) this.#showCurve       = showCurve;
         if (calibrationSecs !== undefined) this.#calibrationSecs = calibrationSecs;
         if (smoothWindow    !== undefined) this.#smoothWindow    = validSmoothWindow(smoothWindow, CONFIG.SMOOTH_WINDOW);
@@ -254,6 +258,8 @@ export default class BioGame {
       this.#subjectCode, this.#group, SCENE.id,
       {
         target_bpm:          this.#activeBpm,   // 6 (slow) or the entered natural BPM
+        natural_bpm_source:  this.#naturalBpmSource,   // baseline | fallback | manual | default
+        baseline_bpm:        this.#baselineBpm,        // Resting-baseline average ('' = none found)
         show_curve:          this.#showCurve,
         calibration_secs:    this.#calibrationSecs,
         smooth_window:       this.#smoothWindow,
