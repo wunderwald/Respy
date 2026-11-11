@@ -9,25 +9,38 @@ export function drawInstructions(ctx, w, h, instructions) {
   const { title, lines = [] } = instructions;
   const u        = Math.min(h, w * 9 / 16) / 100;
   const maxW     = Math.min(w * 0.84, 150 * u);
-  // No title (empty / missing) → no title row and no gap: the panel only
-  // holds the lines.
-  const titleSz  = title ? 8 * u : 0;
-  const lineSz   = 5 * u;
-  const lineH    = lineSz * 1.35;
-  const gapAfterTitle = title ? 4 * u : 0;
-  const paraGap  = 1.6 * u;     // extra space between the separate lines
+  const padX     = 6 * u;
 
-  // Wrap every line to the available width.
-  ctx.font = `700 ${lineSz}px Nunito, sans-serif`;
-  const wrapped = lines.map((line) => wrap(ctx, line, maxW));
+  // Vertical layout at text scale `s` (1 = the full child-sized text). No
+  // title (empty / missing) → no title row and no gap: the panel only holds
+  // the lines.
+  const layout = (s) => {
+    const titleSz = title ? 8 * u * s : 0;
+    const lineSz  = 5 * u * s;
+    const lineH   = lineSz * 1.35;
+    const gapAfterTitle = title ? 4 * u * s : 0;
+    const paraGap = 1.6 * u * s;     // extra space between the separate lines
+    const padY    = 6 * u * s;
+    // Wrap every line to the available width.
+    ctx.font = `700 ${lineSz}px Nunito, sans-serif`;
+    const wrapped = lines.map((line) => wrap(ctx, line, maxW));
+    const bodyH = wrapped.reduce((sum, rows) => sum + rows.length * lineH, 0) + paraGap * Math.max(0, wrapped.length - 1);
+    const panelH = titleSz + gapAfterTitle + bodyH + padY * 2;
+    return { titleSz, lineSz, lineH, gapAfterTitle, paraGap, padY, wrapped, panelH };
+  };
 
-  const bodyH  = wrapped.reduce((sum, rows) => sum + rows.length * lineH, 0) + paraGap * Math.max(0, wrapped.length - 1);
-  const totalH = titleSz + gapAfterTitle + bodyH;
-  const padY   = 6 * u, padX = 6 * u;
+  // Long texts shrink to fit the screen (panel at most 92 % of the height).
+  // Smaller text wraps into fewer rows, so one proportional step always
+  // fits; the loop is just a safety net.
+  const maxPanelH = h * 0.92;
+  let L = layout(1);
+  for (let i = 0; i < 4 && L.panelH > maxPanelH; i++) {
+    L = layout((L.titleSz ? L.titleSz / (8 * u) : L.lineSz / (5 * u)) * maxPanelH / L.panelH);
+  }
+  const { titleSz, lineSz, lineH, gapAfterTitle, paraGap, padY, wrapped, panelH } = L;
 
   // Panel
   const panelW = maxW + padX * 2;
-  const panelH = totalH + padY * 2;
   const px = (w - panelW) / 2, py = (h - panelH) / 2;
   ctx.save();
   ctx.beginPath();

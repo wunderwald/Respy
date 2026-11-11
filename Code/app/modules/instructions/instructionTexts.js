@@ -29,7 +29,10 @@ export const INSTRUCTIONS = {
     return {
       title: 'Halte den Fisch im grünen Bereich!',
       lines: [
-        'Dein Atem steuert den Fisch nach oben und unten.',
+        // Same three lines as bioGame:
+        'Dein Atem steuert den Fisch.',
+        'Einatmen → der Fisch schwimmt nach oben.',
+        'Ausatmen → der Fisch schwimmt nach unten.',
         'Der Fisch schwimmt durch einen grünen Streifen.',
         'Atme, bis der Fisch im grünen Bereich ist. Dann halte die Luft an, damit er dort bleibt!',
         `Zuerst übst du ${trainingPasses}-mal.`,
