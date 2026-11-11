@@ -82,11 +82,11 @@ function fmtTime(secs) {
   return `${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, '0')}`;
 }
 
-// ── Settings bar (ibreath + bioGame) ─────────────────────────────────────────
+// ── Settings bar (ibreath, bioGame, beltTrainingGame, baseline) ──────────────
 
 const settingsBar = document.getElementById('settings-bar');
 
-if (!['ibreath', 'bioGame', 'beltTrainingGame'].includes(frontend)) {
+if (!['ibreath', 'bioGame', 'beltTrainingGame', 'baseline'].includes(frontend)) {
   settingsBar.style.display = 'none';
 }
 
