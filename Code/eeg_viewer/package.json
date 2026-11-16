@@ -1,0 +1,12 @@
+{
+  "name": "eeg-viewer",
+  "version": "1.0.0",
+  "description": "Minimalistic EEG data viewer",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}
