@@ -8,6 +8,6 @@
     { "id": "sync",  "probability": 0.8,    "text": "Hat der Fisch genau zu deinem Atem gepasst?",   "answers": ["yes", "no"], "labels": ["ja", "nein"] },
     { "id": "flash", "probability": 0.06,   "text": "Hast du den rosa Fisch blinken sehen?",          "answers": ["yes", "no"], "labels": ["ja", "nein"] },
     { "id": "lr",    "probability": 0.06,   "text": "War der Fisch links oder rechts?",                  "answers": ["left", "right"], "labels": ["links", "rechts"] },
-    { "id": "img",   "probability": 0.08,   "text": "Hast du den linken oder den rechten Fisch gesehen?", "answers": ["fish0", "fish1"], "labels": ["linker Fisch", "rechter Fisch"] }
+    { "id": "img",   "probability": 0.08,   "text": "Hast du den linken oder den rechten Fisch gesehen?", "answers": ["fish0", "fish1"] }
   ]
 }
