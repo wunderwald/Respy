@@ -8,7 +8,7 @@ export const CALIBRATION_CONFIG = {
   // 10 breaths/min (6 s per cycle)
   INHALE_MS: 3000,
   EXHALE_MS: 3000,
-  CYCLES: 5,          // ~34 s total including the intro
+  CYCLES: 3,          // ~22 s total including the intro
   // Samples from the first part of each phase are discarded: children react
   // late to the prompt, and the tail of the previous exhale would otherwise
   // leak into the next inhale's "quiet" measurement.
