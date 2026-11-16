@@ -165,7 +165,7 @@ One row per trial, appended after each trial ends (or after the response screen)
 | `subject` | Subject code |
 | `questionType` | The `id` of the question asked — one of the active question set's ids (built-in default: always `sync`; see [Presets](#presets) for custom sets) |
 | `synchronous` | `true` / `false` |
-| `img` | Cloud image variant used |
+| `img` | Fish picture shown in this trial: `fish0` (75 % of trials) or `fish1` (25 %) — `images/fish<N>.png` |
 | `lr` | Cloud starting side (`left` / `right`) |
 | `stimX0`, `stimY0` | Cloud start position (normalised 0–1) |
 | `stimX1`, `stimY1` | Cloud end position (normalised 0–1) |
@@ -180,8 +180,8 @@ One row per trial, appended after each trial ends (or after the response screen)
 | `startTime` | ISO-8601 trial start time |
 | `endTime` | ISO-8601 trial end time |
 | `aborted` | `true` if experimenter pressed Abort (or the window was closed mid-trial) |
-| `response` | One of that trial's question's two `answers` labels (e.g. `yes`/`no`, `left`/`right`, `pufferfish`/`starfish`), `timeout`, or `session_closed` if the window was closed during the trial or its question |
-| `flashImage` | Image name or empty — only when `FLASHING_IMAGE` is on |
+| `response` | One of that trial's question's two `answers` labels (e.g. `yes`/`no`, `left`/`right`, `fish0`/`fish1`), `timeout`, or `session_closed` if the window was closed during the trial or its question |
+| `flashImage` | Flash image name (`fish2`, from `FLASH_IMAGE`) or empty — only when `FLASHING_IMAGE` is on |
 | `flashScheduledTime` | Seconds into trial when flash was scheduled |
 | `flashX`, `flashY` | Flash position (normalised 0–1) |
 | `flashShown` | `true` if the flash actually fired before trial ended |
@@ -298,20 +298,20 @@ Every field is optional except `questions`' internal shape (if `questions` is pr
 | `text` | The prompt shown on screen (German in all bundled presets). Freely overridable per preset, even for `sync`/`flash`/`lr`/`img`'s built-in ids. |
 | `answers` | `[left, right]` — what ← and → **record** as `response` (CSV, markers). Kept in English so the data stays comparable. **A `sync`-id question must use `['yes', 'no']`** for the adaptive delay staircase to make sense. |
 | `labels` | `[left, right]` — what the answer cards **show** (e.g. `["ja", "nein"]`). Optional: without it, the `answers` are shown. Not used for the `img` question, which shows pictures. |
-| `probability` | This question's share of trials, as a fraction (all entries' probabilities should sum to ~1). Realized via the smallest shuffled block that reproduces the given probabilities exactly (e.g. 0.8/0.2 → a 5-trial block of 4×this + 1×that) — see [Trial design](#trial-design). Built separately for sync and async trials, so both see the same mix, not just the combined pool overall. |
+| `probability` | This question's share of trials, as a fraction (all entries' probabilities should sum to ~1). Built separately for the sync and the async trials (so both see the same mix): each gets the whole-number counts closest to the probabilities (largest-remainder method — everyone gets ⌊p × n⌋, the leftover trials go to the largest remainders, ties drawn at random), then the order is shuffled. E.g. 0.8/0.06/0.06/0.08 with 30 trials → 15 sync trials with 12 sync + 1 flash + 1 lr + 1 img questions, and the same for the 15 async trials. Probabilities that don't sum to exactly 1 are scaled. |
 
 If the resulting question set has no `sync`-id entry, the experimenter HUD shows a warning next to the preset selector (the adaptive delay has nothing to drive it in that case — see [Async delay staircase](#async-delay-staircase)).
 
-The `img` id keeps its special image-based answer rendering (pufferfish/starfish sprites instead of text) regardless of what `answers` says; every other id (including custom ones like `placeholder`) renders as plain "← leftLabel          rightLabel →" text. The `flash` id also keeps its small pink-fish icon in the prompt.
+The `img` id keeps its special image-based answer rendering: each card shows the picture named by its answer (`answers: ["fish0", "fish1"]` → `images/fish0.png` left, `images/fish1.png` right) instead of text, so the picture always matches what that arrow records; every other id (including custom ones like `placeholder`) renders as plain "← leftLabel          rightLabel →" text. The `flash` id also keeps its small flash-image icon (`FLASH_IMAGE`, `fish2`) in the prompt.
 
 ### Bundled presets
 
 | File | Signal type | Questions | Eye tracking |
 |---|---|---|---|
-| `iBreath_mixed_questions` | Physiological | Mixed: 50% sync, ~16.7% each flash/lr/img | Left to experimenter |
+| `iBreath_mixed_questions` | Physiological | Mixed: 80% sync, 6% flash, 6% lr, 8% img | Left to experimenter |
 | `iBreath_only_sync_question` | Physiological | 100% sync | Left to experimenter |
 | `iBreath_adults` | Physiological | 80% sync, 20% placeholder | Activated |
-| `iBeat_mixed_questions` | Peaks only | Mixed: 50% sync, ~16.7% each flash/lr/img | Left to experimenter |
+| `iBeat_mixed_questions` | Peaks only | Mixed: 80% sync, 6% flash, 6% lr, 8% img | Left to experimenter |
 | `iBeat_only_sync_question` | Peaks only | 100% sync | Left to experimenter |
 | `iBeat_adults` | Peaks only | 80% sync, 20% placeholder | Activated |
 

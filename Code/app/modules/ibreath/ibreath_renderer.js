@@ -17,9 +17,9 @@ export class IBreathRenderer {
     container.innerHTML = '<canvas id="ib-canvas"></canvas>';
     this.#canvas = container.querySelector('#ib-canvas');
     this.#ctx = this.#canvas.getContext('2d');
-    for (const [key, src] of [['pufferfish', 'images/pufferfish.png'],
-                               ['starfish',   'images/starfish.png'],
-                               ['pinkfish',   'images/pinkfish.png']]) {
+    // Fish pictures, named by number (images/fish<N>.png): fish0 / fish1 are
+    // the trial stimuli, fish2 is the flash image (CONFIG.FLASH_IMAGE).
+    for (const [key, src] of ['fish0', 'fish1', 'fish2'].map((k) => [k, `images/${k}.png`])) {
       const img = new Image();
       img.src = src;
       this.#images[key] = img;
@@ -179,7 +179,10 @@ export class IBreathRenderer {
       if (questionType === 'img') {
         // Arrow on top, the picture as the "label"
         this.#drawArrow(ctx, x + side * nudge, cardY - 15 * u, 26 * u, side, color);
-        const img = this.#images[side < 0 ? 'pufferfish' : 'starfish'];
+        // The picture named by the recorded answer (fish0 / fish1), so the
+        // card always shows what pressing that arrow records.
+        const answer = (questionDef.answers ?? [])[side < 0 ? 0 : 1];
+        const img = this.#images[answer] ?? this.#images[side < 0 ? 'fish0' : 'fish1'];
         const s   = Math.min(30 * u, cardW * 0.62);
         if (img?.complete && img.naturalWidth > 0) {
           const ar = img.naturalWidth / img.naturalHeight;
@@ -193,9 +196,9 @@ export class IBreathRenderer {
       }
     }
 
-    // ── Centre column: pinkfish reminder ('flash') + countdown ──
+    // ── Centre column: flash-image reminder ('flash') + countdown ──
     if (questionType === 'flash') {
-      const img = this.#images['pinkfish'];
+      const img = this.#images[CONFIG.FLASH_IMAGE];
       if (img?.complete && img.naturalWidth > 0) {
         const s = 7 * u;
         ctx.drawImage(img, cx - s, cardY - 17 * u - s, s * 2, s * 2);
@@ -286,7 +289,7 @@ export class IBreathRenderer {
     const wag        = Math.sin(phase * 2) * 0.10;
     const fishSize   = unit * 0.11;
 
-    const img = this.#images['pinkfish'];
+    const img = this.#images['fish2'];
     ctx.save();
     ctx.translate(x, y);
     if (facingLeft) ctx.scale(-1, 1);

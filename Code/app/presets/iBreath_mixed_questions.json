@@ -1,13 +1,13 @@
 {
   "name": "iBreath_mixed_questions",
-  "description": "Mixed post-trial questions: 50% sync-detection, ~16.7% each of flash-detection, left/right, and image-identification. Physiological (breath) input signal. Eye tracking left to the experimenter controls.",
+  "description": "Mixed post-trial questions: 80% sync-detection, 6% flash-detection, 6% left/right, 8% image-identification (30 trials: 12 sync + 1 of each other question, separately for the 15 sync and 15 async trials). Physiological (breath) input signal. Eye tracking left to the experimenter controls.",
   "inputSignalType": "physiological",
   "numTrials": 30,
   "trialDurationSecs": 10,
   "questions": [
-    { "id": "sync",  "probability": 0.5,    "text": "Hat der Fisch genau zu deinem Atem gepasst?",   "answers": ["yes", "no"], "labels": ["ja", "nein"] },
-    { "id": "flash", "probability": 0.1667, "text": "Hast du den rosa Fisch blinken sehen?",          "answers": ["yes", "no"], "labels": ["ja", "nein"] },
-    { "id": "lr",    "probability": 0.1667, "text": "War der Fisch links oder rechts?",                  "answers": ["left", "right"], "labels": ["links", "rechts"] },
-    { "id": "img",   "probability": 0.1667, "text": "Hast du den Kugelfisch oder den Seestern gesehen?",  "answers": ["pufferfish", "starfish"], "labels": ["Kugelfisch", "Seestern"] }
+    { "id": "sync",  "probability": 0.8,    "text": "Hat der Fisch genau zu deinem Atem gepasst?",   "answers": ["yes", "no"], "labels": ["ja", "nein"] },
+    { "id": "flash", "probability": 0.06,   "text": "Hast du den rosa Fisch blinken sehen?",          "answers": ["yes", "no"], "labels": ["ja", "nein"] },
+    { "id": "lr",    "probability": 0.06,   "text": "War der Fisch links oder rechts?",                  "answers": ["left", "right"], "labels": ["links", "rechts"] },
+    { "id": "img",   "probability": 0.08,   "text": "Hast du den linken oder den rechten Fisch gesehen?", "answers": ["fish0", "fish1"], "labels": ["linker Fisch", "rechter Fisch"] }
   ]
 }

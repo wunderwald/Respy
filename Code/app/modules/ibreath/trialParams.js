@@ -17,51 +17,42 @@ export function makeTrialParams(numTrials) {
   }
 
   // Question sequence — built from CONFIG.QUESTIONS (a preset's `questions` list, or the
-  // built-in 100%-'sync' default). Balanced into the smallest shuffled block that reproduces
-  // each question's probability exactly (e.g. 50/16.7/16.7/16.7 -> a 6-trial block of
-  // [sync x3, flash, lr, img]; 80/20 -> a 5-trial block of [sync x4, placeholder]), repeated and
-  // reshuffled to fill the requested length. Built separately for sync and async trials (see
-  // call site below) so both see the same question mix, not just the combined pool overall.
-  function questionBlockCounts(questions) {
-    const probs = questions.map(q => q.probability);
-    const MAX_B = 120;
-    const EPS = 1e-3;   // tight on purpose — only accept a B that reconstructs the given
-                        // probabilities almost exactly, not merely "close given B's own rounding"
-    for (let B = questions.length; B <= MAX_B; B++) {
-      const counts = probs.map(p => Math.round(p * B));
-      if (counts.reduce((a, b) => a + b, 0) !== B) continue;
-      const exact = counts.every((c, i) =>
-        (probs[i] <= 0 || c > 0) && Math.abs(c / B - probs[i]) <= EPS
-      );
-      if (exact) return counts;
-    }
-    // Fallback for probabilities that don't reduce to a small clean block
-    // (shouldn't happen for any preset we ship, but don't hang if it does).
-    return probs.map(p => Math.max(0, Math.round(p * MAX_B)));
+  // built-in 100%-'sync' default), separately for the sync and the async trials (see call
+  // site below) so both see the same question mix. Each sequence of n trials gets the
+  // whole-number counts closest to the probabilities (largest-remainder method: everyone
+  // gets floor(p × n), the leftover trials go to the largest remainders, ties drawn at
+  // random), then is shuffled. E.g. 80/6/6/8 % over 15 trials → 12 sync + 1 of each other
+  // question (exact shares 12 / 0.9 / 0.9 / 1.2).
+  function questionCounts(n, questions) {
+    const total  = questions.reduce((sum, q) => sum + q.probability, 0) || 1;
+    // Tolerates sums ≠ 1; rounded so float noise (0.8+0.06+0.06+0.08 = 1.0000000000000002)
+    // can't turn an exact 12 into 11.999….
+    const exact  = questions.map((q) => Math.round(q.probability / total * n * 1e9) / 1e9);
+    const counts = exact.map(Math.floor);
+    let left = n - counts.reduce((a, b) => a + b, 0);
+    const order = exact
+      .map((x, i) => ({ i, rem: x - Math.floor(x), tie: Math.random() }))
+      .sort((a, b) => (b.rem - a.rem) || (a.tie - b.tie));
+    for (let k = 0; left > 0; k = (k + 1) % order.length, left--) counts[order[k].i]++;
+    return counts;
   }
 
   function makeQuestionSeq(n, questions) {
-    const counts = questionBlockCounts(questions);
-    const block = [];
-    questions.forEach((q, i) => {
-      for (let k = 0; k < counts[i]; k++) block.push(q.id);
-    });
-
+    const counts = questionCounts(n, questions);
     const out = [];
-    while (out.length < n) {
-      const b = [...block];
-      for (let i = b.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [b[i], b[j]] = [b[j], b[i]];
-      }
-      out.push(...b);
+    questions.forEach((q, i) => {
+      for (let k = 0; k < counts[i]; k++) out.push(q.id);
+    });
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [out[i], out[j]] = [out[j], out[i]];
     }
-    return out.slice(0, n);
+    return out;
   }
 
   const lrSeq       = balancedSeq(numTrials, 4);     // left / right
   const saSeq       = balancedSeq(numTrials, 2);     // sync / async alternating
-  const starfishSeq = balancedSeq(numTrials, 4, 1);  // 25% starfish, 75% pufferfish
+  const fish1Seq    = balancedSeq(numTrials, 4, 1);  // 25% fish1, 75% fish0
   const flashSeq    = CONFIG.FLASHING_IMAGE
     ? balancedSeq(numTrials, 2)                      // 50% of trials get a flash
     : null;
@@ -82,7 +73,7 @@ export function makeTrialParams(numTrials) {
     const trial = {
       trialIndex:   i + 1,
       synchronous:  sync,
-      img:          starfishSeq[i] ? 'starfish' : 'pufferfish',
+      img:          fish1Seq[i] ? 'fish1' : 'fish0',   // images/fish<N>.png
       lr:           lrSeq[i],          // true = left, false = right
       stimX0:       lrSeq[i] ? 0 : 0.5,
       stimY0:       0,

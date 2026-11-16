@@ -1,6 +1,6 @@
 // Pre-trial display animation: three fish bopping happily around the centre.
 // Pure function — all animation is derived from elapsed (ms since display started).
-// images: { pufferfish, starfish, pinkfish } → HTMLImageElement
+// images: { fish0, fish1, fish2 } → HTMLImageElement
 
 export function drawDisplay(ctx, w, h, t, images) {
   const cx     = w / 2, cy = h / 2;
@@ -11,9 +11,9 @@ export function drawDisplay(ctx, w, h, t, images) {
 
   // Each fish has its own bounce speed and amplitude so they feel independent
   const FISH = [
-    { key: 'pufferfish', phase: 0,               bopHz: 0.65, ampX: unit * 0.028, ampY: unit * 0.030 },
-    { key: 'starfish',   phase: (Math.PI*2) / 3, bopHz: 0.80, ampX: unit * 0.032, ampY: unit * 0.024 },
-    { key: 'pinkfish',   phase: (Math.PI*4) / 3, bopHz: 0.95, ampX: unit * 0.025, ampY: unit * 0.034 },
+    { key: 'fish0',      phase: 0,               bopHz: 0.65, ampX: unit * 0.028, ampY: unit * 0.030 },
+    { key: 'fish1',      phase: (Math.PI*2) / 3, bopHz: 0.80, ampX: unit * 0.032, ampY: unit * 0.024 },
+    { key: 'fish2',      phase: (Math.PI*4) / 3, bopHz: 0.95, ampX: unit * 0.025, ampY: unit * 0.034 },
   ];
 
   for (const { key, phase, bopHz, ampX, ampY } of FISH) {

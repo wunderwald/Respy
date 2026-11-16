@@ -38,9 +38,9 @@ export class BeltTrainingGameRenderer {
     this.#sceneRenderer = new SceneRenderer(scene);
     this.#sceneRenderer.warmUpShadow(this.#ctx);
 
-    for (const [key, src] of [['pufferfish', 'images/pufferfish.png'],
-                               ['starfish',   'images/starfish.png'],
-                               ['pinkfish',   'images/pinkfish.png']]) {
+    // Fish pictures, named by number (images/fish<N>.png): fish0 / fish1 are
+    // the trial stimuli, fish2 is the flash image (CONFIG.FLASH_IMAGE).
+    for (const [key, src] of ['fish0', 'fish1', 'fish2'].map((k) => [k, `images/${k}.png`])) {
       const img = new Image();
       img.src = src;
       this.#images[key] = img;

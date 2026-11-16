@@ -356,7 +356,7 @@ if (frontend === 'ibreath') {
   }
 
   // Trial attributes are balanced in shuffled blocks — left/right and
-  // pufferfish/starfish in blocks of 4 (sync/async in blocks of 2) — so
+  // fish0/fish1 in blocks of 4 (sync/async in blocks of 2) — so
   // only a multiple of 4 gives exactly balanced counts. Not blocking: the
   // session runs either way.
   function updateTrialsWarning() {
