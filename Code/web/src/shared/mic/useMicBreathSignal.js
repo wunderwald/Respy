@@ -12,6 +12,7 @@
 //   mic.stop();                        // releases the mic + audio graph
 import { useRef, useCallback, useEffect } from 'react';
 import { RollingMean } from '../signal/RollingMean.js';
+import { micSupport, micSupportMessage } from './micPermission.js';
 // The `?url` suffix is Vite's explicit "give me this file's built, hashed
 // URL" convention — unlike `new URL('./x.js', import.meta.url)`, which Vite
 // only auto-detects for new Worker(...)/new SharedWorker(...) call sites,
@@ -47,7 +48,13 @@ export function useMicBreathSignal() {
     if (s.starting) return s.starting;
 
     s.starting = (async () => {
-      const audioCtx = new AudioContext();
+      // Fail with a readable reason (shown by MicCalibration) rather than a
+      // "cannot read properties of undefined" TypeError over plain HTTP.
+      const support = micSupport();
+      if (support !== 'ok') throw new Error(micSupportMessage(support));
+
+      // Get the stream before creating the AudioContext, so a denied/failed
+      // permission doesn't leave an orphaned, never-closed context behind.
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: false,
@@ -55,6 +62,12 @@ export function useMicBreathSignal() {
           autoGainControl: false,
         },
       });
+      const audioCtx = new AudioContext();
+      // A context created outside a user gesture can start 'suspended'
+      // (Safari/Chrome autoplay policy); an active capture normally lifts
+      // that, but ask explicitly. Not awaited — resume() can stay pending
+      // rather than reject when the browser declines.
+      if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
 
       await audioCtx.audioWorklet.addModule(breathWorkletUrl);
 

@@ -1,4 +1,5 @@
 import react from '@vitejs/plugin-react'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 import { defineConfig } from 'vite'
 
 // Games this project bundles. Each one gets its own HTML entry
@@ -27,7 +28,15 @@ function inputsFor(mode) {
 }
 
 export default defineConfig(({ mode }) => ({
-  plugins: [react()],
+  // getUserMedia (the mic) only exists in a secure context. http://localhost
+  // counts as secure, but http://<lan-ip> does not — so a tablet on the local
+  // network would get no navigator.mediaDevices at all. Serve dev/preview over
+  // HTTPS with a self-signed cert (the tablet has to accept the certificate
+  // warning once per origin) and listen on all interfaces so the LAN can
+  // reach it.
+  plugins: [react(), basicSsl()],
+  server: { host: true },
+  preview: { host: true },
   build: {
     outDir: mode === 'development' || mode === 'production' ? 'dist' : `dist/${mode}`,
     rollupOptions: { input: inputsFor(mode) },

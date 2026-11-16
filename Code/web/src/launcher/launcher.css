@@ -68,3 +68,44 @@ main {
   transform: translateY(0);
   background: #ffcde0;
 }
+
+.card-disabled,
+.card-disabled:hover,
+.card-disabled:active {
+  cursor: not-allowed;
+  opacity: 0.4;
+  background: #ffeaf2;
+  border-color: rgba(214, 51, 108, 0.22);
+  transform: none;
+}
+
+.mic-status {
+  margin: 0;
+  max-width: 440px;
+  text-align: center;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  color: #9a6a80;
+}
+
+.mic-status p {
+  margin: 0 0 12px;
+}
+
+.mic-ok {
+  color: #3f8f5a;
+}
+
+.mic-bad {
+  color: #b3261e;
+}
+
+.mic-btn {
+  font: inherit;
+  color: #c43d73;
+  background: #ffeaf2;
+  border: 1px solid rgba(214, 51, 108, 0.35);
+  border-radius: 12px;
+  padding: 8px 20px;
+  cursor: pointer;
+}

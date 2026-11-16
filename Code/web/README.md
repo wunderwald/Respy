@@ -17,6 +17,10 @@ npm run dev:trainingGameControl  # River Crossing (Tap)
 npm run dev:chromeDinoGame       # Breath Runner
 ```
 
+`dev` and `preview` serve over **HTTPS** (self-signed cert via `@vitejs/plugin-basic-ssl`) and listen on the local network. Browsers only allow microphone access in a secure context — `http://localhost` qualifies, `http://<lan-ip>` does not — so a tablet must open the `https://<lan-ip>:<port>/` URL Vite prints, and accept the certificate warning once. If you serve `dist/` with some other static server, it needs HTTPS too.
+
+The launcher requests microphone permission on load; mic games stay locked until it's granted.
+
 ## Build
 
 ```bash
@@ -69,4 +73,4 @@ src/
 4. Create `<name>.html` at the project root, modeled on an existing one.
 5. Add `<name>` to `GAMES` in `vite.config.js`.
 6. Add `dev:<name>` / `build:<name>` scripts to `package.json`.
-7. Add a card to `src/launcher/Launcher.jsx`'s `GAMES` list.
+7. Add a card to `src/launcher/Launcher.jsx`'s `GAMES` list (`needsMic: true` for mic games).
