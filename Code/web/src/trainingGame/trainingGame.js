@@ -221,7 +221,7 @@ export class TrainingGame {
       // state: a pause mid-crossing keeps the exhale prompt until the sheep
       // is delivered, and the inhale prompt stays until the boat is back.
       hint: this.#state === STATE.PLAYING
-        ? (this.#hasSheep ? "Blow into the boat's sail!" : 'Breathe in')
+        ? (this.#hasSheep ? 'Puste in das Segel!' : 'Atme ein')
         : null,
     };
   }

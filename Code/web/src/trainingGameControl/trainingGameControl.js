@@ -206,7 +206,7 @@ export class TrainingGameControl {
       now,
       // Only during the tapping phase itself — not on the idle/countdown/
       // game-over screens, which have their own "tap to…" text.
-      hint: this.#state === STATE.PLAYING ? 'Tap as fast as you can!' : null,
+      hint: this.#state === STATE.PLAYING ? 'Tippe so schnell du kannst!' : null,
     };
   }
 }

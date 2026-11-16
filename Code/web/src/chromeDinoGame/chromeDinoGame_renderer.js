@@ -148,7 +148,7 @@ export class ChromeDinoGameRenderer {
     ctx.font = font(300, 20, this.#s);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Tap to start', w / 2, h / 2 - 60 * this.#s);
+    ctx.fillText('Tippe, um zu starten', w / 2, h / 2 - 60 * this.#s);
   }
 
   #drawCountdown(ctx, w, h, elapsed) {
@@ -157,12 +157,12 @@ export class ChromeDinoGameRenderer {
     if (elapsed < 1000)      label = '3';
     else if (elapsed < 2000) label = '2';
     else if (elapsed < 3000) label = '1';
-    else                     label = 'GO!';
+    else                     label = 'LOS!';
 
     ctx.save();
     ctx.shadowColor  = 'rgba(0,0,0,0.12)';
     ctx.shadowBlur   = 12;
-    ctx.fillStyle    = label === 'GO!' ? '#2e9e62' : COLORS.ink;
+    ctx.fillStyle    = label === 'LOS!' ? '#2e9e62' : COLORS.ink;
     ctx.font         = font(300, 80, this.#s);
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
@@ -179,15 +179,15 @@ export class ChromeDinoGameRenderer {
 
     ctx.fillStyle = COLORS.ink;
     ctx.font      = font(300, 42, s);
-    ctx.fillText(`Score: ${score}`, cx, cy - 10 * s);
+    ctx.fillText(`Punkte: ${score}`, cx, cy - 10 * s);
 
     ctx.fillStyle = COLORS.inkSoft;
     ctx.font      = font(300, 22, s);
-    ctx.fillText(`Best score: ${highScore}`, cx, cy + 36 * s);
+    ctx.fillText(`Rekord: ${highScore}`, cx, cy + 36 * s);
 
     ctx.fillStyle = COLORS.inkFaint;
     ctx.font      = font(200, 14, s);
-    ctx.fillText('Tap to play again', cx, cy + 78 * s);
+    ctx.fillText('Tippe, um nochmal zu spielen', cx, cy + 78 * s);
     ctx.restore();
   }
 
@@ -201,14 +201,14 @@ export class ChromeDinoGameRenderer {
     ctx.textBaseline = 'top';
     ctx.fillStyle    = COLORS.inkFaint;
     ctx.font         = font(200, 13, s);
-    ctx.fillText('best', x, 14 * s);
+    ctx.fillText('Rekord', x, 14 * s);
     ctx.fillStyle    = COLORS.inkSoft;
     ctx.font         = font(300, 26, s);
     ctx.fillText(highScore, x, 30 * s);
 
     ctx.fillStyle    = COLORS.inkFaint;
     ctx.font         = font(200, 13, s);
-    ctx.fillText('score', x, 70 * s);
+    ctx.fillText('Punkte', x, 70 * s);
     ctx.fillStyle    = COLORS.ink;
     ctx.font         = font(300, 40, s);
     ctx.fillText(score, x, 86 * s);

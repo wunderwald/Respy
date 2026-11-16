@@ -66,26 +66,26 @@ function useMicPermissionGate() {
 function MicStatus({ mic, errorMsg, onRequest }) {
   switch (mic) {
     case 'granted':
-      return <p className="mic-status mic-ok">Microphone ready</p>;
+      return <p className="mic-status mic-ok">Mikrofon bereit</p>;
     case 'checking':
     case 'requesting':
-      return <p className="mic-status">Asking for microphone access…</p>;
+      return <p className="mic-status">Mikrofonzugriff wird angefragt…</p>;
     case 'insecure':
     case 'unsupported':
       return <p className="mic-status mic-bad">{micSupportMessage(mic)}</p>;
     case 'denied':
       return (
         <div className="mic-status mic-bad">
-          <p>Microphone access was blocked. Allow it in the browser's site
-            settings for this page, then try again.</p>
-          <button className="mic-btn" onClick={onRequest}>Try again</button>
+          <p>Der Mikrofonzugriff wurde blockiert. Bitte in den Website-Einstellungen
+            des Browsers erlauben und dann erneut versuchen.</p>
+          <button className="mic-btn" onClick={onRequest}>Erneut versuchen</button>
         </div>
       );
     default: // 'error'
       return (
         <div className="mic-status mic-bad">
-          <p>Couldn't access the microphone{errorMsg ? `: ${errorMsg}` : '.'}</p>
-          <button className="mic-btn" onClick={onRequest}>Try again</button>
+          <p>Kein Zugriff auf das Mikrofon{errorMsg ? `: ${errorMsg}` : '.'}</p>
+          <button className="mic-btn" onClick={onRequest}>Erneut versuchen</button>
         </div>
       );
   }
@@ -98,7 +98,7 @@ export function Launcher() {
   return (
     <div className="launcher-page">
       <div className="launcher-box">
-        <h1>Respy games</h1>
+        <h1>Respy-Spiele</h1>
         <MicStatus mic={mic} errorMsg={errorMsg} onRequest={request} />
         <main>
           {GAMES.map((g) => (g.needsMic && !micReady ? (

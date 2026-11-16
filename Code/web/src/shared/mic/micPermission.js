@@ -19,11 +19,11 @@ export function micSupport() {
 /** Human-readable explanation for a non-'ok' micSupport() result. */
 export function micSupportMessage(support) {
   if (support === 'insecure') {
-    return 'The microphone only works over a secure connection. '
-      + `Open this page via https:// instead of ${window.location.protocol}//.`;
+    return 'Das Mikrofon funktioniert nur über eine sichere Verbindung. '
+      + `Bitte die Seite über https:// statt ${window.location.protocol}// öffnen.`;
   }
   if (support === 'unsupported') {
-    return "This browser doesn't support microphone access.";
+    return 'Dieser Browser unterstützt keinen Mikrofonzugriff.';
   }
   return null;
 }
@@ -60,6 +60,6 @@ export async function requestMicPermission() {
       return { state: 'denied' };
     }
     // NotFoundError (no mic), NotReadableError (mic busy), ...
-    return { state: 'error', message: e?.message || e?.name || 'Microphone access failed' };
+    return { state: 'error', message: e?.message || e?.name || 'Mikrofonzugriff fehlgeschlagen' };
   }
 }

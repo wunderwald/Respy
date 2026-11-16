@@ -22,12 +22,12 @@ const SEGMENTS = [
 ];
 
 const TEXT = {
-  intro: { title: "Let's breathe with the sun!",
-           sub: 'In through your nose, out through your mouth' },
-  in:    { title: 'Breathe in…',
-           sub: 'slowly, through your nose' },
-  out:   { title: '…and breathe out',
-           sub: 'through your mouth, towards the microphone' },
+  intro: { title: 'Lass uns mit der Sonne atmen!',
+           sub: 'Atme durch die Nase ein und durch den Mund aus' },
+  in:    { title: 'Atme ein…',
+           sub: 'langsam durch die Nase' },
+  out:   { title: '…und atme aus',
+           sub: 'durch den Mund, in Richtung Mikrofon' },
 };
 
 // Raw envelope → rough 0..1 level for the sun's rays. Uncalibrated by
@@ -173,7 +173,7 @@ export function MicCalibration({ mic, onDone }) {
         startRef.current = performance.now();
         rafRef.current = requestAnimationFrame(tick);
       } catch (e) {
-        if (!cancelled) setMicError(e?.message ?? 'Microphone access failed');
+        if (!cancelled) setMicError(e?.message ?? 'Mikrofonzugriff fehlgeschlagen');
       }
     })();
 
@@ -186,10 +186,10 @@ export function MicCalibration({ mic, onDone }) {
   if (micError) {
     return (
       <div className="calibration-screen">
-        <p className="calibration-title">Couldn't access the microphone</p>
+        <p className="calibration-title">Kein Zugriff auf das Mikrofon</p>
         <p className="calibration-sub">{micError}</p>
         <button className="calibration-btn" onClick={() => { setMicError(null); setAttempt((a) => a + 1); }}>
-          Try again
+          Nochmal versuchen
         </button>
       </div>
     );
@@ -198,21 +198,21 @@ export function MicCalibration({ mic, onDone }) {
   if (warning) {
     return (
       <div className="calibration-screen">
-        <p className="calibration-title">Let's try that again!</p>
+        <p className="calibration-title">Lass es uns nochmal versuchen!</p>
         {warning.includes('blowTooQuiet') && (
           <p className="calibration-sub">
-            Breathe out a little stronger through your mouth, close to the microphone
+            Atme etwas kräftiger durch den Mund aus, nah am Mikrofon
           </p>
         )}
         {warning.includes('quietTooLoud') && (
           <p className="calibration-sub">
-            Find a quieter spot, and breathe in gently through your nose
+            Such dir einen leiseren Platz und atme sanft durch die Nase ein
           </p>
         )}
         <div className="calibration-buttons">
-          <button className="calibration-btn" onClick={retry}>Try again</button>
+          <button className="calibration-btn" onClick={retry}>Nochmal versuchen</button>
           <button className="calibration-btn calibration-btn-secondary" onClick={continueAnyway}>
-            Continue anyway
+            Trotzdem weiter
           </button>
         </div>
       </div>
@@ -222,7 +222,7 @@ export function MicCalibration({ mic, onDone }) {
   if (segIndex == null) {
     return (
       <div className="calibration-screen">
-        <p className="calibration-title">Getting the microphone ready…</p>
+        <p className="calibration-title">Das Mikrofon wird vorbereitet…</p>
       </div>
     );
   }
@@ -238,7 +238,7 @@ export function MicCalibration({ mic, onDone }) {
         <p className="calibration-sub">{text.sub}</p>
       </div>
       <canvas className="calibration-sun" ref={canvasRef} />
-      <div className="calibration-dots" aria-label={`Breath ${(seg.cycle ?? -1) + 1} of ${C.CYCLES}`}>
+      <div className="calibration-dots" aria-label={`Atemzug ${(seg.cycle ?? -1) + 1} von ${C.CYCLES}`}>
         {Array.from({ length: C.CYCLES }, (_, i) => {
           const cls = seg.cycle == null || i > seg.cycle ? ''
             : i < seg.cycle ? ' done' : ' active';

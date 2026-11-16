@@ -429,14 +429,14 @@ export class RiverCrossingRenderer {
 
     ctx.fillStyle = COLORS.inkSoft;
     ctx.font = font(200, 13, s);
-    ctx.fillText('time', x, 14 * s);
+    ctx.fillText('Zeit', x, 14 * s);
     ctx.fillStyle = COLORS.ink;
     ctx.font = font(300, 26, s);
     ctx.fillText(`${mm}:${ss}`, x, 30 * s);
 
     ctx.fillStyle = COLORS.inkSoft;
     ctx.font = font(200, 13, s);
-    ctx.fillText('score', x, 70 * s);
+    ctx.fillText('Punkte', x, 70 * s);
     ctx.fillStyle = COLORS.ink;
     ctx.font = font(300, 40, s);
     ctx.fillText(score, x, 86 * s);
@@ -460,7 +460,7 @@ export class RiverCrossingRenderer {
     ctx.font = font(300, 20, this.#s);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Tap to start', w / 2, h * 0.28);
+    ctx.fillText('Tippe, um zu starten', w / 2, h * 0.28);
   }
 
   #drawCountdown(ctx, w, h, elapsed) {
@@ -469,7 +469,7 @@ export class RiverCrossingRenderer {
     if (elapsed < 1000)      label = '3';
     else if (elapsed < 2000) label = '2';
     else if (elapsed < 3000) label = '1';
-    else                     label = 'GO!';
+    else                     label = 'LOS!';
 
     ctx.save();
     ctx.fillStyle    = COLORS.ink;
@@ -487,10 +487,10 @@ export class RiverCrossingRenderer {
     ctx.textBaseline = 'middle';
     ctx.fillStyle    = COLORS.ink;
     ctx.font         = font(300, 42, this.#s);
-    ctx.fillText(`Sheep delivered: ${score}`, cx, cy);
+    ctx.fillText(`Transportierte Schafe: ${score}`, cx, cy);
     ctx.fillStyle    = COLORS.inkSoft;
     ctx.font         = font(200, 14, this.#s);
-    ctx.fillText('Tap to play again', cx, cy + 40 * this.#s);
+    ctx.fillText('Tippe, um nochmal zu spielen', cx, cy + 40 * this.#s);
     ctx.restore();
   }
 }
