@@ -17,8 +17,10 @@
  *                         live breath-driven here too, so the child can see the
  *                         connection before the trial starts; skipped entirely if
  *                         "auto-proceed" is on. A 3-2-1-GO COUNTDOWN precedes each
- *                         phase automatically. PHOTO is a polaroid of the fish's
- *                         best target-crossing moment that trial's test phase —
+ *                         phase automatically. PHOTO (practice trials only; real
+ *                         trials go straight to the next READY) is a polaroid of
+ *                         the fish at its cleaned-average height during that
+ *                         trial's test-phase target crossing —
  *                         auto-advances if "auto-proceed" is on, otherwise also
  *                         waits for Space/Next.)
  *
@@ -34,7 +36,7 @@
  * markers (see #phaseLabel), so the training passes can be told apart.
  *
  * No scoring/feedback UI during gameplay (by design) — the only feedback is
- * the post-test photo, which is purely celebratory (best moment, not a
+ * the practice trials' post-test photo, which is purely celebratory (cleaned average, not a
  * score). Full data output is via CSV only.
  *
  * Implements the standard frontend interface:
@@ -57,6 +59,22 @@ import { TEXTS } from './beltTrainingGame_texts.js';
 
 function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
 function lerp(a, b, t)    { return a + (b - a) * t; }
+
+/**
+ * "Cleaned average" height for the practice photo: leave out the
+ * `trimFraction` of samples furthest from the target (floor(n × fraction)
+ * of them), then average the heights of the rest.
+ * @param {number[]} heights  normalized fish heights, one per frame
+ * @param {number}   target   normalized target-centre height
+ */
+export function cleanedAverage(heights, target, trimFraction) {
+  const n = heights.length;
+  if (n === 0) return NaN;
+  const drop = Math.min(n - 1, Math.floor(n * trimFraction));
+  const kept = [...heights].sort((a, b) => Math.abs(a - target) - Math.abs(b - target)).slice(0, n - drop);
+  return kept.reduce((sum, y) => sum + y, 0) / kept.length;
+}
+
 function randBetween(lo, hi) { return lo + Math.random() * (hi - lo); }
 
 // ── BeltTrainingGame ────────────────────────────────────────────────────────
@@ -100,10 +118,10 @@ export default class BeltTrainingGame {
   #segGreenTime    = 0;     // time spent inside the green band during the 'target' segment
   #segTotalTime    = 0;     // total time spent in the 'target' segment
 
-  // ── Best-moment tracking (test phase only) — feeds the post-test photo ────
-  #bestTargetDistance = Infinity;
-  #bestFishXRatio     = 0;
-  #bestFishNormY      = 0.5;
+  // ── Photo (practice trials) — fish heights during the test phase's
+  // target crossing, one per drawn frame (same rows as the frame CSV) ─────
+  #photoSamples   = [];
+  #photoFishNormY = 0.5;   // cleaned average shown in the photo
 
   // ── Post-test photo review ────────────────────────────────────────────────
   #photoStartTime = null;
@@ -460,15 +478,28 @@ export default class BeltTrainingGame {
     this.#csv.appendEvent(this.#trialNo, this.#phaseLabel, 'trial_end');
     this.#sound.stopBlock();
 
-    this.#beginPhotoReview();
+    if (this.#isPractice()) {
+      this.#beginPhotoReview();
+    } else {
+      this.#trialIndex++;   // real trials: no photo
+      this.#nextTrial();
+    }
   }
 
-  // Shows the post-test polaroid (see beltTrainingGame_renderer.js's
-  // #capturePhoto/#drawPhotoReview) of the fish at its best (closest-to-
-  // target) moment during the test phase's target crossing. With
+  // Practice trials: shows the post-test polaroid (see
+  // beltTrainingGame_renderer.js's #capturePhoto/#drawPhotoReview) of the
+  // fish at its cleaned-average height during the test phase's target
+  // crossing (see cleanedAverage), in the middle of the stripe. Logged as a
+  // 'photo' event (value1 = height, value2 = number of frames). With
   // auto-proceed on, it auto-advances itself (see #tick) once developed plus
   // a short hold; otherwise it waits for Space/Next trial, like READY.
   #beginPhotoReview() {
+    const n = this.#photoSamples.length;
+    // No frame drawn in the target zone (display stall): the fish's last height.
+    this.#photoFishNormY = n > 0
+      ? cleanedAverage(this.#photoSamples, this.#targetNormY, CONFIG.PHOTO_TRIM_FRACTION)
+      : this.#avatarNormY;
+    this.#csv.appendEvent(this.#trialNo, 'test', 'photo', this.#photoFishNormY.toFixed(4), n);
     this.#state = STATE.PHOTO;
     this.#photoStartTime = performance.now();
     this.#photoSeq++;
@@ -624,7 +655,7 @@ export default class BeltTrainingGame {
         this.#markers.send(`target_enter_t${this.#trialNo}`);
         this.#segGreenTime = 0;
         this.#segTotalTime = 0;
-        if (this.#phase === 'test') this.#bestTargetDistance = Infinity;
+        if (this.#phase === 'test') this.#photoSamples = [];
       }
       if (from <= 1 && to >= 2) {
         // Empty if no frame was drawn inside the target zone at all.
@@ -641,11 +672,7 @@ export default class BeltTrainingGame {
       if (distance <= CONFIG.TARGET_HEIGHT) {
         this.#segGreenTime += dt;
       }
-      if (this.#phase === 'test' && distance < this.#bestTargetDistance) {
-        this.#bestTargetDistance = distance;
-        this.#bestFishXRatio     = this.#fishXRatio;
-        this.#bestFishNormY      = this.#avatarNormY;
-      }
+      if (this.#phase === 'test') this.#photoSamples.push(this.#avatarNormY);
     }
 
     if (this.#segment === null) {
@@ -708,8 +735,8 @@ export default class BeltTrainingGame {
                        : null,
       trialIndex:        this.#trialIndex,
       photoKey:          this.#photoSeq,
-      bestFishXRatio:    this.#bestFishXRatio,
-      bestFishNormY:     this.#bestFishNormY,
+      photoFishXRatio:   (CONFIG.TARGET_X_START + CONFIG.TARGET_X_END) / 2,   // middle of the stripe
+      photoFishNormY:    this.#photoFishNormY,
       photoElapsedMs:    this.#photoStartTime != null ? now - this.#photoStartTime : 0,
     };
   }

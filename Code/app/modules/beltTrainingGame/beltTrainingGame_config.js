@@ -32,10 +32,13 @@ export const CONFIG = {
   COUNTDOWN_SECS:          3.75,  // 3-2-1-GO before each phase (3 + 2 + 1 + GO! each 1s, GO 0.75s)
 
   // ── Post-test "photo" review ─────────────────────────────────────────────
-  // Shown after each test phase: a polaroid of the fish at its single best
-  // (closest-to-target) moment during that phase's target crossing. With
+  // Practice trials only: after the test phase, a polaroid of the fish at its
+  // "cleaned average" height during that phase's target crossing — drop the
+  // PHOTO_TRIM_FRACTION of frames furthest from the target, average the rest —
+  // drawn in the middle of the stripe. Real trials have no photo. With
   // auto-proceed on, it auto-advances after PHOTO_DEVELOP_MS + PHOTO_HOLD_MS;
   // otherwise it waits for Space/Next trial, same as the READY screen.
+  PHOTO_TRIM_FRACTION: 0.2, // share of target-crossing frames (furthest from the target) left out of the average
   PHOTO_DEVELOP_MS:   2000,  // how long the polaroid takes to "develop" (fade in)
   PHOTO_HOLD_MS:      2000,  // (auto-proceed only) how long it stays visible after developing, before auto-advancing
   PHOTO_ZOOM_MARGIN_X: 0.04, // extra horizontal margin around the target band, as a fraction of canvas width
@@ -85,6 +88,6 @@ export const STATE = {
   COUNTDOWN:   'countdown',   // 3-2-1-GO before each phase (training and test)
   TRAINING:    'training',    // training phase of the current trial (target visible)
   TEST:        'test',        // test phase of the current trial (target hidden)
-  PHOTO:       'photo',       // post-test polaroid review of the best target-crossing moment
+  PHOTO:       'photo',       // post-test polaroid (practice trials only) — cleaned-average height of the target crossing
   DONE:        'done',
 };

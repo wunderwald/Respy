@@ -204,9 +204,9 @@ export class BeltTrainingGameRenderer {
   // ── Post-test photo review ────────────────────────────────────────────────
 
   // Renders a zoomed-in snapshot (fish + full target bands + a little
-  // surrounding background) into an offscreen canvas, as the scene looked at
-  // the single best (closest-to-target) moment of the test phase's target
-  // crossing. Reuses the exact same drawing calls as live gameplay, just
+  // surrounding background) into an offscreen canvas: the fish at its
+  // cleaned-average height from the test phase's target crossing, in the
+  // middle of the stripe (practice trials only). Reuses the exact same drawing calls as live gameplay, just
   // under a scale+translate that crops/zooms into the target area.
   #capturePhoto(bigW, bigH, fishXRatio, fishNormY, targetNormY) {
     const topPad = bigH * 0.10;
@@ -222,8 +222,8 @@ export class BeltTrainingGameRenderer {
     const centerYpx = normToScreenY(targetNormY);
     const fishYpx   = normToScreenY(fishNormY);
 
-    // Normally just the red band + margin, but if the fish's best moment
-    // still landed well outside the target (a missed trial), zoom out
+    // Normally just the red band + margin, but if the fish's average
+    // landed well outside the target (a missed trial), zoom out
     // further so the shot still includes both the full target and the fish.
     const cropY1 = Math.min(centerYpx - redHalfPx, fishYpx) - marginY;
     const cropY2 = Math.max(centerYpx + redHalfPx, fishYpx) + marginY;
@@ -256,10 +256,10 @@ export class BeltTrainingGameRenderer {
   // PHOTO_DEVELOP_MS. The photo itself is captured once per photo review and
   // cached (keyed by photoKey) rather than re-rendered every frame.
   #drawPhotoReview(ctx, w, h, data) {
-    const { photoKey, bestFishXRatio, bestFishNormY, targetNormY, photoElapsedMs = 0 } = data;
+    const { photoKey, photoFishXRatio, photoFishNormY, targetNormY, photoElapsedMs = 0 } = data;
 
     if (this.#cachedPhotoKey !== photoKey) {
-      this.#cachedPhotoCanvas = this.#capturePhoto(w, h, bestFishXRatio, bestFishNormY, targetNormY);
+      this.#cachedPhotoCanvas = this.#capturePhoto(w, h, photoFishXRatio, photoFishNormY, targetNormY);
       this.#cachedPhotoKey = photoKey;
     }
     const photo = this.#cachedPhotoCanvas;

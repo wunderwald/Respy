@@ -39,7 +39,7 @@ In every phase the fish travels left → right through three timed segments:
 
 The target zone spans `TARGET_X_START`–`TARGET_X_END` (default 0.55–0.82 of canvas width, a wide band). Given the durations above, the fish's exit speed is always clearly faster than its target-crossing speed (≈1.9x with the defaults) — matching the "fast on exit" requirement; its approach speed is comparable to its target speed.
 
-After each test phase, a **polaroid photo review** appears (see below) — the only feedback shown during the session, and purely celebratory rather than a score. Full data is recorded to CSV (see below).
+In **practice trials**, a **polaroid photo review** appears after the test phase (see below) — the only feedback shown during the session. Real trials have no photo: after their test phase the session goes straight on to the next trial's READY screen (or ends). Full data is recorded to CSV (see below).
 
 ---
 
@@ -57,7 +57,13 @@ Whether the breath signal was inside the green band is tracked continuously duri
 
 ## Photo review
 
-Right after each test phase ends, a **polaroid** appears over the scene with the caption "Here's how you did!". It shows a zoomed-in crop of the fish inside the full red/yellow/green target band (plus a little surrounding background) — captured at the test phase's single **best moment**: whichever instant during the target crossing had the fish closest to the target centre. This is deliberately a celebratory snapshot, not an average or a score.
+**Practice trials only.** Right after the test phase ends, a **polaroid** appears over the scene with the caption „Das hast du super gemacht!". It shows a zoomed-in crop of the fish inside the full red/yellow/green target band (plus a little surrounding background). The fish is drawn in the middle of the stripe, at its **cleaned-average height** during the test phase's target crossing:
+
+1. Take the fish height of every drawn frame while it crossed the target zone (the frame CSV's rows with `phase = test`, `segment = target`).
+2. Leave out the `PHOTO_TRIM_FRACTION` (default **20 %**, rounded down) of those frames that are furthest from the target centre.
+3. Average the heights of the rest.
+
+If no frame was drawn in the target zone at all (display stall), the fish's last height is used. The result is logged as a `photo` event (see [Data output](#data-output)), and can be rebuilt from the frame CSV with the steps above.
 
 The photo starts blank and "develops" in over `PHOTO_DEVELOP_MS` (default 2000ms), with a fading sepia-ish wash for a photo-booth feel.
 
@@ -78,7 +84,7 @@ The photo starts blank and "develops" in over `PHOTO_DEVELOP_MS` (default 2000ms
 | Start | Begins calibration (enabled once the resp stream is connected) |
 | Retry calibration / Use default calibration | Shown only if calibration fails (flat/no signal) |
 | Next trial | Shown during the READY screen and, if auto-proceed is off, the photo review; same action as pressing **Space** |
-| Abort trial | Ends only the running trial (available during either countdown and either phase) — also bound to **Escape**. The aborted trial gets no photo; the session moves on to the next trial's READY screen (always waits there, even with auto-proceed on), or ends if it was the last trial |
+| Abort trial | Ends only the running trial (available during either countdown and either phase) — also bound to **Escape**. The aborted trial gets no photo; the session moves on to the next trial's READY screen (or the „Jetzt geht es richtig los." screen after the last practice trial) (always waits there, even with auto-proceed on), or ends if it was the last trial |
 | **Press SPACE to continue** badge | Mirrors the **Next trial** button's visibility |
 
 **Ending a session early:** close the window. Buffered frame rows and a `session_closed` event are written synchronously before it goes away.
@@ -116,6 +122,7 @@ Written to `output_data/belt_training_game/<subjectCode>/`:
   - `setting` (session settings, written right after `session_start`: value1 = name, value2 = value; a later `setting` row with the same name = changed mid-session), `calibration_complete` / `calibration_default_used` (value1 = range min, value2 = max), `calibration_failed`. Settings rows: `calibration_secs`, `breath_filter` (e.g. `butterworth2_1.5Hz_fs100`, see [breath filter](signal.md#breath-filter)), `sample_rate_source` (`nominal` / `measured` / `default` — as in [bioGame](bioGame.md#events--eventdatacsv)), `auto_proceed` (repeated whenever it's toggled during the session), `num_trials`, `practice_trials` (trials 1 … `practice_trials` are practice), `training_passes`
   - `trialIndex` is 1-based; empty for session-level rows
   - `target_leave` (value1 = fraction of the target-crossing segment spent inside the green band, `0`–`1`; empty if no frame was drawn inside the target zone, e.g. after a display stall — the event and the `target_enter/leave` markers are still written)
+  - `photo` (practice trials only; phase `test`): value1 = cleaned-average fish height shown in the photo (normalized, 4 decimals), value2 = number of target-crossing frames it was computed from (before leaving out the furthest `PHOTO_TRIM_FRACTION`)
   - `trial_end`; `trial_abort` (value1 = state it was aborted in: `countdown`, `training` or `test` — during the countdown before training 2 the `phase` column still says `training1`)
   - `session_closed` (value1 = state the window was closed in, e.g. `training`; the `phase` column says which pass)
 - **`frameData_trial<N>.csv`** (N = 1, 2, …) — one file per trial, one row per drawn animation frame, `timestamp,trialIndex,phase,segment,breathRaw,breathSmoothed,breathNorm,normMin,normMax,fishX,fishY,targetY,breathFilter`
