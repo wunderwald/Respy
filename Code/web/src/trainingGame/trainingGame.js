@@ -1,6 +1,7 @@
 import { GaussianSmoother }     from '../shared/signal/GaussianSmoother.js';
 import { CONFIG, STATE }        from './trainingGame_config.js';
 import { RiverCrossingRenderer } from '../shared/riverCrossing/RiverCrossingRenderer.js';
+import { RunRecorder, round, sig, mean, sum } from '../shared/recording/RunRecorder.js';
 
 // ── TrainingGame — River Crossing ───────────────────────────────────────────
 // A ship ferries sheep from the right bank to the left bank against a river
@@ -28,6 +29,10 @@ export class TrainingGame {
   // signal
   #smoother = new GaussianSmoother(CONFIG.SMOOTH_WINDOW);
   #blowing = false;
+  #exhaleStart = null; // performance.now() of the current exhale's onset
+
+  // data export — one mic sample per row while PLAYING
+  #rec = new RunRecorder(['raw', 'norm', 'smoothed', 'is_exhale', 'boat_pos']);
 
   // boat
   #boatPos = 0;   // 0 = docked right, 1 = docked left
@@ -70,9 +75,90 @@ export class TrainingGame {
     }
   }
 
-  /** Feed one normalized [0, 1] breath sample (from useMicBreathSignal). */
-  pushSample(value) {
+  /**
+   * Feed one breath sample (from useMicBreathSignal, ~100 Hz).
+   * @param {number} value  calibration-normalized level in [0, 1]
+   * @param {number} [raw]  the un-normalized mic envelope, for the export only
+   */
+  pushSample(value, raw = null) {
     this.#smoother.push(value);
+    if (this.#state !== STATE.PLAYING) return;
+
+    // Exhale detection: hysteresis threshold on the smoothed signal,
+    // evaluated per mic sample (not per frame) so the recorded is_exhale is
+    // exactly the decision the game acted on.
+    const now = performance.now();
+    const v = this.#smoother.value;
+    const was = this.#blowing;
+    if (was) {
+      if (v < CONFIG.BLOW_THRESHOLD - CONFIG.BLOW_HYSTERESIS) this.#blowing = false;
+    } else if (v >= CONFIG.BLOW_THRESHOLD) {
+      this.#blowing = true;
+    }
+    if (this.#blowing && !was) {
+      this.#exhaleStart = now;
+      this.#rec.event(now, 'exhale_start');
+    } else if (!this.#blowing && was) {
+      this.#endExhale(now);
+    }
+
+    this.#rec.sample(now, {
+      raw: sig(raw),
+      norm: round(value, 4),
+      smoothed: round(v, 4),
+      is_exhale: this.#blowing ? 1 : 0,
+      boat_pos: round(this.#boatPos, 4),
+    });
+  }
+
+  /**
+   * The finished run's data for export (see shared/recording/runExport.js),
+   * or null if no run has finished yet.
+   */
+  getRunData() {
+    const base = this.#rec.data();
+    if (!base) return null;
+    const exhales = this.#rec.intervals('exhale_start', 'exhale_end');
+    const crossings = this.#rec.intervals('sheep_picked_up', 'sheep_delivered');
+    const exhaleTotal = sum(exhales);
+    return {
+      game: 'trainingGame',
+      variant: 'breath',
+      ...base,
+      config: {
+        ...CONFIG,
+        derived: {
+          target_exhale_s: 30 / CONFIG.TARGET_BPM,
+          forward_speed_pos_per_s: round(this.#forwardSpeed, 6),
+          current_speed_pos_per_s: round(this.#currentSpeed, 6),
+        },
+      },
+      detection: {
+        method: 'hysteresis threshold on Gaussian-smoothed, calibration-normalized mic envelope',
+        input: 'norm = clamp((raw - calibration.range.min) / (calibration.range.max - calibration.range.min), 0, 1)',
+        smoothing: { type: 'gaussian', window_samples: CONFIG.SMOOTH_WINDOW },
+        threshold_on: CONFIG.BLOW_THRESHOLD,
+        threshold_off: round(CONFIG.BLOW_THRESHOLD - CONFIG.BLOW_HYSTERESIS, 4),
+        evaluated: 'per mic sample',
+      },
+      summary: {
+        sheep_delivered: this.#score,
+        crossing_count: crossings.length,
+        crossing_mean_s: round(mean(crossings), 3),
+        exhale_count: exhales.length,
+        exhale_mean_s: round(mean(exhales), 3),
+        exhale_total_s: round(exhaleTotal, 3),
+        exhale_fraction: round(exhaleTotal / base.time.duration_s, 4),
+        exhales_per_min: round(exhales.length / (base.time.duration_s / 60), 3),
+      },
+    };
+  }
+
+  #endExhale(now, extra = {}) {
+    this.#rec.event(now, 'exhale_end', {
+      duration_ms: round(now - this.#exhaleStart, 1), ...extra,
+    });
+    this.#exhaleStart = null;
   }
 
   // ── State machine ──────────────────────────────────────────────────────────
@@ -83,20 +169,30 @@ export class TrainingGame {
     this.#onStateChange?.(this.#state);
   }
 
-  #beginPlaying() {
+  // `now` is the RAF frame timestamp, so the run's t=0 shares the clock of
+  // every later frame (performance.now() here would be slightly later).
+  #beginPlaying(now) {
     this.#state = STATE.PLAYING;
     this.#score = 0;
     this.#boatPos = 0;
     this.#boatVel = 0;
     this.#hasSheep = true;
     this.#blowing = false;
+    this.#exhaleStart = null;
     this.#sailAnim = 0;
     this.#smoother.reset();
-    this.#playStartTime = performance.now();
+    this.#playStartTime = now;
+    this.#rec.start(this.#playStartTime);
+    this.#rec.event(this.#playStartTime, 'run_start');
+    this.#rec.event(this.#playStartTime, 'sheep_picked_up', { initial: true });
     this.#onStateChange?.(this.#state);
   }
 
-  #endGame() {
+  #endGame(now) {
+    if (this.#blowing) this.#endExhale(now, { at_run_end: true });
+    this.#blowing = false;
+    this.#rec.event(now, 'run_end', { reason: 'time_up', sheep_delivered: this.#score });
+    this.#rec.finish(now);
     this.#state = STATE.GAME_OVER;
     this.#onStateChange?.(this.#state);
   }
@@ -105,10 +201,10 @@ export class TrainingGame {
 
   #tick(now) {
     if (this.#state === STATE.COUNTDOWN && now - this.#countdownStart >= 3500) {
-      this.#beginPlaying();
+      this.#beginPlaying(now);
     } else if (this.#state === STATE.PLAYING &&
                now - this.#playStartTime >= CONFIG.GAME_DURATION_SECS * 1000) {
-      this.#endGame();
+      this.#endGame(now);
     }
   }
 
@@ -127,7 +223,7 @@ export class TrainingGame {
     this.#tickClouds(dt);
 
     if (this.#state === STATE.PLAYING) {
-      this.#tickBoat(dt);
+      this.#tickBoat(dt, timestamp);
     }
     this.#sailAnim += ((this.#blowing ? 1 : 0) - this.#sailAnim) * Math.min(1, dt * 6);
 
@@ -142,13 +238,8 @@ export class TrainingGame {
 
   // ── Boat physics ─────────────────────────────────────────────────────────
 
-  #tickBoat(dt) {
-    const v = this.#smoother.value;
-    if (this.#blowing) {
-      if (v < CONFIG.BLOW_THRESHOLD - CONFIG.BLOW_HYSTERESIS) this.#blowing = false;
-    } else {
-      if (v >= CONFIG.BLOW_THRESHOLD) this.#blowing = true;
-    }
+  #tickBoat(dt, now) {
+    // #blowing itself is updated per mic sample in pushSample().
 
     // Momentum: velocity eases toward its target rather than snapping
     // instantly, so a brief dip below threshold (a micro-pause, mic noise)
@@ -166,8 +257,10 @@ export class TrainingGame {
     if (this.#boatPos >= 1 && this.#hasSheep) {
       this.#hasSheep = false;
       this.#score++;
+      this.#rec.event(now, 'sheep_delivered', { sheep_delivered: this.#score });
     } else if (this.#boatPos <= 0 && !this.#hasSheep) {
       this.#hasSheep = true;
+      this.#rec.event(now, 'sheep_picked_up');
     }
   }
 

@@ -129,9 +129,39 @@ export function useMicBreathSignal() {
 
   const getRaw = useCallback(() => ref.current.lastRaw, []);
 
+  /** Mic/audio context + processing parameters, for data export. */
+  const getInfo = useCallback(() => {
+    const s = ref.current;
+    const track = s.stream?.getAudioTracks()[0];
+    // deviceId/groupId are opaque per-origin identifiers — not useful for
+    // analysis, so left out.
+    const { deviceId: _d, groupId: _g, ...settings } = track?.getSettings?.() ?? {};
+    // The worklet posts every whole number of 128-sample render quanta
+    // closest to 10 ms, so the true rate depends on the context sample rate
+    // (≈115 Hz at 44.1 kHz, ≈94 Hz at 48 kHz) — mirrors its quantaPerPost.
+    const sr = s.audioCtx?.sampleRate;
+    const quanta = sr ? Math.max(1, Math.round((sr * 0.01) / 128)) : null;
+    return {
+      device_label: track?.label ?? null,
+      track_settings: settings,
+      context_sample_rate_hz: s.audioCtx?.sampleRate ?? null,
+      context_base_latency_s: s.audioCtx?.baseLatency ?? null,
+      pipeline: {
+        bandpass_hz: [BP_LOW_HZ, BP_HIGH_HZ],
+        bandpass_impl: '2x cascaded BiquadFilterNode bandpass',
+        bandpass_center_hz: BP_CENTER_HZ,
+        bandpass_q: BP_Q,
+        rms_window_ms: 100,     // breathEnvelopeProcessor.js RMS_WINDOW_SECS
+        output_rate_hz_nominal: 100, // breathEnvelopeProcessor.js POST_INTERVAL_SECS
+        output_rate_hz: sr ? sr / (128 * quanta) : null,
+        rolling_mean_window: SMOOTH_WINDOW,
+      },
+    };
+  }, []);
+
   useEffect(() => () => stop(), [stop]);
 
-  return { start, stop, subscribe, getRaw };
+  return { start, stop, subscribe, getRaw, getInfo };
 }
 
 export default useMicBreathSignal;

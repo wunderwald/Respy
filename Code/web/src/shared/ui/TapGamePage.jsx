@@ -3,6 +3,7 @@
 // game; every other tap is forwarded to the game as a registerTap() call.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { enterFullscreen } from './fullscreen.js';
+import { exportRun } from '../recording/runExport.js';
 import './gamePage.css';
 
 export function TapGamePage({ GameClass }) {
@@ -12,10 +13,15 @@ export function TapGamePage({ GameClass }) {
   const [state, setState] = useState('idle');
 
   useEffect(() => {
-    gameRef.current = new GameClass({
+    const game = new GameClass({
       sceneContainer: containerRef.current,
-      onStateChange: setState,
+      onStateChange: (s) => {
+        setState(s);
+        // JSON download as soon as a run finishes (games with getRunData).
+        if (s === 'game_over' && game.getRunData) exportRun(game.getRunData());
+      },
     });
+    gameRef.current = game;
   }, [GameClass]);
 
   const handlePointerDown = useCallback(() => {

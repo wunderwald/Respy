@@ -1,5 +1,6 @@
 import { CONFIG, STATE }         from './trainingGameControl_config.js';
 import { RiverCrossingRenderer } from '../shared/riverCrossing/RiverCrossingRenderer.js';
+import { RunRecorder, round, mean, sum } from '../shared/recording/RunRecorder.js';
 
 // ── TrainingGameControl — River Crossing (Tap) ──────────────────────────────
 // The tap-controlled counterpart to trainingGame (River Crossing): identical
@@ -24,6 +25,11 @@ export class TrainingGameControl {
   // tap-rate detection
   #tapTimes = [];
   #pushing = false;
+  #pushStart = null; // performance.now() of the current push's onset
+  #tapCount = 0;
+
+  // data export — one row per animation frame while PLAYING
+  #rec = new RunRecorder(['taps_in_window', 'is_pushing', 'boat_pos']);
 
   // boat
   #boatPos = 0;   // 0 = docked right, 1 = docked left
@@ -62,7 +68,47 @@ export class TrainingGameControl {
 
   /** Call once per tap while COUNTDOWN/PLAYING — feeds the tap-rate detector. */
   registerTap() {
-    this.#tapTimes.push(performance.now());
+    const now = performance.now();
+    this.#tapTimes.push(now);
+    if (this.#state === STATE.PLAYING) {
+      this.#tapCount++;
+      this.#rec.event(now, 'tap');
+    }
+  }
+
+  /**
+   * The finished run's data for export (see shared/recording/runExport.js),
+   * or null if no run has finished yet.
+   */
+  getRunData() {
+    const base = this.#rec.data();
+    if (!base) return null;
+    const pushes = this.#rec.intervals('push_start', 'push_end');
+    const crossings = this.#rec.intervals('sheep_picked_up', 'sheep_delivered');
+    const pushTotal = sum(pushes);
+    return {
+      game: 'trainingGameControl',
+      variant: 'tap',
+      ...base,
+      config: { ...CONFIG },
+      detection: {
+        method: 'pushing while at least count_threshold taps fall within the last window_ms',
+        window_ms: CONFIG.TAP_WINDOW_MS,
+        count_threshold: CONFIG.TAP_COUNT_THRESHOLD,
+        evaluated: 'per animation frame',
+      },
+      summary: {
+        sheep_delivered: this.#score,
+        crossing_count: crossings.length,
+        crossing_mean_s: round(mean(crossings), 3),
+        tap_count: this.#tapCount,
+        taps_per_s: round(this.#tapCount / base.time.duration_s, 3),
+        push_count: pushes.length,
+        push_mean_s: round(mean(pushes), 3),
+        push_total_s: round(pushTotal, 3),
+        push_fraction: round(pushTotal / base.time.duration_s, 4),
+      },
+    };
   }
 
   // ── State machine ──────────────────────────────────────────────────────────
@@ -73,20 +119,31 @@ export class TrainingGameControl {
     this.#onStateChange?.(this.#state);
   }
 
-  #beginPlaying() {
+  // `now` is the RAF frame timestamp, so the run's t=0 shares the clock of
+  // every later frame (performance.now() here would be slightly later).
+  #beginPlaying(now) {
     this.#state = STATE.PLAYING;
     this.#score = 0;
     this.#boatPos = 0;
     this.#boatVel = 0;
     this.#hasSheep = true;
     this.#pushing = false;
+    this.#pushStart = null;
+    this.#tapCount = 0;
     this.#sailAnim = 0;
     this.#tapTimes = [];
-    this.#playStartTime = performance.now();
+    this.#playStartTime = now;
+    this.#rec.start(this.#playStartTime);
+    this.#rec.event(this.#playStartTime, 'run_start');
+    this.#rec.event(this.#playStartTime, 'sheep_picked_up', { initial: true });
     this.#onStateChange?.(this.#state);
   }
 
-  #endGame() {
+  #endGame(now) {
+    if (this.#pushing) this.#endPush(now, { at_run_end: true });
+    this.#pushing = false;
+    this.#rec.event(now, 'run_end', { reason: 'time_up', sheep_delivered: this.#score });
+    this.#rec.finish(now);
     this.#state = STATE.GAME_OVER;
     this.#onStateChange?.(this.#state);
   }
@@ -95,10 +152,10 @@ export class TrainingGameControl {
 
   #tick(now) {
     if (this.#state === STATE.COUNTDOWN && now - this.#countdownStart >= 3500) {
-      this.#beginPlaying();
+      this.#beginPlaying(now);
     } else if (this.#state === STATE.PLAYING &&
                now - this.#playStartTime >= CONFIG.GAME_DURATION_SECS * 1000) {
-      this.#endGame();
+      this.#endGame(now);
     }
   }
 
@@ -136,7 +193,14 @@ export class TrainingGameControl {
     // Prune taps outside the rolling window, then check the sustained rate.
     const cutoff = now - CONFIG.TAP_WINDOW_MS;
     while (this.#tapTimes.length && this.#tapTimes[0] < cutoff) this.#tapTimes.shift();
+    const was = this.#pushing;
     this.#pushing = this.#tapTimes.length >= CONFIG.TAP_COUNT_THRESHOLD;
+    if (this.#pushing && !was) {
+      this.#pushStart = now;
+      this.#rec.event(now, 'push_start');
+    } else if (!this.#pushing && was) {
+      this.#endPush(now);
+    }
 
     // Momentum: velocity eases toward its target rather than snapping
     // instantly, so a brief gap between tap bursts doesn't immediately
@@ -155,9 +219,22 @@ export class TrainingGameControl {
     if (this.#boatPos >= 1 && this.#hasSheep) {
       this.#hasSheep = false;
       this.#score++;
+      this.#rec.event(now, 'sheep_delivered', { sheep_delivered: this.#score });
     } else if (this.#boatPos <= 0 && !this.#hasSheep) {
       this.#hasSheep = true;
+      this.#rec.event(now, 'sheep_picked_up');
     }
+
+    this.#rec.sample(now, {
+      taps_in_window: this.#tapTimes.length,
+      is_pushing: this.#pushing ? 1 : 0,
+      boat_pos: round(this.#boatPos, 4),
+    });
+  }
+
+  #endPush(now, extra = {}) {
+    this.#rec.event(now, 'push_end', { duration_ms: round(now - this.#pushStart, 1), ...extra });
+    this.#pushStart = null;
   }
 
   // ── Background clouds (parallax, drift left→right with the current) ───────

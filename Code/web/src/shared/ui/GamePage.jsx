@@ -7,12 +7,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMicBreathSignal } from '../mic/useMicBreathSignal.js';
 import { MicCalibration } from '../calibration/MicCalibration.jsx';
 import { enterFullscreen } from './fullscreen.js';
+import { exportRun } from '../recording/runExport.js';
 import './gamePage.css';
 
 export function GamePage({ GameClass }) {
   const containerRef = useRef(null);
   const gameRef = useRef(null);
   const rangeRef = useRef(null);       // calibrated {min, max}, reused across replays
+  const calibrationRef = useRef(null); // calibration details, for the data export
+  const micInfoRef = useRef(null);     // mic/audio settings, for the data export
   const wiredRef = useRef(false);      // whether mic.subscribe() -> pushSample is hooked up yet
   const mic = useMicBreathSignal();
 
@@ -20,10 +23,21 @@ export function GamePage({ GameClass }) {
   const [calibrating, setCalibrating] = useState(false);
 
   useEffect(() => {
-    gameRef.current = new GameClass({
+    const game = new GameClass({
       sceneContainer: containerRef.current,
-      onStateChange: setState,
+      onStateChange: (s) => {
+        setState(s);
+        // Games that record their runs (River Crossing) get a JSON download
+        // as soon as a run finishes; others (no getRunData) are skipped.
+        if (s === 'game_over' && game.getRunData) {
+          exportRun(game.getRunData(), {
+            audio: micInfoRef.current,
+            calibration: calibrationRef.current,
+          });
+        }
+      },
     });
+    gameRef.current = game;
   }, [GameClass]);
 
   const wireMicToGame = useCallback(() => {
@@ -33,7 +47,7 @@ export function GamePage({ GameClass }) {
       const { min, max } = rangeRef.current;
       const span = max - min || 1e-6;
       const norm = Math.max(0, Math.min(1, (raw - min) / span));
-      gameRef.current.pushSample(norm);
+      gameRef.current.pushSample(norm, raw);
     });
   }, [mic]);
 
@@ -47,12 +61,14 @@ export function GamePage({ GameClass }) {
     gameRef.current.start();
   }, [state]);
 
-  const handleCalibrationDone = useCallback((range) => {
+  const handleCalibrationDone = useCallback((range, details) => {
     rangeRef.current = range;
+    calibrationRef.current = details;
+    micInfoRef.current = mic.getInfo();
     setCalibrating(false);
     wireMicToGame();
     gameRef.current.start();
-  }, [wireMicToGame]);
+  }, [wireMicToGame, mic]);
 
   const tappable = !calibrating && (state === 'idle' || state === 'game_over');
 

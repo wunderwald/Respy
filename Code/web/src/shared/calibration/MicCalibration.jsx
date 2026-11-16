@@ -68,6 +68,37 @@ function rangeFrom({ blow, quiet }) {
   return { min: max(quiet), max: mean(blow) };
 }
 
+function sig(x) { return x === 0 ? 0 : Number(x.toPrecision(5)); }
+
+function stats(arr) {
+  return {
+    n: arr.length,
+    mean: sig(mean(arr)),
+    std: sig(stddev(arr)),
+    min: arr.length ? sig(Math.min(...arr)) : null,
+    max: sig(max(arr)),
+  };
+}
+
+// Everything about this calibration, for the run data export. Samples are
+// the raw mic envelope, taken once per animation frame after SETTLE_MS of
+// each phase.
+function calibrationDetails(samples, { attempts, warnings, continuedAnyway }) {
+  const range = rangeFrom(samples);
+  return {
+    completed_at: new Date().toISOString(),
+    attempts,
+    warnings,
+    continued_anyway: continuedAnyway,
+    range: { min: sig(range.min), max: sig(range.max) },
+    range_rule: 'min = max(inhale samples), max = mean(exhale samples)',
+    inhale: stats(samples.quiet),
+    exhale: stats(samples.blow),
+    config: C,
+    samples: { inhale: samples.quiet.map(sig), exhale: samples.blow.map(sig) },
+  };
+}
+
 /** Sun radius as a fraction of the canvas side, for segment `seg` at progress p∈[0,1]. */
 function sunRadiusFrac(seg, p, now) {
   if (seg.type === 'in')  return lerp(C.SUN_MIN_R, C.SUN_MAX_R, easeInOut(p));
@@ -103,7 +134,8 @@ function drawFrame(canvas, seg, p, level, now) {
 /**
  * @param {object} props
  * @param {ReturnType<import('../mic/useMicBreathSignal.js').useMicBreathSignal>} props.mic
- * @param {(range: {min: number, max: number}) => void} props.onDone
+ * @param {(range: {min: number, max: number}, details: object) => void} props.onDone
+ *   `details` — see calibrationDetails(), included in the run data export
  */
 export function MicCalibration({ mic, onDone }) {
   const [attempt, setAttempt] = useState(0);
@@ -124,8 +156,10 @@ export function MicCalibration({ mic, onDone }) {
       setWarning(reasons);
       return;
     }
-    onDone(rangeFrom(samplesRef.current));
-  }, [onDone]);
+    onDone(rangeFrom(samplesRef.current), calibrationDetails(samplesRef.current, {
+      attempts: attempt + 1, warnings: [], continuedAnyway: false,
+    }));
+  }, [onDone, attempt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -181,7 +215,9 @@ export function MicCalibration({ mic, onDone }) {
   }, [attempt, mic, finish]);
 
   const retry = () => { setWarning(null); setSegIndex(null); setAttempt((a) => a + 1); };
-  const continueAnyway = () => onDone(rangeFrom(samplesRef.current));
+  const continueAnyway = () => onDone(rangeFrom(samplesRef.current), calibrationDetails(
+    samplesRef.current, { attempts: attempt + 1, warnings: warning, continuedAnyway: true },
+  ));
 
   if (micError) {
     return (
