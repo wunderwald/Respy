@@ -171,9 +171,16 @@ export class ChromeDinoGame {
       this.#jumpOffset = 0;
       return;
     }
-    // Simple parabolic arc: 0 at takeoff/landing, JUMP_HEIGHT_PX at apex.
+    // Simple parabolic arc: 0 at takeoff/landing, JUMP_HEIGHT_PX at apex —
+    // capped so the character's head stays on screen on short (landscape
+    // phone) canvases, where there's less than JUMP_HEIGHT_PX of sky above
+    // the ground. Never capped below the tallest obstacle, so obstacles stay
+    // clearable.
+    const headroom = this.#groundY() - CONFIG.CHAR_HEIGHT - CONFIG.JUMP_TOP_MARGIN_PX;
+    const apex = Math.max(CONFIG.OBSTACLE_HEIGHT_MAX * 1.5,
+                          Math.min(CONFIG.JUMP_HEIGHT_PX, headroom));
     const p = t / CONFIG.JUMP_DURATION_MS;
-    this.#jumpOffset = 4 * CONFIG.JUMP_HEIGHT_PX * p * (1 - p);
+    this.#jumpOffset = 4 * apex * p * (1 - p);
   }
 
   // ── Obstacles ────────────────────────────────────────────────────────────

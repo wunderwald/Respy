@@ -1,13 +1,23 @@
 .launcher-page {
   position: fixed;
   inset: 0;
-  width: 100vw;
+  width: 100%;
+  /* 100vh on mobile is the viewport height with the browser toolbar hidden,
+     so the bottom gets cut off while the toolbar shows (very visible on
+     Firefox Android). dvh tracks the actually visible height; vh stays as a
+     fallback for browsers without dvh. */
   height: 100vh;
+  height: 100dvh;
   background: #ffdce8;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  /* 'safe' falls back to start-aligned (scrollable) instead of clipping the
+     top when the box is taller than a short phone screen. */
+  align-items: safe center;
+  justify-content: safe center;
+  overflow-y: auto;
+  padding: 16px;
 }
 
 .launcher-box {
@@ -108,4 +118,19 @@ main {
   border-radius: 12px;
   padding: 8px 20px;
   cursor: pointer;
+}
+
+/* Phones: tighter box and cards so everything fits without scrolling. */
+@media (max-width: 480px), (max-height: 500px) {
+  .launcher-box {
+    gap: 18px;
+    padding: 24px 20px;
+    border-radius: 20px;
+  }
+
+  .card {
+    height: 56px;
+    width: 170px;
+    padding: 0 16px;
+  }
 }

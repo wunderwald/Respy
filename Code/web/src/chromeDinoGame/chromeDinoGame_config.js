@@ -13,6 +13,7 @@ export const CONFIG = {
   CHAR_WIDTH: 26,
   CHAR_HEIGHT: 60,
   JUMP_HEIGHT_PX: 230,
+  JUMP_TOP_MARGIN_PX: 8,  // min gap above the head at the jump apex (caps JUMP_HEIGHT_PX on short screens)
   // The character's x position is fixed (the world scrolls, not the
   // character), so a jump has no horizontal motion of its own — "width along
   // the x axis" is really how much scrolling ground passes beneath while

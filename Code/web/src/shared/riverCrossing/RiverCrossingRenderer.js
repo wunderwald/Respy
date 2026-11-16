@@ -1,4 +1,5 @@
 import { VISUAL_CONFIG as CONFIG, STATE } from './riverCrossingVisuals.js';
+import { uiScale, font } from '../ui/canvasText.js';
 
 // ── RiverCrossingRenderer ────────────────────────────────────────────────────
 // Bright pastel line-art rendering, sized for young kids: soft pink sky,
@@ -34,6 +35,8 @@ export class RiverCrossingRenderer {
   #leftTrees;
   #rightTrees;
   #fish;
+
+  #s = 1; // uiScale() of the current frame — shrinks HUD/overlay text on phones
 
   constructor(container) {
     container.innerHTML = '<canvas id="game-canvas"></canvas>';
@@ -78,6 +81,7 @@ export class RiverCrossingRenderer {
     const h = this.#canvas.height;
     if (!w || !h) return;
 
+    this.#s = uiScale(w, h); // text/HUD scale for this frame
     const layout = this.#layout(w, h);
 
     this.#drawBackground(ctx, w, h, layout.riverTop);
@@ -451,30 +455,33 @@ export class RiverCrossingRenderer {
     const mm = Math.floor(timeLeftSecs / 60);
     const ss = Math.floor(timeLeftSecs % 60).toString().padStart(2, '0');
 
+    const s = this.#s;
+    const x = w - 24 * s;
+
     ctx.save();
     ctx.textAlign = 'right';
     ctx.textBaseline = 'top';
 
     ctx.fillStyle = COLORS.inkSoft;
-    ctx.font = '200 13px Nunito, sans-serif';
-    ctx.fillText('time', w - 24, 14);
+    ctx.font = font(200, 13, s);
+    ctx.fillText('time', x, 14 * s);
     ctx.fillStyle = COLORS.ink;
-    ctx.font = '300 26px Nunito, sans-serif';
-    ctx.fillText(`${mm}:${ss}`, w - 24, 30);
+    ctx.font = font(300, 26, s);
+    ctx.fillText(`${mm}:${ss}`, x, 30 * s);
 
     ctx.fillStyle = COLORS.inkSoft;
-    ctx.font = '200 13px Nunito, sans-serif';
-    ctx.fillText('score', w - 24, 70);
+    ctx.font = font(200, 13, s);
+    ctx.fillText('score', x, 70 * s);
     ctx.fillStyle = COLORS.ink;
-    ctx.font = '300 40px Nunito, sans-serif';
-    ctx.fillText(score, w - 24, 86);
+    ctx.font = font(300, 40, s);
+    ctx.fillText(score, x, 86 * s);
     ctx.restore();
   }
 
   #drawHint(ctx, w, h, text) {
     ctx.save();
     ctx.fillStyle = COLORS.ink;
-    ctx.font = '400 36px Nunito, sans-serif';
+    ctx.font = font(400, 36, this.#s);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.fillText(text, w / 2, h * 0.04);
@@ -485,7 +492,7 @@ export class RiverCrossingRenderer {
 
   #drawIdle(ctx, w, h) {
     ctx.fillStyle = COLORS.inkSoft;
-    ctx.font = '300 20px Nunito, sans-serif';
+    ctx.font = font(300, 20, this.#s);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('Tap to start', w / 2, h * 0.28);
@@ -501,7 +508,7 @@ export class RiverCrossingRenderer {
 
     ctx.save();
     ctx.fillStyle    = COLORS.ink;
-    ctx.font         = '300 80px Nunito, sans-serif';
+    ctx.font         = font(300, 80, this.#s);
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(label, cx, cy);
@@ -514,11 +521,11 @@ export class RiverCrossingRenderer {
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle    = COLORS.ink;
-    ctx.font         = '300 42px Nunito, sans-serif';
+    ctx.font         = font(300, 42, this.#s);
     ctx.fillText(`Sheep delivered: ${score}`, cx, cy);
     ctx.fillStyle    = COLORS.inkSoft;
-    ctx.font         = '200 14px Nunito, sans-serif';
-    ctx.fillText('Tap to play again', cx, cy + 40);
+    ctx.font         = font(200, 14, this.#s);
+    ctx.fillText('Tap to play again', cx, cy + 40 * this.#s);
     ctx.restore();
   }
 }

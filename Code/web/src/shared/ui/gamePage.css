@@ -1,8 +1,13 @@
 .game-page {
   position: fixed;
   inset: 0;
-  width: 100vw;
+  width: 100%;
+  /* 100vh on mobile is the viewport height with the browser toolbar hidden,
+     so the bottom gets cut off while the toolbar shows (very visible on
+     Firefox Android). dvh tracks the actually visible height; vh stays as a
+     fallback for browsers without dvh. */
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   /* Both games are light-themed; this is just the flash-of-unpainted-canvas color. */
   background: #f3f6f8;

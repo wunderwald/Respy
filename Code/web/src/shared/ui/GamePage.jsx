@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMicBreathSignal } from '../mic/useMicBreathSignal.js';
 import { MicCalibration } from '../calibration/MicCalibration.jsx';
+import { enterFullscreen } from './fullscreen.js';
 import './gamePage.css';
 
 export function GamePage({ GameClass }) {
@@ -38,6 +39,7 @@ export function GamePage({ GameClass }) {
 
   const handleTap = useCallback(() => {
     if (state !== 'idle' && state !== 'game_over') return;
+    enterFullscreen(); // must run inside the tap's gesture, before any await
     if (!rangeRef.current) {
       setCalibrating(true);
       return;

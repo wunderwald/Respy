@@ -2,6 +2,7 @@
 // calibration, just a tap target. A tap while idle/game-over (re)starts the
 // game; every other tap is forwarded to the game as a registerTap() call.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { enterFullscreen } from './fullscreen.js';
 import './gamePage.css';
 
 export function TapGamePage({ GameClass }) {
@@ -19,6 +20,7 @@ export function TapGamePage({ GameClass }) {
 
   const handlePointerDown = useCallback(() => {
     if (state === 'idle' || state === 'game_over') {
+      enterFullscreen();
       gameRef.current.start();
     } else {
       gameRef.current.registerTap();

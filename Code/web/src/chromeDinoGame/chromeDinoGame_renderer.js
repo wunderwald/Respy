@@ -1,4 +1,5 @@
 import { STATE } from './chromeDinoGame_config.js';
+import { uiScale, font } from '../shared/ui/canvasText.js';
 
 // ── ChromeDinoGameRenderer ─────────────────────────────────────────────
 // Minimal 2D canvas renderer: light daytime-sky scrolling world, parallax
@@ -20,6 +21,7 @@ const COLORS = {
 export class ChromeDinoGameRenderer {
   #canvas;
   #ctx;
+  #s = 1; // uiScale() of the current frame — shrinks HUD/overlay text on phones
 
   constructor(container) {
     container.innerHTML = '<canvas id="game-canvas"></canvas>';
@@ -34,6 +36,7 @@ export class ChromeDinoGameRenderer {
     const ctx = this.#ctx;
     const w = this.#canvas.width;
     const h = this.#canvas.height;
+    this.#s = uiScale(w, h);
 
     this.#drawBackground(ctx, w, h);
     this.#drawClouds(ctx, clouds);
@@ -142,14 +145,14 @@ export class ChromeDinoGameRenderer {
 
   #drawIdle(ctx, w, h) {
     ctx.fillStyle = COLORS.inkSoft;
-    ctx.font = '300 20px Nunito, sans-serif';
+    ctx.font = font(300, 20, this.#s);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Tap to start', w / 2, h / 2 - 60);
+    ctx.fillText('Tap to start', w / 2, h / 2 - 60 * this.#s);
   }
 
   #drawCountdown(ctx, w, h, elapsed) {
-    const cx = w / 2, cy = h / 2 - 60;
+    const cx = w / 2, cy = h / 2 - 60 * this.#s;
     let label;
     if (elapsed < 1000)      label = '3';
     else if (elapsed < 2000) label = '2';
@@ -160,7 +163,7 @@ export class ChromeDinoGameRenderer {
     ctx.shadowColor  = 'rgba(0,0,0,0.12)';
     ctx.shadowBlur   = 12;
     ctx.fillStyle    = label === 'GO!' ? '#2e9e62' : COLORS.ink;
-    ctx.font         = '300 80px Nunito, sans-serif';
+    ctx.font         = font(300, 80, this.#s);
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(label, cx, cy);
@@ -168,43 +171,47 @@ export class ChromeDinoGameRenderer {
   }
 
   #drawGameOver(ctx, w, h, score, highScore) {
-    const cx = w / 2, cy = h / 2 - 60;
+    const s = this.#s;
+    const cx = w / 2, cy = h / 2 - 60 * s;
     ctx.save();
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
 
     ctx.fillStyle = COLORS.ink;
-    ctx.font      = '300 42px Nunito, sans-serif';
-    ctx.fillText(`Score: ${score}`, cx, cy - 10);
+    ctx.font      = font(300, 42, s);
+    ctx.fillText(`Score: ${score}`, cx, cy - 10 * s);
 
     ctx.fillStyle = COLORS.inkSoft;
-    ctx.font      = '300 22px Nunito, sans-serif';
-    ctx.fillText(`Best score: ${highScore}`, cx, cy + 36);
+    ctx.font      = font(300, 22, s);
+    ctx.fillText(`Best score: ${highScore}`, cx, cy + 36 * s);
 
     ctx.fillStyle = COLORS.inkFaint;
-    ctx.font      = '200 14px Nunito, sans-serif';
-    ctx.fillText('Tap to play again', cx, cy + 78);
+    ctx.font      = font(200, 14, s);
+    ctx.fillText('Tap to play again', cx, cy + 78 * s);
     ctx.restore();
   }
 
   #drawCounters(ctx, w, score, highScore) {
+    const s = this.#s;
+    const x = w - 24 * s;
+
     ctx.save();
     ctx.textAlign    = 'right';
 
     ctx.textBaseline = 'top';
     ctx.fillStyle    = COLORS.inkFaint;
-    ctx.font         = '200 13px Nunito, sans-serif';
-    ctx.fillText('best', w - 24, 14);
+    ctx.font         = font(200, 13, s);
+    ctx.fillText('best', x, 14 * s);
     ctx.fillStyle    = COLORS.inkSoft;
-    ctx.font         = '300 26px Nunito, sans-serif';
-    ctx.fillText(highScore, w - 24, 30);
+    ctx.font         = font(300, 26, s);
+    ctx.fillText(highScore, x, 30 * s);
 
     ctx.fillStyle    = COLORS.inkFaint;
-    ctx.font         = '200 13px Nunito, sans-serif';
-    ctx.fillText('score', w - 24, 70);
+    ctx.font         = font(200, 13, s);
+    ctx.fillText('score', x, 70 * s);
     ctx.fillStyle    = COLORS.ink;
-    ctx.font         = '300 40px Nunito, sans-serif';
-    ctx.fillText(score, w - 24, 86);
+    ctx.font         = font(300, 40, s);
+    ctx.fillText(score, x, 86 * s);
     ctx.restore();
   }
 }
