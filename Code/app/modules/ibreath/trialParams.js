@@ -103,12 +103,14 @@ export function makeTrialParams(numTrials) {
 
     if (CONFIG.FLASHING_IMAGE && flashSeq[i]) {
       trial.flashImage = CONFIG.FLASH_IMAGE;
-      const flashMax = Math.min(
+      // Within [FLASH_TIME_MIN, FLASH_TIME_MAX], and always fully inside the
+      // trial (a trial shorter than FLASH_TIME_MIN moves the window earlier).
+      const flashMax = Math.max(0, Math.min(
         CONFIG.FLASH_TIME_MAX,
-        CONFIG.MAX_TRIAL_TIME - CONFIG.FLASH_DURATION / 1000
-      );
-      trial.flashTime = +(CONFIG.FLASH_TIME_MIN +
-        Math.random() * (flashMax - CONFIG.FLASH_TIME_MIN)).toFixed(2);
+        CONFIG.TRIAL_DURATION_SECS - CONFIG.FLASH_DURATION / 1000
+      ));
+      const flashMin = Math.min(CONFIG.FLASH_TIME_MIN, flashMax);
+      trial.flashTime = +(flashMin + Math.random() * (flashMax - flashMin)).toFixed(2);
       trial.flashX = +Math.random().toFixed(4);
       trial.flashY = +Math.random().toFixed(4);
     }

@@ -27,9 +27,10 @@ export const CONFIG = {
   RANGE_MIN_SPAN_FRACTION: 0.3,   // range never narrows below this fraction of the calibrated span
 
   // Trial timing
-  MAX_NUM_TRIALS: 80,
-  MAX_TRIAL_TIME: 30,       // seconds
-  MIN_TRIAL_TIME: 5,       // seconds
+  // Trial count and duration: defaults for the experimenter's "trials" and
+  // "trial secs" fields (a preset's numTrials / trialDurationSecs fill them).
+  MAX_NUM_TRIALS: 30,
+  TRIAL_DURATION_SECS: 10, // seconds the fish is shown; the response window comes on top
   ITI_MIN: 2000,       // ms
   ITI_MAX: 3000,       // ms
 
@@ -51,7 +52,11 @@ export const CONFIG = {
 
   // Questions after trials
   SHOW_QUESTIONS: true,      // show a post-trial response question after each trial (fixed — not exposed in experimenter UI)
-  RESPONSE_TIMEOUT_SECS: 5,        // seconds before a non-response is recorded as 'timeout'
+  // Response window: an arrow key answers and moves on right away; no
+  // answer within RESPONSE_TIMEOUT_SECS → 'timeout'.
+  RESPONSE_TIMEOUT_SECS: 5,
+  RESPONSE_LEFT_COLOR:  '#b07cff',  // purple — left arrow (←)
+  RESPONSE_RIGHT_COLOR: '#ff9a3c',  // orange — right arrow (→)
 
   // Active question set. Each entry: { id, text, answers: [left, right], labels: [left, right], probability }.
   // `answers` are the values recorded in the CSV/markers (and checked by the adaptive delay: 'yes'/'no');

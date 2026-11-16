@@ -137,8 +137,12 @@ if (frontend === 'ibreath') {
            value="${CONFIG.CALIBRATION_SECS}" />
     <span class="label">trials</span>
     <input id="s-num-trials" type="number" class="settings-num" min="1" step="1"
-           value="${CONFIG.MAX_NUM_TRIALS}" title="Number of trials — set by the preset if it defines numTrials" />
+           value="${CONFIG.MAX_NUM_TRIALS}" title="Number of trials — filled in by a preset that defines numTrials; editable" />
     <span id="s-trials-warning" class="preset-warning" style="display:none"></span>
+    <span class="label">trial secs</span>
+    <input id="s-trial-secs" type="number" class="settings-num" min="1" step="1"
+           value="${CONFIG.TRIAL_DURATION_SECS}" title="Seconds per trial (the response window, up to ${CONFIG.RESPONSE_TIMEOUT_SECS} s, comes on top) — filled in by a preset that defines trialDurationSecs; editable" />
+    <span id="s-trial-secs-warning" class="preset-warning" style="display:none"></span>
     <span class="label">preset</span>
     <select id="s-preset" class="stream-select">
       <option value="">None (sync only)</option>
@@ -184,6 +188,8 @@ if (frontend === 'ibreath') {
   const signalTypeSelect  = document.getElementById('s-signal-type');
   const numTrialsInput    = document.getElementById('s-num-trials');
   const trialsWarningEl   = document.getElementById('s-trials-warning');
+  const trialSecsInput    = document.getElementById('s-trial-secs');
+  const trialSecsWarningEl = document.getElementById('s-trial-secs-warning');
   const presetSelect      = document.getElementById('s-preset');
   const presetStatusEl    = document.getElementById('s-preset-status');
   const presetWarningEl   = document.getElementById('ib-preset-warning');
@@ -281,9 +287,15 @@ if (frontend === 'ibreath') {
   startBtn.addEventListener('click', () => {
     if (!subjectCheck.isValid()) return;   // the hint under the subject field says why
     const numTrials = parseTrialCount(numTrialsInput.value);
-    if (numTrials == null) {   // the field is editable then; the warning next to it says why
+    if (numTrials == null) {   // the warning next to the field says why
       updateTrialsWarning();
       numTrialsInput.focus();
+      return;
+    }
+    const trialDurationSecs = parseTrialCount(trialSecsInput.value);
+    if (trialDurationSecs == null) {
+      updateTrialSecsWarning();
+      trialSecsInput.focus();
       return;
     }
     window.api.hud.sendAction({
@@ -295,6 +307,7 @@ if (frontend === 'ibreath') {
       inputSignalType: signalTypeSelect.value,
       calibrationSecs: parseInt(document.getElementById('s-cal-secs').value) || CONFIG.CALIBRATION_SECS,
       numTrials,
+      trialDurationSecs,
       questions:       activePreset?.questions ?? null,
       configOverrides: activePreset?.configOverrides ?? null,
     });
@@ -327,9 +340,9 @@ if (frontend === 'ibreath') {
   // ── Presets ──────────────────────────────────────────────────────────────────
   //
   // A preset is a JSON file (bundled under app/presets/, or any file via
-  // "Browse…") that can define: inputSignalType / useEyeTracking / numTrials
-  // (pre-filled and locked in the UI the moment the preset loads — not
-  // deferred to Start), a custom `questions` list (replacing the default
+  // "Browse…") that can define: inputSignalType / useEyeTracking (pre-filled
+  // and locked in the UI the moment the preset loads — not deferred to
+  // Start), numTrials / trialDurationSecs (pre-filled, but stay editable), a custom `questions` list (replacing the default
   // sync-only question), and arbitrary `configOverrides` (applied to CONFIG
   // at Start, same as every other setting). See docs/ibreath.md for the file
   // format.
@@ -358,6 +371,13 @@ if (frontend === 'ibreath') {
   }
   numTrialsInput.addEventListener('input', updateTrialsWarning);
 
+  function updateTrialSecsWarning() {
+    const msg = parseTrialCount(trialSecsInput.value) == null ? '⚠ trial secs must be a whole number ≥ 1' : '';
+    trialSecsWarningEl.textContent   = msg;
+    trialSecsWarningEl.style.display = msg ? '' : 'none';
+  }
+  trialSecsInput.addEventListener('input', updateTrialSecsWarning);
+
   function updateSyncWarning(questions) {
     const list = questions?.length ? questions : CONFIG.QUESTIONS;
     const hasSync = list.some(q => q.id === 'sync');
@@ -383,21 +403,22 @@ if (frontend === 'ibreath') {
       useEyeTrackingBox.disabled = false;
     }
 
-    if (preset?.numTrials !== undefined) {
-      const n = parseTrialCount(preset.numTrials);
+    // Trial count and duration: the preset fills the field, which stays
+    // editable (the value in the field at Start is what's used). A bad
+    // preset value leaves the field as it was and says why.
+    for (const [key, input, label] of [['numTrials', numTrialsInput, 'trials'],
+                                       ['trialDurationSecs', trialSecsInput, 'trial secs']]) {
+      if (preset?.[key] === undefined) continue;
+      const n = parseTrialCount(preset[key]);
       if (n != null) {
-        numTrialsInput.value    = n;
-        numTrialsInput.disabled = true;
+        input.value = n;
       } else {
-        // Don't lock a bad value in — leave the field editable and say why.
-        numTrialsInput.disabled = false;
-        const warn = `⚠ preset numTrials ${JSON.stringify(preset.numTrials)} is not a whole number ≥ 1 — set trials manually`;
+        const warn = `⚠ preset ${key} ${JSON.stringify(preset[key])} is not a whole number ≥ 1 — set ${label} manually`;
         presetStatusEl.textContent = presetStatusEl.textContent ? `${presetStatusEl.textContent} · ${warn}` : warn;
       }
-    } else {
-      numTrialsInput.disabled = false;
     }
     updateTrialsWarning();
+    updateTrialSecsWarning();
 
     updateSyncWarning(preset?.questions);
   }

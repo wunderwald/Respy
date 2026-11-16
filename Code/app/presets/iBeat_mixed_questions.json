@@ -2,7 +2,8 @@
   "name": "iBeat_mixed_questions",
   "description": "Mixed post-trial questions: 50% sync-detection, ~16.7% each of flash-detection, left/right, and image-identification. Peaks-only (ECG) input signal, with the default peak-envelope timings carried explicitly so this preset doesn't depend on whatever config.js happens to default to. Eye tracking left to the experimenter controls.",
   "inputSignalType": "peaksOnly",
-  "numTrials": 80,
+  "numTrials": 30,
+  "trialDurationSecs": 10,
   "questions": [
     { "id": "sync",  "probability": 0.5,    "text": "Hat der Fisch genau zu deinem Herzschlag gepasst?",   "answers": ["yes", "no"], "labels": ["ja", "nein"] },
     { "id": "flash", "probability": 0.1667, "text": "Hast du den rosa Fisch blinken sehen?",          "answers": ["yes", "no"], "labels": ["ja", "nein"] },

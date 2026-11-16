@@ -143,8 +143,9 @@ export class IBreathRenderer {
   // Post-trial question, made for children: a big question line and two
   // big answer cards (← left / right →), each with a fat drawn arrow and
   // the answer in large bold text — or, for the 'img' question, the picture.
-  // Both cards look identical (same colours) so neither answer is visually
-  // favoured. Everything scales with the screen via `u` (1 u = 1 % of the
+  // The arrows are colour-coded by side — left purple, right orange
+  // (RESPONSE_LEFT/RIGHT_COLOR) — otherwise both cards look the same.
+  // Everything scales with the screen via `u` (1 u = 1 % of the
   // height on a 16:9 screen; narrower windows scale down by width).
   #drawResponse(ctx, w, h, now, responseStartTime, questionType) {
     const elapsed   = now - responseStartTime;
@@ -171,12 +172,13 @@ export class IBreathRenderer {
 
     for (const side of [-1, 1]) {
       const x = cx + side * cardDx;
+      const color = side < 0 ? CONFIG.RESPONSE_LEFT_COLOR : CONFIG.RESPONSE_RIGHT_COLOR;
       this.#roundRect(ctx, x - cardW / 2, cardY - cardH / 2, cardW, cardH, 5 * u,
                       'rgba(255,255,255,0.09)', 'rgba(255,255,255,0.55)', 0.5 * u);
 
       if (questionType === 'img') {
         // Arrow on top, the picture as the "label"
-        this.#drawArrow(ctx, x + side * nudge, cardY - 15 * u, 26 * u, side, '#ffd166');
+        this.#drawArrow(ctx, x + side * nudge, cardY - 15 * u, 26 * u, side, color);
         const img = this.#images[side < 0 ? 'pufferfish' : 'starfish'];
         const s   = Math.min(30 * u, cardW * 0.62);
         if (img?.complete && img.naturalWidth > 0) {
@@ -185,7 +187,7 @@ export class IBreathRenderer {
           ctx.drawImage(img, x - iw / 2, cardY + 10 * u - ih / 2, iw, ih);
         }
       } else {
-        this.#drawArrow(ctx, x + side * nudge, cardY - 9 * u, 32 * u, side, '#ffd166');
+        this.#drawArrow(ctx, x + side * nudge, cardY - 9 * u, 32 * u, side, color);
         this.#fitText(ctx, x, cardY + 15 * u, side < 0 ? leftLabel : rightLabel,
                       '#ffffff', 12 * u, cardW * 0.86, '800');
       }

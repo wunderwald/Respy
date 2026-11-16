@@ -280,7 +280,7 @@ export default class IBreath {
 
   // ── State machine ──────────────────────────────────────────────────────
 
-  #beginCalibration({ debugGaze, inputSignalType, calibrationSecs, numTrials, presetName, questions, configOverrides } = {}) {
+  #beginCalibration({ debugGaze, inputSignalType, calibrationSecs, numTrials, trialDurationSecs, presetName, questions, configOverrides } = {}) {
     // Reset to the hardcoded defaults first so a previous session's preset
     // (configOverrides) never silently lingers into a session that loads no
     // preset, or a different one that doesn't mention the same keys.
@@ -295,6 +295,9 @@ export default class IBreath {
     // numTrials, or the experimenter's own value). Takes precedence over a
     // configOverrides MAX_NUM_TRIALS; invalid values keep the default.
     if (Number.isInteger(numTrials) && numTrials >= 1) CONFIG.MAX_NUM_TRIALS = numTrials;
+    // Trial duration from the "trial secs" field (a preset's
+    // trialDurationSecs, or the experimenter's own value) — same rules.
+    if (Number.isInteger(trialDurationSecs) && trialDurationSecs >= 1) CONFIG.TRIAL_DURATION_SECS = trialDurationSecs;
 
     this.#subjectCode = this.#hud.subjectCode;
     this.#trials = makeTrialParams(CONFIG.MAX_NUM_TRIALS);
@@ -324,6 +327,7 @@ export default class IBreath {
     // sample happened to have arrived by the time Start was pressed.
     this.#csv = new IBreathCSV(this.#subjectCode, this.#useEyeTracking || this.#gazeEnabled,
       { signalType: this.#inputSignalType, preset: presetName ?? '',
+        trialDurationSecs: CONFIG.TRIAL_DURATION_SECS,
         // peaksOnly doesn't use the breath filter (peak envelope instead).
         breathFilter: this.#inputSignalType === 'peaksOnly' ? 'none' : this.#smoother.label },
       (msg) => this.#showWarning(`CSV: ${msg}`));
@@ -477,7 +481,7 @@ export default class IBreath {
     this.#state = STATE.TRIAL;
     this.#sound.stopDisplay();
     this.#sound.startTrial();
-    this.#hud.stateTimer   = { startedAt: Date.now(), duration: CONFIG.MAX_TRIAL_TIME };
+    this.#hud.stateTimer   = { startedAt: Date.now(), duration: CONFIG.TRIAL_DURATION_SECS };
     this.#hud.abortVisible = true;
     this.#markers.send(`trial_start_t${trial.trialIndex}`);
   }
@@ -637,7 +641,7 @@ export default class IBreath {
         // Extend the trial clock by however long we were paused
         this.#trialStartTime += performance.now() - this.#pausedAt;
         this.#state = STATE.TRIAL;
-        const remaining = CONFIG.MAX_TRIAL_TIME - (performance.now() - this.#trialStartTime) / 1000;
+        const remaining = CONFIG.TRIAL_DURATION_SECS - (performance.now() - this.#trialStartTime) / 1000;
         this.#hud.stateTimer   = { startedAt: Date.now(), duration: Math.max(0, remaining) };
         this.#hud.abortVisible = true;
         this.#hud.pauseVisible = true;
@@ -911,7 +915,7 @@ export default class IBreath {
         this.#markers.send(`flash_end_t${trial.trialIndex}`);
       }
 
-      if (tSecs >= CONFIG.MAX_TRIAL_TIME) {
+      if (tSecs >= CONFIG.TRIAL_DURATION_SECS) {
         this.#endTrial(false);
       }
     }
