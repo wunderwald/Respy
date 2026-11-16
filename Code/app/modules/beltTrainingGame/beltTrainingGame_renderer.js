@@ -68,6 +68,8 @@ export class BeltTrainingGameRenderer {
 
       case STATE.INSTRUCTIONS_CAL:
       case STATE.INSTRUCTIONS_TASK:
+      case STATE.INSTRUCTIONS_PRACTICE:
+      case STATE.INSTRUCTIONS_MAIN:
         drawInstructions(ctx, w, h, renderData.instructions);
         break;
 

@@ -4,8 +4,12 @@
  * Gets children used to controlling the on-screen fish with a respiration
  * belt before they play the main BioGame.
  *
+ * Session: IDLE → INSTRUCTIONS_CAL → CALIBRATING → INSTRUCTIONS_TASK →
+ *   INSTRUCTIONS_PRACTICE → practice trials (the first CONFIG.PRACTICE_TRIALS)
+ *   → INSTRUCTIONS_MAIN → the remaining ("real") trials → DONE.
+ *   (No practice trials → straight from INSTRUCTIONS_TASK to trial 1.)
+ *
  * State machine (one trial; CONFIG.TRAINING_PASSES = 2 training phases):
- *   IDLE → INSTRUCTIONS_CAL → CALIBRATING → INSTRUCTIONS_TASK →
  *          READY → COUNTDOWN → TRAINING (1) → COUNTDOWN → TRAINING (2)
  *                          ↑      → COUNTDOWN → TEST → PHOTO → READY → … → DONE
  *                          |_____________________________________|
@@ -195,7 +199,9 @@ export default class BeltTrainingGame {
 
       case 'next':
         if (this.#state === STATE.INSTRUCTIONS_CAL) this.#startCalibration();
-        else if (this.#state === STATE.INSTRUCTIONS_TASK) this.#beginReadyForTrial();
+        else if (this.#state === STATE.INSTRUCTIONS_TASK) this.#afterTaskInstructions();
+        else if (this.#state === STATE.INSTRUCTIONS_PRACTICE ||
+                 this.#state === STATE.INSTRUCTIONS_MAIN) this.#beginReadyForTrial();
         else if (this.#state === STATE.READY) this.#beginCountdown(0);
         else if (this.#state === STATE.PHOTO) this.#finishPhotoReview();
         break;
@@ -243,6 +249,7 @@ export default class BeltTrainingGame {
         sample_rate_source: rate.source,         // nominal | measured | default
         auto_proceed:     this.#autoProceed,   // can change mid-session → later `setting` rows
         num_trials:       CONFIG.NUM_TRIALS,
+        practice_trials:  this.#practiceTrials,   // trials 1 … practice_trials are practice
         training_passes:  CONFIG.TRAINING_PASSES,
       },
       (msg) => this.#csvWarn(msg)
@@ -319,6 +326,44 @@ export default class BeltTrainingGame {
     this.#completeCalibration(CONFIG.DEFAULT_CAL_RANGE, { fromData: false });
   }
 
+  // Practice trials = the first PRACTICE_TRIALS (at most all of them).
+  get #practiceTrials() {
+    return Math.max(0, Math.min(CONFIG.PRACTICE_TRIALS, CONFIG.NUM_TRIALS));
+  }
+
+  #isPractice(index = this.#trialIndex) {
+    return index < this.#practiceTrials;
+  }
+
+  // "trial 3 / 9" or "trial 1 / 9 (practice)" — for the experimenter's status line.
+  #trialTag(index = this.#trialIndex) {
+    return `trial ${index + 1} / ${CONFIG.NUM_TRIALS}${this.#isPractice(index) ? ' (practice)' : ''}`;
+  }
+
+  // After the game explanation: announce the practice trials, if any.
+  #afterTaskInstructions() {
+    if (this.#practiceTrials === 0) { this.#beginReadyForTrial(); return; }
+    this.#state = STATE.INSTRUCTIONS_PRACTICE;
+    this.#markers.send('instructions_practice_start');
+    this.#pushState({ stateText: 'announcing the practice trials — press Space or Next' });
+  }
+
+  // Moves on to the next trial after one ended (photo done, or aborted):
+  // the end of the session, the "now for real" screen right after the
+  // last practice trial, or the next trial's READY.
+  #nextTrial({ afterAbort = false } = {}) {
+    const prefix = afterAbort ? `trial ${this.#trialIndex} aborted — ` : '';
+    if (this.#trialIndex >= CONFIG.NUM_TRIALS) {
+      this.#endExperiment();
+    } else if (this.#trialIndex === this.#practiceTrials) {
+      this.#state = STATE.INSTRUCTIONS_MAIN;
+      this.#markers.send('instructions_main_start');
+      this.#pushState({ stateText: `${prefix}practice done — announcing the real trials — press Space or Next` });
+    } else {
+      this.#beginReadyForTrial({ afterAbort });
+    }
+  }
+
   // `afterAbort`: always wait in READY, even with auto-proceed on, so the
   // experimenter can sort out whatever made them abort before going on.
   #beginReadyForTrial({ afterAbort = false } = {}) {
@@ -335,7 +380,7 @@ export default class BeltTrainingGame {
     const prefix = afterAbort ? `trial ${this.#trialIndex} aborted — ` : '';
     this.#state = STATE.READY;
     this.#pushState({
-      stateText:    `${prefix}ready — trial ${this.#trialIndex + 1} / ${CONFIG.NUM_TRIALS} — press Space or Start`,
+      stateText:    `${prefix}ready — ${this.#trialTag()} — press Space or Start`,
       nextVisible:  true,
       abortVisible: false,
       calFailed:    false,
@@ -372,7 +417,7 @@ export default class BeltTrainingGame {
     this.#countdownStartTime = performance.now();
     this.#state              = STATE.COUNTDOWN;
     this.#pushState({
-      stateText:    `trial ${this.#trialIndex + 1} / ${CONFIG.NUM_TRIALS} — starting ${BeltTrainingGame.#labelOf(step)}…`,
+      stateText:    `${this.#trialTag()} — starting ${BeltTrainingGame.#labelOf(step)}…`,
       nextVisible:  false,
       abortVisible: true,
     });
@@ -396,7 +441,7 @@ export default class BeltTrainingGame {
     this.#state = this.#phase === 'training' ? STATE.TRAINING : STATE.TEST;
 
     this.#pushState({
-      stateText:    `trial ${this.#trialIndex + 1} / ${CONFIG.NUM_TRIALS} — ${this.#phaseLabel}`,
+      stateText:    `${this.#trialTag()} — ${this.#phaseLabel}`,
       nextVisible:  false,
       abortVisible: true,
     });
@@ -428,7 +473,7 @@ export default class BeltTrainingGame {
     this.#photoStartTime = performance.now();
     this.#photoSeq++;
     this.#pushState({
-      stateText:    `trial ${this.#trialIndex + 1} / ${CONFIG.NUM_TRIALS} — here's how you did`,
+      stateText:    `${this.#trialTag()} — here's how you did`,
       nextVisible:  !this.#autoProceed,
       abortVisible: false,
     });
@@ -437,11 +482,7 @@ export default class BeltTrainingGame {
   #finishPhotoReview() {
     this.#photoStartTime = null;
     this.#trialIndex++;
-    if (this.#trialIndex >= CONFIG.NUM_TRIALS) {
-      this.#endExperiment();
-      return;
-    }
-    this.#beginReadyForTrial();
+    this.#nextTrial();
   }
 
   // Ends only the running trial; the session moves on to the next trial
@@ -456,11 +497,7 @@ export default class BeltTrainingGame {
     this.#pendingStep = null;
 
     this.#trialIndex++;
-    if (this.#trialIndex >= CONFIG.NUM_TRIALS) {
-      this.#endExperiment();
-      return;
-    }
-    this.#beginReadyForTrial({ afterAbort: true });
+    this.#nextTrial({ afterAbort: true });
   }
 
   // Closing the window is how a session is ended early: write the buffered
@@ -666,6 +703,8 @@ export default class BeltTrainingGame {
       countdownProgress: clamp(countdownProgress, 0, 1),
       instructions:      this.#state === STATE.INSTRUCTIONS_CAL  ? INSTRUCTIONS.calibration()
                        : this.#state === STATE.INSTRUCTIONS_TASK ? INSTRUCTIONS.beltTrainingGame({ trainingPasses: CONFIG.TRAINING_PASSES })
+                       : this.#state === STATE.INSTRUCTIONS_PRACTICE ? INSTRUCTIONS.beltPracticeStart({ practiceTrials: this.#practiceTrials })
+                       : this.#state === STATE.INSTRUCTIONS_MAIN     ? INSTRUCTIONS.beltMainStart()
                        : null,
       trialIndex:        this.#trialIndex,
       photoKey:          this.#photoSeq,
@@ -687,6 +726,7 @@ export default class BeltTrainingGame {
       startEnabled: this.#streamReady && s === STATE.IDLE,
       startText:    'Start',
       nextVisible:  s === STATE.INSTRUCTIONS_CAL || s === STATE.INSTRUCTIONS_TASK ||
+                    s === STATE.INSTRUCTIONS_PRACTICE || s === STATE.INSTRUCTIONS_MAIN ||
                     s === STATE.READY || (s === STATE.PHOTO && !this.#autoProceed),
       abortVisible: s === STATE.COUNTDOWN || s === STATE.TRAINING || s === STATE.TEST,
       calFailed:    s === STATE.CALIBRATING && this.#calFailed,

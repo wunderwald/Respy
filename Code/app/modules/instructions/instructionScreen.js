@@ -18,7 +18,7 @@ export function drawInstructions(ctx, w, h, instructions) {
     const titleSz = title ? 8 * u * s : 0;
     const lineSz  = 5 * u * s;
     const lineH   = lineSz * 1.35;
-    const gapAfterTitle = title ? 4 * u * s : 0;
+    const gapAfterTitle = title && lines.length ? 4 * u * s : 0;   // title-only panel: no gap
     const paraGap = 1.6 * u * s;     // extra space between the separate lines
     const padY    = 6 * u * s;
     // Wrap every line to the available width.

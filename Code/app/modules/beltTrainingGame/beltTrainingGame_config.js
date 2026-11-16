@@ -7,6 +7,10 @@ export const CONFIG = {
 
   // ── Trials ───────────────────────────────────────────────────────────────
   NUM_TRIALS:            9,
+  // The first PRACTICE_TRIALS of the NUM_TRIALS are practice: the child
+  // learns the mechanics, then the "real" trials follow. Explanation screens
+  // before the practice trials and before the first real trial. 0 = none.
+  PRACTICE_TRIALS:       2,
   TRAINING_PASSES:       2,     // training phases per trial (target visible), followed by one test phase
   CALIBRATION_SECS:      30,
   // TODO: measure real min/max from pilot recordings and replace these placeholders
@@ -75,6 +79,8 @@ export const STATE = {
   INSTRUCTIONS_CAL:  'instructions_cal',   // explanation before calibration — waits for Space/Next
   CALIBRATING: 'calibrating',
   INSTRUCTIONS_TASK: 'instructions_task',  // explanation before the first trial — waits for Space/Next
+  INSTRUCTIONS_PRACTICE: 'instructions_practice',  // "we start with practice trials" — waits for Space/Next
+  INSTRUCTIONS_MAIN:     'instructions_main',      // after the practice trials: "now for real" — waits for Space/Next
   READY:       'ready',       // waiting for experimenter/Space before a trial
   COUNTDOWN:   'countdown',   // 3-2-1-GO before each phase (training and test)
   TRAINING:    'training',    // training phase of the current trial (target visible)

@@ -42,6 +42,23 @@ export const INSTRUCTIONS = {
     };
   },
 
+  // beltTrainingGame: before the practice trials, and after them (before
+  // the first real trial). Title only — one short sentence, extra large.
+  beltPracticeStart({ practiceTrials = 2 } = {}) {
+    const WORDS = ['', 'einem', 'zwei', 'drei', 'vier', 'fünf', 'sechs', 'sieben', 'acht', 'neun', 'zehn'];
+    const n = WORDS[practiceTrials] ?? String(practiceTrials);
+    return {
+      title: practiceTrials === 1
+        ? 'Wir beginnen mit einem Probedurchlauf.'
+        : `Wir beginnen mit ${n} Probedurchläufen.`,
+      lines: [],
+    };
+  },
+
+  beltMainStart() {
+    return { title: 'Jetzt geht es richtig los.', lines: [] };
+  },
+
   // Deliberately says nothing about which questions come (fish type, side,
   // pink fish) — those should catch the child unprepared.
   ibreath({ signal = 'physiological' } = {}) {
