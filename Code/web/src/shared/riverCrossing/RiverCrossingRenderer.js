@@ -1,5 +1,6 @@
 import { VISUAL_CONFIG as CONFIG, STATE } from './riverCrossingVisuals.js';
 import { uiScale, font } from '../ui/canvasText.js';
+import { drawSun } from './sun.js';
 
 // ── RiverCrossingRenderer ────────────────────────────────────────────────────
 // Bright pastel line-art rendering, sized for young kids: soft pink sky,
@@ -144,43 +145,7 @@ export class RiverCrossingRenderer {
     const cx = w * 0.10 + Math.sin(t * 0.35) * r * 0.12;
     const cy = h * 0.12 + Math.sin(t * 0.5 + 1.3) * r * 0.18;
 
-    ctx.save();
-    ctx.translate(cx, cy);
-
-    ctx.strokeStyle = '#ffcf4d';
-    ctx.lineWidth = 3;
-    const rayCount = 8;
-    for (let i = 0; i < rayCount; i++) {
-      const a = (i / rayCount) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(a) * r * 1.25, Math.sin(a) * r * 1.25);
-      ctx.lineTo(Math.cos(a) * r * 1.55, Math.sin(a) * r * 1.55);
-      ctx.stroke();
-    }
-
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffe17a';
-    ctx.fill();
-    ctx.strokeStyle = COLORS.ink;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.fillStyle = COLORS.ink;
-    ctx.beginPath();
-    ctx.arc(-r * 0.32, -r * 0.1, r * 0.09, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(r * 0.32, -r * 0.1, r * 0.09, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(0, r * 0.05, r * 0.42, 0.15 * Math.PI, 0.85 * Math.PI);
-    ctx.strokeStyle = COLORS.ink;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.restore();
+    drawSun(ctx, cx, cy, r, { ink: COLORS.ink });
   }
 
   #drawClouds(ctx, clouds) {

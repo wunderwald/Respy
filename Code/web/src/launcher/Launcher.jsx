@@ -66,10 +66,10 @@ function useMicPermissionGate() {
 function MicStatus({ mic, errorMsg, onRequest }) {
   switch (mic) {
     case 'granted':
-      return <p className="mic-status mic-ok">🎤 Microphone ready</p>;
+      return <p className="mic-status mic-ok">Microphone ready</p>;
     case 'checking':
     case 'requesting':
-      return <p className="mic-status">🎤 Asking for microphone access…</p>;
+      return <p className="mic-status">Asking for microphone access…</p>;
     case 'insecure':
     case 'unsupported':
       return <p className="mic-status mic-bad">{micSupportMessage(mic)}</p>;
