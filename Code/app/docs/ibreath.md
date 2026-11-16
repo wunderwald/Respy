@@ -35,7 +35,7 @@ Two windows open:
 | **Use eye tracking** | Off by default. When on, reveals a shared group with the rest of the eye-tracking controls and status — see [Eye tracking](#eye-tracking-eyelink) below. Locked immediately if a loaded preset defines it. |
 | **Start** | Begins calibration. Requires a connected resp stream. |
 | **Next trial** | Visible when `AUTO_ADVANCE` is off — advances to the next trial. |
-| **Abort** | Ends the current trial early (marks it `aborted = true` in CSV). |
+| **Abort** | Ends the current trial early (`aborted = true`, `abortReason = experimenter` in CSV). With eye tracking on, trials can also end on their own when the child looks away — see the inattention check under [Trial design](#trial-design). |
 
 Auto-advance, sync-detection questions, and the flashing-image stimulus are always on (`AUTO_ADVANCE` / `SHOW_QUESTIONS` / `FLASHING_IMAGE` in [config.js](./modules/ibreath/config.js)) and no longer exposed as experimenter controls.
 
@@ -84,6 +84,7 @@ The `[READY]` step between trials is skipped when `AUTO_ADVANCE` is on. The `[DI
 - **Asynchronous trials** — cloud tracks the participant's own real-time breath signal, delayed by the current adaptive delay (see [Async delay staircase](#async-delay-staircase) below), then rescaled the same way as sync trials.
 - **Flash stimulus** (`FLASHING_IMAGE`) — a lightning image appears on 50 % of trials at a random time between `FLASH_TIME_MIN` and `FLASH_TIME_MAX` seconds into the trial, but always fully inside the trial (10 s trials: between 5 and 9.75 s).
 - **Post-trial question** (`CONFIG.QUESTIONS`) — after each non-aborted trial, a question is shown for up to `RESPONSE_TIMEOUT_SECS` (5) seconds; an arrow key answers and moves on right away. Non-responses are recorded as `timeout`. The arrows are colour-coded: **left purple, right orange** (`RESPONSE_LEFT_COLOR` / `RESPONSE_RIGHT_COLOR`). Which question(s) can appear, in what mix, is defined by `CONFIG.QUESTIONS` — either the built-in default (100% `sync`) or a loaded preset's `questions` list. See [Presets](#presets) for the full mechanism.
+- **Inattention check** (eye tracking on only, `GAZE_ABORT`) — the first `GAZE_ABORT_MIN_SECS` (5 s) of a trial are always shown. After that, the trial is ended as soon as there has been **no gaze position on screen for `GAZE_ABORT_LOST_SECS` (2 s) in a row**: blinks / lost tracking (`[-1, -1]`), gaze outside `[0, 1]`, or no gaze samples at all. The run counts from the trial start at the earliest, so a child who already looked away early is stopped right at 5 s. The trial is aborted like an experimenter abort (no question, next trial follows), with `abortReason = gaze_lost` in `trialData.csv` and a `trial_abort_reason_gaze_lost_t<N>` marker; the experimenter's status line says so during the ITI. ⚠ If the gaze stream stops while eye tracking is on, every trial ends at 5 s.
 
 ### Signal range
 
@@ -139,6 +140,9 @@ Flags in [app/modules/ibreath/config.js](./modules/ibreath/config.js):
 | `DEBUG_GAZE` | `false` | Overlay gaze position dot on scene |
 | `MAX_NUM_TRIALS` | `30` | Default trial count — the **Trials** field's initial value; overridden per session by that field (a preset's `numTrials`, or the experimenter's own value) |
 | `TRIAL_DURATION_SECS` | `10` | Default trial duration (s) — the **Trial secs** field's initial value; overridden per session by that field (a preset's `trialDurationSecs`, or the experimenter's own value) |
+| `GAZE_ABORT` | `true` | Inattention check on/off (only active with eye tracking on) |
+| `GAZE_ABORT_MIN_SECS` | `5` | Seconds of each trial that are always shown |
+| `GAZE_ABORT_LOST_SECS` | `2` | No on-screen gaze for this long (after the first `GAZE_ABORT_MIN_SECS`) ends the trial |
 | `RESPONSE_TIMEOUT_SECS` | `5` | Response window (s): an answer moves on right away; none by then → `timeout` |
 | `RESPONSE_LEFT_COLOR` / `RESPONSE_RIGHT_COLOR` | `#b07cff` / `#ff9a3c` | Arrow colours on the answer cards (left purple, right orange) |
 | `CALIBRATION_SECS` | `10` | Duration of the calibration recording |
@@ -179,7 +183,8 @@ One row per trial, appended after each trial ends (or after the response screen)
 | `ITI` | Inter-trial interval in ms |
 | `startTime` | ISO-8601 trial start time |
 | `endTime` | ISO-8601 trial end time |
-| `aborted` | `true` if experimenter pressed Abort (or the window was closed mid-trial) |
+| `aborted` | `true` if the trial ended early — see `abortReason` |
+| `abortReason` | Why an aborted trial ended (empty otherwise): `experimenter` (Abort button / Escape), `gaze_lost` (inattention check), `pause` (Pause during the trial), `eye_calibration` (eye-tracker calibration started during the trial), `session_closed` (window closed mid-trial) |
 | `response` | One of that trial's question's two `answers` labels (e.g. `yes`/`no`, `left`/`right`, `fish0`/`fish1`), `timeout`, or `session_closed` if the window was closed during the trial or its question |
 | `flashImage` | Flash image name (`fish2`, from `FLASH_IMAGE`) or empty — only when `FLASHING_IMAGE` is on |
 | `flashScheduledTime` | Seconds into trial when flash was scheduled |
@@ -217,7 +222,8 @@ Sent to `MARKER_STREAM_URL` (default `ws://localhost:9001`).
 | `display_start_t<N>` | Pre-trial animation starts for trial N |
 | `trial_start_t<N>` | Trial N begins |
 | `trial_end_t<N>` | Trial N ends normally |
-| `trial_abort_t<N>` | Trial N aborted by experimenter |
+| `trial_abort_t<N>` | Trial N aborted (any reason) |
+| `trial_abort_reason_<reason>_t<N>` | Sent right after `trial_abort_t<N>`: `experimenter`, `gaze_lost`, `pause` or `eye_calibration` (same values as `abortReason`; a window close sends no markers) |
 | `response_start_t<N>` | Response screen shown after trial N |
 | `response_yes_t<N>` | Participant responded "yes, in sync" |
 | `response_no_t<N>` | Participant responded "no, not in sync" |

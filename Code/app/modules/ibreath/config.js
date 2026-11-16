@@ -31,6 +31,15 @@ export const CONFIG = {
   // "trial secs" fields (a preset's numTrials / trialDurationSecs fill them).
   MAX_NUM_TRIALS: 30,
   TRIAL_DURATION_SECS: 10, // seconds the fish is shown; the response window comes on top
+
+  // Inattention check (only with eye tracking on): after the first
+  // GAZE_ABORT_MIN_SECS of a trial, the trial ends (aborted, reason
+  // 'gaze_lost') once there has been no gaze position on screen for
+  // GAZE_ABORT_LOST_SECS in a row. Blinks / lost tracking / gaze off screen
+  // / no gaze samples at all all count as "not on screen".
+  GAZE_ABORT: true,
+  GAZE_ABORT_MIN_SECS: 5,
+  GAZE_ABORT_LOST_SECS: 2,
   ITI_MIN: 2000,       // ms
   ITI_MAX: 3000,       // ms
 

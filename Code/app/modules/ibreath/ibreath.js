@@ -104,6 +104,7 @@ export default class IBreath {
   #gazeX = null;
   #gazeY = null;
   #gazeEnabled = false;
+  #lastOnScreenGazeAt = -Infinity;   // performance.now() of the last gaze sample on screen (inattention check)
 
   // ── sub-modules ────────────────────────────────────────────────────────
   #markers = null;
@@ -120,7 +121,7 @@ export default class IBreath {
       // Space / Next in the experimenter window arrive here in any state;
       // only READY may advance (mid-trial it would discard the trial's data).
       onNext:            () => this.#onNext(),
-      onAbort:           () => this.#abortTrial(),
+      onAbort:           () => this.#abortTrial('experimenter'),
       onResponse:        (v) => { if (this.#state === STATE.RESPONSE) this.#onResponse(v); },
       onPause:           () => this.#onPause(),
       onPlay:            () => this.#onPlay(),
@@ -219,6 +220,7 @@ export default class IBreath {
       const valid = Number.isFinite(x) && Number.isFinite(y) && x >= 0 && y >= 0;
       this.#gazeX = valid ? x : null;
       this.#gazeY = valid ? y : null;
+      if (valid && x <= 1 && y <= 1) this.#lastOnScreenGazeAt = performance.now();
       this.#gazeEnabled = true;
     }
     if (this.#gazeEnabled !== wasEnabled) this.#hud.gazeActive = this.#gazeEnabled;
@@ -266,7 +268,7 @@ export default class IBreath {
           this.#onNext();
           break;
         case 'Escape':
-          if (this.#state === STATE.TRIAL) this.#abortTrial();
+          if (this.#state === STATE.TRIAL) this.#abortTrial('experimenter');
           break;
         case 'ArrowLeft':
           if (this.#state === STATE.RESPONSE) this.#onResponse('left');
@@ -495,15 +497,20 @@ export default class IBreath {
     }
   }
 
-  #endTrial(aborted = false) {
+  // `abortReason` (aborted trials): 'experimenter' (Abort / Escape), 'gaze_lost'
+  // (inattention check), 'pause', 'eye_calibration' — recorded in
+  // trialData.csv (abortReason) and as a trial_abort_reason_<reason>_t<N> marker.
+  #endTrial(aborted = false, abortReason = '') {
     const trial = this.#trials[this.#trialIndex];
     trial.endTime = new Date().toISOString();
     trial.aborted = aborted;
+    trial.abortReason = aborted ? abortReason : '';
 
     trial.flashShown = this.#flashShown;
     this.#sound.stopTrial();
     this.#csv.flushFrameCSV(trial, this.#frameRows);
     this.#markers.send(aborted ? `trial_abort_t${trial.trialIndex}` : `trial_end_t${trial.trialIndex}`);
+    if (aborted && abortReason) this.#markers.send(`trial_abort_reason_${abortReason}_t${trial.trialIndex}`);
     this.#hud.abortVisible = false;
     this.#trialIndex++;
 
@@ -583,9 +590,9 @@ export default class IBreath {
   // Only a running trial can be aborted. Escape in the experimenter window
   // reaches here in every state, so the guard is needed: otherwise it would
   // "abort" the next, not-yet-run trial (or crash in IDLE / DONE).
-  #abortTrial() {
+  #abortTrial(reason) {
     if (this.#state !== STATE.TRIAL) return;
-    this.#endTrial(true);
+    this.#endTrial(true, reason);
   }
 
   #onPause() {
@@ -594,7 +601,7 @@ export default class IBreath {
 
     if (this.#state === STATE.TRIAL) {
       // Abort and flush the running trial before pausing
-      this.#endTrial(true);
+      this.#endTrial(true, 'pause');
       if (this.#state === STATE.DONE) return;  // last trial just finished — don't pause
       // state is now ITI; resume will skip it and go straight to the next display
       this.#pausedFromState = STATE.ITI;
@@ -743,7 +750,7 @@ export default class IBreath {
       // display already had its sound stopped.)
       const interrupted = this.#state === STATE.PAUSED ? this.#pausedFromState : this.#state;
       if (interrupted === STATE.TRIAL) {
-        this.#abortTrial();               // flushes + marks the running trial aborted
+        this.#abortTrial('eye_calibration');   // flushes + marks the running trial aborted
       } else if (interrupted === STATE.DISPLAY && this.#state !== STATE.PAUSED) {
         this.#sound.stopDisplay();
       } else if (interrupted === STATE.RESPONSE) {
@@ -847,6 +854,7 @@ export default class IBreath {
       const trial = this.#trials[this.#trialIndex];
       trial.endTime    = new Date().toISOString();
       trial.aborted    = true;
+      trial.abortReason = 'session_closed';
       trial.flashShown = this.#flashShown;
       trial.response   = 'session_closed';
       this.#csv.flushFrameCSVSync(trial, this.#frameRows);
@@ -917,8 +925,25 @@ export default class IBreath {
 
       if (tSecs >= CONFIG.TRIAL_DURATION_SECS) {
         this.#endTrial(false);
+      } else if (this.#gazeLost(now, tSecs)) {
+        const n = trial.trialIndex;
+        this.#endTrial(true, 'gaze_lost');
+        // Status line until the next state replaces it (ITI → next trial).
+        if (this.#state === STATE.ITI) {
+          this.#hud.stateText = `⚠ trial ${n} ended: no gaze on screen for ${CONFIG.GAZE_ABORT_LOST_SECS} s — inter-trial interval…`;
+        }
       }
     }
+  }
+
+  // Inattention check: eye tracking on, past the first GAZE_ABORT_MIN_SECS,
+  // and no on-screen gaze sample for GAZE_ABORT_LOST_SECS in a row. The run
+  // counts from the trial start at the earliest, so a child who already
+  // looked away before the trial is stopped right at GAZE_ABORT_MIN_SECS.
+  #gazeLost(now, tSecs) {
+    if (!CONFIG.GAZE_ABORT || !this.#useEyeTracking || tSecs < CONFIG.GAZE_ABORT_MIN_SECS) return false;
+    const lastSeen = Math.max(this.#lastOnScreenGazeAt, this.#trialStartTime);
+    return now - lastSeen >= CONFIG.GAZE_ABORT_LOST_SECS * 1000;
   }
 
   // Async trials: the stimulus is the delayed signal, read at `now`. (Sync
