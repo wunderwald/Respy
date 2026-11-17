@@ -7,10 +7,10 @@ rem Folder with the .xdf recordings (searched recursively)
 set "INPUT_DIR=C:\Users\a47_nb_admin\Desktop\RespFishData\LSL"
 
 rem Folder for the processed data
-set "OUTPUT_DIR=C:\Users\a47_nb_admin\Desktop\RespFishData\CSV_PLACEHOLDER"
+set "OUTPUT_DIR=C:\Respy\data\csv_converted"
 
 rem Folder the .xdf files are copied to
-set "BACKUP_DIR=C:\Users\a47_nb_admin\Desktop\RespFishData\BACKUP_PLACEHOLDER"
+set "BACKUP_DIR=C:\Respy\data\xdf_backup"
 
 rem 1 = reprocess recordings that already have an output folder, 0 = skip them
 set "OVERWRITE=0"
