@@ -4,13 +4,13 @@ setlocal
 rem --- SETTINGS ---------------------------------------------------------------
 
 rem Folder with the .xdf recordings (searched recursively)
-set "INPUT_DIR=C:\path\to\recordings"
+set "INPUT_DIR=C:\Users\a47_nb_admin\Desktop\RespFishData\LSL"
 
 rem Folder for the processed data
-set "OUTPUT_DIR=C:\path\to\processed"
+set "OUTPUT_DIR=C:\Users\a47_nb_admin\Desktop\RespFishData\CSV_PLACEHOLDER"
 
 rem Folder the .xdf files are copied to
-set "BACKUP_DIR=C:\path\to\backup"
+set "BACKUP_DIR=C:\Users\a47_nb_admin\Desktop\RespFishData\BACKUP_PLACEHOLDER"
 
 rem 1 = reprocess recordings that already have an output folder, 0 = skip them
 set "OVERWRITE=0"
@@ -18,8 +18,7 @@ set "OVERWRITE=0"
 rem 1 = do not copy the .xdf files to BACKUP_DIR, 0 = back them up
 set "DISABLE_BACKUP=0"
 
-rem 1 = keep this window open at the end, 0 = close it (e.g. for the Task Scheduler)
-set "PAUSE_AT_END=1"
+rem 1 = keep this window open at the end, 0 = close it set "PAUSE_AT_END=1"
 
 rem ----------------------------------------------------------------------------
 
