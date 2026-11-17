@@ -21,6 +21,11 @@ def _marker_values(stream):
         yield float(ts), str(value)
 
 
+def is_aborted(pair):
+    """Return True if the pair was closed by a task_abort_<name> marker instead of task_end_<name>."""
+    return TASK_MARKER_RE.match(pair["end_marker"]).group(1) == "abort"
+
+
 """
 PAIRING
 """
