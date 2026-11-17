@@ -5,7 +5,7 @@ export const CONFIG = {
   // Natural group: BPM used when there is no usable Resting baseline —
   // none found, or its estimate outside NATURAL_BPM_RANGE (the experimenter
   // UI then shows a warning).
-  NATURAL_BPM:           11,
+  NATURAL_BPM:           18,
   NATURAL_BPM_RANGE:     [16, 20],
   SHOW_CURVE:            false,
   DATA_DIR:              'output_data/bio_game', // do not change
