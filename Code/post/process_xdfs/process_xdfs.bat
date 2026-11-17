@@ -18,7 +18,8 @@ set "OVERWRITE=0"
 rem 1 = do not copy the .xdf files to BACKUP_DIR, 0 = back them up
 set "DISABLE_BACKUP=0"
 
-rem 1 = keep this window open at the end, 0 = close it set "PAUSE_AT_END=1"
+rem 1 = keep this window open at the end, 0 = close it
+set "PAUSE_AT_END=1"
 
 rem ----------------------------------------------------------------------------
 

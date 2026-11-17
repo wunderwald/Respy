@@ -93,7 +93,7 @@ def main():
     n_processed = n_skipped = n_failed = 0
     for path in xdf_files:
         rel = path.relative_to(args.input)
-        log.info("%s", rel)
+        log.info("## Processing: %s", rel)
 
         if not args.disable_backup:
             try:
@@ -107,12 +107,12 @@ def main():
         if out_dir.exists() and not args.overwrite:
             log.info("  Already processed, skipping")
             n_skipped += 1
-            continue
-
-        if process_recording(path, out_dir):
+        elif process_recording(path, out_dir):
             n_processed += 1
         else:
             n_failed += 1
+
+        log.info("\n")
 
     log.info("Done: %d processed, %d already processed, %d error(s)", n_processed, n_skipped, n_failed)
     return 1 if n_failed else 0
