@@ -6,7 +6,7 @@ export const CONFIG = {
   // none found, or its estimate outside NATURAL_BPM_RANGE (the experimenter
   // UI then shows a warning).
   NATURAL_BPM:           11,
-  NATURAL_BPM_RANGE:     [7, 15],
+  NATURAL_BPM_RANGE:     [16, 20],
   SHOW_CURVE:            false,
   DATA_DIR:              'output_data/bio_game', // do not change
   SEND_MARKERS:          true,
@@ -30,7 +30,7 @@ export const CONFIG = {
   RANGE_MIN_SPAN_FRACTION:  0.3,   // range never narrows below this fraction of the calibrated span
 
   // ── Breath target ────────────────────────────────────────────────────────
-  SLOW_BPM:              6,
+  SLOW_BPM:              10,
 
   // ── Avatar ───────────────────────────────────────────────────────────────
   AVATAR_X_RATIO:        0.20,  // fixed x as fraction of canvas width

@@ -263,7 +263,7 @@ export default class BioGame {
     this.#csv = new BioGameCSV(
       this.#subjectCode, this.#group, SCENE.id,
       {
-        target_bpm:          this.#activeBpm,   // 6 (slow) or the entered natural BPM
+        target_bpm:          this.#activeBpm,   // SLOW_BPM (slow) or the entered natural BPM
         natural_bpm_source:  this.#naturalBpmSource,   // baseline | fallback | manual | default
         baseline_bpm:        this.#baselineBpm,        // Resting-baseline average ('' = none found)
         show_curve:          this.#showCurve,

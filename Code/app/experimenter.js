@@ -526,7 +526,7 @@ if (frontend === 'ibreath') {
     <span>
       <span class="label">group</span>
       <select id="bg-group" class="stream-select">
-        <option value="slow">Target (slow 6 BPM)</option>
+        <option value="slow">Target (slow ${BG.SLOW_BPM} BPM)</option>
         <option value="natural">Control (natural)</option>
       </select>
     </span>
