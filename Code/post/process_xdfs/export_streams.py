@@ -1,12 +1,16 @@
 import csv
+import io
+import os
 import re
+from collections import deque
 
 import numpy as np
 
 from stream_summary import channel_labels, info_value
 
 TIME_COLUMNS = ["timestamp", "time_from_task_start", "time_from_recording_start"]
-CSV_BLOCK_ROWS = 10_000   # rows converted to text at once (bounds the memory of the CSV export)
+CSV_BLOCK_ROWS = 2_000                       # rows converted to text at once (bounds the memory of the CSV export)
+BLOCKS_IN_FLIGHT = 2 * (os.cpu_count() or 1)  # blocks queued or converted in parallel at any time
 
 """
 HELPERS
@@ -34,9 +38,35 @@ def recording_start(streams):
     return float(min(firsts)) if firsts else 0.0
 
 
-def write_stream_csv(stream, path, t0, time_column):
+def format_rows(time_stamps, samples, t0):
+    """Return the CSV text of one block of rows. Runs in the worker processes, so it must stay a top-level function.
+
+    Numeric streams are arrays, string streams lists of lists; astype(str) writes each value in its
+    shortest exact form for its dtype (float32 without float64 noise digits).
+    """
+    if isinstance(samples, np.ndarray):
+        samples = samples.astype(str).tolist()
+    f = io.StringIO()
+    csv.writer(f).writerows([ts, round(ts - t0, 6), *sample] for ts, sample in zip(time_stamps.tolist(), samples))
+    return f.getvalue()
+
+
+def map_in_order(executor, fn, arg_tuples, window):
+    """Like executor.map, but with at most `window` blocks in flight, so memory stays bounded for large streams."""
+    pending = deque()
+    for args in arg_tuples:
+        pending.append(executor.submit(fn, *args))
+        if len(pending) >= window:
+            yield pending.popleft().result()
+    while pending:
+        yield pending.popleft().result()
+
+
+def write_stream_csv(stream, path, t0, time_column, executor=None):
     """Write one stream as CSV: timestamp, <time_column> (timestamp - t0), then one column per channel.
 
+    The rows are converted to text block by block (as text, a stream takes ~30x its numeric size in memory);
+    with an executor (process pool) the blocks of numeric streams are converted in parallel.
     Streams without samples get a header-only file.
     """
     info = stream["info"]
@@ -44,22 +74,20 @@ def write_stream_csv(stream, path, t0, time_column):
 
     time_stamps = np.asarray(stream["time_stamps"], dtype=float)
     time_series = stream["time_series"]
+    blocks = ((time_stamps[i:i + CSV_BLOCK_ROWS], time_series[i:i + CSV_BLOCK_ROWS], t0)
+              for i in range(0, len(time_stamps), CSV_BLOCK_ROWS))
 
     with open(path, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["timestamp", time_column] + channel_columns(info, n_channels))
-        # Converted block by block: as text, a stream takes ~30x its numeric size in memory.
-        for i in range(0, len(time_stamps), CSV_BLOCK_ROWS):
-            block = time_series[i:i + CSV_BLOCK_ROWS]
-            # numeric streams are arrays, string streams lists of lists; astype(str) writes each value in its
-            # shortest exact form for its dtype (float32 without float64 noise digits)
-            if isinstance(block, np.ndarray):
-                block = block.astype(str).tolist()
-            ts_block = time_stamps[i:i + CSV_BLOCK_ROWS].tolist()
-            writer.writerows([ts, round(ts - t0, 6), *sample] for ts, sample in zip(ts_block, block))
+        csv.writer(f).writerow(["timestamp", time_column] + channel_columns(info, n_channels))
+        if executor is not None and isinstance(time_series, np.ndarray):
+            texts = map_in_order(executor, format_rows, blocks, window=BLOCKS_IN_FLIGHT)
+        else:
+            texts = (format_rows(*block) for block in blocks)
+        for text in texts:
+            f.write(text)
 
 
-def write_stream_csvs(streams, out_dir, t0, time_column="time_from_task_start"):
+def write_stream_csvs(streams, out_dir, t0, time_column="time_from_task_start", executor=None):
     """Write every stream to <out_dir>/<stream name>.csv (see write_stream_csv).
 
     Duplicate names (case-insensitive, for macOS/Windows file systems) get a suffix: name_2, name_3, ...
@@ -72,4 +100,4 @@ def write_stream_csvs(streams, out_dir, t0, time_column="time_from_task_start"):
             n += 1
             name = f"{base}_{n}"
         used.add(name.lower())
-        write_stream_csv(stream, out_dir / f"{name}.csv", t0, time_column)
+        write_stream_csv(stream, out_dir / f"{name}.csv", t0, time_column, executor)

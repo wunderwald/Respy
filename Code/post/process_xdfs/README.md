@@ -17,6 +17,10 @@ python process_xdfs.py [--input DIR] [--output DIR] [--backup DIR] [--overwrite]
 
 The exit code is 1 if any recording could not be loaded, processed or backed up.
 
+Converting the data to CSV text is the slow part; it is spread over `WORKERS` processes (constant in `process_xdfs.py`,
+default: number of CPU cores - 1; set it to 1 to disable). Each worker needs ~50-150 MB on top of the main process,
+which holds the loaded recording (peak ~2.5x the `.xdf` file size while loading).
+
 ## Backup
 
 Every `.xdf` file is copied to `BACKUP_DIR/<path relative to INPUT_DIR>`. Files already in the backup (same size) are

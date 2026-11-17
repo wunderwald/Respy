@@ -6,8 +6,11 @@ For every .xdf file, with <rel> = its path relative to INPUT_DIR:
 """
 import argparse
 import logging
+import os
 import shutil
 import sys
+from concurrent.futures import ProcessPoolExecutor
+from contextlib import nullcontext
 from pathlib import Path
 
 from process_recording import process_recording
@@ -20,6 +23,7 @@ OUTPUT_DIR = Path("processed")    # placeholder
 BACKUP_DIR = Path("backup")       # placeholder
 OVERWRITE = False                 # reprocess recordings that already have an output folder
 DISABLE_BACKUP = False            # skip copying the .xdf files to BACKUP_DIR
+WORKERS = max(1, (os.cpu_count() or 1) - 1)   # processes converting CSV data in parallel (1 = no parallelism)
 
 """
 LOGGING
@@ -91,28 +95,30 @@ def main():
     log.info("Found %d XDF file(s) in %s", len(xdf_files), args.input.resolve())
 
     n_processed = n_skipped = n_failed = 0
-    for path in xdf_files:
-        rel = path.relative_to(args.input)
-        log.info("## Processing: %s", rel)
+    # worker processes are only started once the first CSV block is submitted
+    with ProcessPoolExecutor(max_workers=WORKERS) if WORKERS > 1 else nullcontext() as executor:
+        for path in xdf_files:
+            rel = path.relative_to(args.input)
+            log.info("## Processing: %s", rel)
 
-        if not args.disable_backup:
-            try:
-                if not backup_file(path, args.backup / rel):
+            if not args.disable_backup:
+                try:
+                    if not backup_file(path, args.backup / rel):
+                        n_failed += 1
+                except OSError as e:
+                    log.error("  Backup failed: %s", e)
                     n_failed += 1
-            except OSError as e:
-                log.error("  Backup failed: %s", e)
+
+            out_dir = args.output / rel.parent / rel.stem
+            if out_dir.exists() and not args.overwrite:
+                log.info("  Already processed, skipping")
+                n_skipped += 1
+            elif process_recording(path, out_dir, executor):
+                n_processed += 1
+            else:
                 n_failed += 1
 
-        out_dir = args.output / rel.parent / rel.stem
-        if out_dir.exists() and not args.overwrite:
-            log.info("  Already processed, skipping")
-            n_skipped += 1
-        elif process_recording(path, out_dir):
-            n_processed += 1
-        else:
-            n_failed += 1
-
-        log.info("\n")
+            log.info("\n")
 
     log.info("Done: %d processed, %d already processed, %d error(s)", n_processed, n_skipped, n_failed)
     return 1 if n_failed else 0

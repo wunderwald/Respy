@@ -33,10 +33,11 @@ def write_lines(path, lines):
 """
 PROCESSING
 """
-def write_outputs(xdf_path, streams, out_dir):
+def write_outputs(xdf_path, streams, out_dir, executor=None):
     """Write the summary, the task markers and one folder per task (summary + stream CSVs) into out_dir.
 
     Without any task marker pair, the stream CSVs of the full recording are written into out_dir instead.
+    executor: optional process pool the CSV text conversion is spread over (see export_streams.write_stream_csv).
     Returns (number of tasks, number of unmatched task markers, whether there is a marker stream).
     """
     lines = [
@@ -55,7 +56,8 @@ def write_outputs(xdf_path, streams, out_dir):
         reason = "No task marker pairs" if markers else "No marker stream"
         lines += ["-" * 70, f"WARNING: {reason}: stream CSVs cover the full recording"]
         write_lines(out_dir / SUMMARY_NAME, lines)
-        write_stream_csvs(streams, out_dir, t0=recording_start(streams), time_column="time_from_recording_start")
+        write_stream_csvs(streams, out_dir, t0=recording_start(streams), time_column="time_from_recording_start",
+                          executor=executor)
         return 0, len(unmatched), bool(markers)
 
     write_lines(out_dir / SUMMARY_NAME, lines)
@@ -64,13 +66,13 @@ def write_outputs(xdf_path, streams, out_dir):
         task_dir.mkdir()
         task_streams = [slice_stream(s, pair["start_time"], pair["end_time"]) for s in streams]
         write_lines(task_dir / SUMMARY_NAME, summarize_task(pair, task_streams))
-        write_stream_csvs(task_streams, task_dir, t0=pair["start_time"])
+        write_stream_csvs(task_streams, task_dir, t0=pair["start_time"], executor=executor)
 
     return len(pairs), len(unmatched), True
 
 
-def process_recording(xdf_path, out_dir):
-    """Process one XDF file into out_dir; returns True on success.
+def process_recording(xdf_path, out_dir, executor=None):
+    """Process one XDF file into out_dir; returns True on success. executor: see write_outputs.
 
     The output is built in a hidden .<name>.partial folder next to out_dir and only renamed to out_dir once complete,
     so an interrupted run never leaves a folder that looks processed. An existing out_dir is replaced.
@@ -87,7 +89,7 @@ def process_recording(xdf_path, out_dir):
     tmp_dir.mkdir(parents=True)
 
     try:
-        result = write_outputs(xdf_path, streams, tmp_dir)
+        result = write_outputs(xdf_path, streams, tmp_dir, executor)
     except Exception:
         log.exception("Could not process %s", xdf_path)
         shutil.rmtree(tmp_dir, ignore_errors=True)
