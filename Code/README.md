@@ -10,7 +10,7 @@ The experiment runs across two or three machines on the same network.
 
 | Machine | Role | Key software |
 |---|---|---|
-| **PC 1** | Experiment Host | `app/` (Electron), `lsl_ws_bridge/`, `eyelink_to_lsl/` |
+| **PC 1** | Experiment Host | `app/` (Electron), `lsl_ws_bridge/`, `eyelink_to_lsl/`, `lsl_to_videosync` |
 | **PC 2** | Physiological data → LSL | `labchart_to_lsl/` (Windows) or `simulation/` scripts |
 | **PC 3** | EyeLink Host | SR Research EyeLink software |
 
@@ -30,3 +30,4 @@ Multiple machines can stream data to LSL simultaneously. Only the stream selecte
 | [eyelink_to_lsl/](eyelink_to_lsl/) | SR Research EyeLink → LSL bridge |
 | [labchart_to_lsl/](labchart_to_lsl/) | Windows-only LabChart → LSL forwarding module |
 | [raspi/](raspi/) | Raspberry Pi analog-to-LSL script |
+| [lsl_to_videosync/](lsl_to_videosync/) | Forwards LSL markers to Mangold VideoSync Pro (UDP External Marker) |
