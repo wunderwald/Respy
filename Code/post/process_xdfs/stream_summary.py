@@ -31,10 +31,20 @@ def channel_labels(info):
 
 
 def slice_stream(stream, t_start, t_end):
-    """Return a copy of the stream holding only the samples with t_start <= timestamp <= t_end."""
+    """Return the stream holding only the samples with t_start <= timestamp <= t_end.
+
+    With sorted timestamps (the normal case) the arrays are views into the original stream, not copies,
+    so slicing large streams costs no memory.
+    """
     time_stamps = np.asarray(stream["time_stamps"])
-    mask = (time_stamps >= t_start) & (time_stamps <= t_end)
     time_series = stream["time_series"]
+
+    if (time_stamps[1:] >= time_stamps[:-1]).all():
+        i0 = np.searchsorted(time_stamps, t_start, side="left")
+        i1 = np.searchsorted(time_stamps, t_end, side="right")
+        return {**stream, "time_series": time_series[i0:i1], "time_stamps": time_stamps[i0:i1]}
+
+    mask = (time_stamps >= t_start) & (time_stamps <= t_end)
     if isinstance(time_series, np.ndarray):
         time_series = time_series[mask]
     else:

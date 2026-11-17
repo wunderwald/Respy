@@ -6,6 +6,7 @@ import numpy as np
 from stream_summary import channel_labels, info_value
 
 TIME_COLUMNS = ["timestamp", "time_from_task_start", "time_from_recording_start"]
+CSV_BLOCK_ROWS = 10_000   # rows converted to text at once (bounds the memory of the CSV export)
 
 """
 HELPERS
@@ -41,16 +42,21 @@ def write_stream_csv(stream, path, t0, time_column):
     info = stream["info"]
     n_channels = int(info_value(info, "channel_count", 0))
 
-    time_stamps = np.asarray(stream["time_stamps"], dtype=float).tolist()
+    time_stamps = np.asarray(stream["time_stamps"], dtype=float)
     time_series = stream["time_series"]
-    # numeric streams are arrays, string streams lists of lists;
-    # astype(str) writes each value in its shortest exact form for its dtype (float32 without float64 noise digits)
-    samples = time_series.astype(str).tolist() if isinstance(time_series, np.ndarray) else time_series
 
     with open(path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["timestamp", time_column] + channel_columns(info, n_channels))
-        writer.writerows([ts, round(ts - t0, 6), *sample] for ts, sample in zip(time_stamps, samples))
+        # Converted block by block: as text, a stream takes ~30x its numeric size in memory.
+        for i in range(0, len(time_stamps), CSV_BLOCK_ROWS):
+            block = time_series[i:i + CSV_BLOCK_ROWS]
+            # numeric streams are arrays, string streams lists of lists; astype(str) writes each value in its
+            # shortest exact form for its dtype (float32 without float64 noise digits)
+            if isinstance(block, np.ndarray):
+                block = block.astype(str).tolist()
+            ts_block = time_stamps[i:i + CSV_BLOCK_ROWS].tolist()
+            writer.writerows([ts, round(ts - t0, 6), *sample] for ts, sample in zip(ts_block, block))
 
 
 def write_stream_csvs(streams, out_dir, t0, time_column="time_from_task_start"):
