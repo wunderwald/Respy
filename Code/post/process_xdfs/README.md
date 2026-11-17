@@ -50,6 +50,7 @@ OUTPUT_DIR/<path>/<name>/
 
 | File | |
 |---|---|
+| `process_xdfs.bat` | Windows launcher with the settings at the top |
 | `process_xdfs.py` | settings, CLI, backup, finding the recordings to process |
 | `process_recording.py` | processing of one recording into its output folder |
 | `stream_summary.py` | stream and task summaries, cutting streams to a time window |
