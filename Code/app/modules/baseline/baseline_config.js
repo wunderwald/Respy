@@ -6,7 +6,7 @@ export const CONFIG = {
   // missing (or can't play); CUSTOM_DURATION_SECS is the default value of the
   // experimenter's seconds field.
   DURATION_SECS:        420,   // 7 minutes
-  CUSTOM_DURATION_SECS: 500,
+  CUSTOM_DURATION_SECS: 300,
   SUBJECT_CODE:      'TEST',
 
   // Baseline name — the experimenter's "name" dropdown. `label` is written to

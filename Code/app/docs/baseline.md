@@ -21,7 +21,7 @@ Or select **Baseline** from the start screen (`npm start`).
 | **Resp stream** | Select the LSL resp stream. Required before pressing Start. |
 | **Subject** | Subject code — first part of the file names. Locked once recording begins. Only letters, digits, `-` and `_` (empty = `TEST`); anything else shows a red hint under the field and disables Start. If data for this code already exists, an amber hint warns that Start will overwrite it (Start stays enabled). The existing-data check uses the selected **Name**. |
 | **Name** | *Resting*, *Post natural*, *Post slow*, *Post stressor* or *Post slow post stressor* (`NAMES` in `baseline_config.js`). Written to both CSVs' `name` column, into the file names and as a `baseline_name_<slug>` marker. Locked once recording begins. |
-| **Play full video** (settings bar) | Off by default: the recording ends after the number of seconds in the **secs** field (default `CUSTOM_DURATION_SECS`, 500 s; the video is paused then). On: the recording ends when the video ends, and the **secs** field is disabled. The hint next to it shows the video's length, and notes if the entered time is longer than the video — the video then loops until the time is up. Locked once recording begins. |
+| **Play full video** (settings bar) | Off by default: the recording ends after the number of seconds in the **secs** field (default `CUSTOM_DURATION_SECS`, 300 s; the video is paused then). On: the recording ends when the video ends, and the **secs** field is disabled. The hint next to it shows the video's length, and notes if the entered time is longer than the video — the video then loops until the time is up. Locked once recording begins. |
 | **Start** | Locks the settings and shows the explanation screen to the child (`instructions_start` marker). Requires a connected resp stream (and a duration > 0 when "play full video" is off). |
 | **Start video** | Shown on the explanation screen (also **Space**): begins the recording. Sends `recording_start` and `baseline_name_<slug>`. |
 | **Abort** | Stops early and sends `task_abort_baseline`. Also triggered by `Escape`. |
@@ -100,7 +100,7 @@ Configured in [baseline_config.js](../modules/baseline/baseline_config.js):
 
 ```js
 DURATION_SECS:        420,   // "play full video" length without a playable video
-CUSTOM_DURATION_SECS: 500,   // default of the secs field
+CUSTOM_DURATION_SECS: 300,   // default of the secs field
 VIDEO_PATH: 'videos/01_Inscapes_NoScannerSound_h264.mov',
 VIDEO_MISSING_WARNING: '...',
 ```
