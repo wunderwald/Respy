@@ -2,7 +2,7 @@
   "name": "iBreath_mixed_questions",
   "description": "Mixed post-trial questions: 80% sync-detection, 6% flash-detection, 6% left/right, 8% image-identification (30 trials: 12 sync + 1 of each other question, separately for the 15 sync and 15 async trials). Physiological (breath) input signal. Eye tracking left to the experimenter controls.",
   "inputSignalType": "physiological",
-  "numTrials": 30,
+  "numTrials": 32,
   "trialDurationSecs": 10,
   "questions": [
     { "id": "sync",  "probability": 0.8,    "text": "Hat der Fisch genau zu deinem Atem gepasst?",   "answers": ["yes", "no"], "labels": ["ja", "nein"] },

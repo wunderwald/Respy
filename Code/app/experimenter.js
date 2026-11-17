@@ -146,7 +146,7 @@ if (frontend === 'ibreath') {
     <span class="label">preset</span>
     <select id="s-preset" class="stream-select">
       <option value="">None (sync only)</option>
-      <option value="iBreath_mixed_questions">iBreath — mixed questions</option>
+      <option value="iBreath_mixed_questions" selected>iBreath — mixed questions</option>
       <option value="iBreath_only_sync_question">iBreath — sync only</option>
       <option value="iBreath_adults">iBreath — adults</option>
       <option value="iBeat_mixed_questions">iBeat — mixed questions</option>
@@ -468,7 +468,10 @@ if (frontend === 'ibreath') {
     }
   });
 
-  applyPreset(null);   // initial state: no preset, default sync-only question
+  // Initial state: the default preset (selected in the dropdown above),
+  // loaded through the same path as picking it by hand — falls back to
+  // "None" if it can't be loaded.
+  presetSelect.dispatchEvent(new Event('change'));
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────────
 
@@ -760,9 +763,9 @@ if (frontend === 'ibreath') {
 
   settingsBar.innerHTML = `
     <span class="label">settings</span>
-    <label><input type="checkbox" id="bl-full-video" checked> play full video</label>
+    <label><input type="checkbox" id="bl-full-video"> play full video</label>
     <input id="bl-duration" type="number" class="settings-num" min="1" step="1"
-           value="${BL.DURATION_SECS}" disabled />
+           value="${BL.CUSTOM_DURATION_SECS}" />
     <span class="label">secs</span>
     <span id="bl-video-len" class="label"></span>
   `;

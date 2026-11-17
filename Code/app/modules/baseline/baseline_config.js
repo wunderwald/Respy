@@ -1,9 +1,12 @@
 export const CONFIG = {
-  // Recording length. "Play full video" (default) ends the recording when the
-  // video ends; unticked, the experimenter's seconds value is used instead.
-  // DURATION_SECS is the fallback when the video is missing (or can't play),
-  // and the default value of the experimenter's seconds field.
-  DURATION_SECS:     420,   // 7 minutes
+  // Recording length. Ticked, "play full video" ends the recording when the
+  // video ends; unticked (the default), the experimenter's seconds value is
+  // used instead.
+  // DURATION_SECS is the fallback for "play full video" when the video is
+  // missing (or can't play); CUSTOM_DURATION_SECS is the default value of the
+  // experimenter's seconds field.
+  DURATION_SECS:        420,   // 7 minutes
+  CUSTOM_DURATION_SECS: 500,
   SUBJECT_CODE:      'TEST',
 
   // Baseline name — the experimenter's "name" dropdown. `label` is written to

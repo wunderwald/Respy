@@ -30,7 +30,7 @@ Two windows open:
 | **Use default calibration** | Appears only if calibration fails. Skips ahead using `CONFIG.DEFAULT_CAL_RANGE` instead of a measured range. |
 | **Data dir** | Folder for CSV output. Default: `iBreathData/` inside the app folder. |
 | **Signal type** | *Physiological* (default) or *Peaks only* — see [Input signal types](#input-signal-types) below. Locked immediately if a loaded preset defines it, otherwise locked once calibration begins. |
-| **Preset** | *None (sync only)* (default), one of the bundled presets, or *Browse…* for any other preset file — see [Presets](#presets) below. |
+| **Preset** | *iBreath — mixed questions* (default, loaded when the window opens), *None (sync only)*, one of the bundled presets, or *Browse…* for any other preset file — see [Presets](#presets) below. |
 | **Animation display** | Show a 5-second pre-trial animation before each trial begins. |
 | **Use eye tracking** | Off by default. When on, reveals a shared group with the rest of the eye-tracking controls and status — see [Eye tracking](#eye-tracking-eyelink) below. Locked immediately if a loaded preset defines it. |
 | **Start** | Begins calibration. Requires a connected resp stream. |
@@ -79,7 +79,7 @@ The `[READY]` step between trials is skipped when `AUTO_ADVANCE` is on. The `[DI
 
 ## Trial design
 
-- **30 trials** of **10 s** per session by default (the **Trials** / **Trial secs** fields), balanced in blocks of 2: 1 sync, 1 async.
+- **32 trials** (with the default preset; 30 with no preset) of **10 s** per session by default (the **Trials** / **Trial secs** fields), balanced in blocks of 2: 1 sync, 1 async.
 - **Synchronous trials** — cloud animation tracks the filtered breath signal (low-latency [breath filter](signal.md#breath-filter), ≈ 0.13–0.15 s behind the breath), rescaled into `[0, 1]` using the current signal range — taken from calibration, then drift-tracked (see [Signal range](#signal-range) below).
 - **Asynchronous trials** — cloud tracks the participant's own real-time breath signal, delayed by the current adaptive delay (see [Async delay staircase](#async-delay-staircase) below), then rescaled the same way as sync trials.
 - **Flash stimulus** (`FLASHING_IMAGE`) — a lightning image appears on 50 % of trials at a random time between `FLASH_TIME_MIN` and `FLASH_TIME_MAX` seconds into the trial, but always fully inside the trial (10 s trials: between 5 and 9.75 s).
@@ -275,7 +275,7 @@ A preset is a JSON file that bundles a set of iBreath settings — the experimen
   "description": "optional human-readable blurb",
   "inputSignalType": "physiological",
   "useEyeTracking": true,
-  "numTrials": 30,
+  "numTrials": 32,
   "trialDurationSecs": 10,
   "questions": [
     { "id": "sync",        "probability": 0.8, "text": "Hat der Fisch genau zu deinem Atem gepasst?", "answers": ["yes", "no"], "labels": ["ja", "nein"] },
@@ -291,7 +291,7 @@ Every field is optional except `questions`' internal shape (if `questions` is pr
 |---|---|
 | `inputSignalType` | `'physiological'` or `'peaksOnly'` — pre-fills and locks the **Signal type** control. Omit to leave it to the experimenter. |
 | `useEyeTracking` | `true` or `false` — pre-fills and locks the **Use eye tracking** checkbox (and applies it immediately, same as checking it by hand). Omit (or `null`) to leave it to the experimenter. |
-| `numTrials` | Whole number ≥ 1 — fills in the **Trials** field (still editable). Omit to leave the field as it is (default 30). An invalid value is ignored and a warning appears next to the preset selector. All bundled presets set `30`. |
+| `numTrials` | Whole number ≥ 1 — fills in the **Trials** field (still editable). Omit to leave the field as it is (default 30). An invalid value is ignored and a warning appears next to the preset selector. All bundled presets set `32`. |
 | `trialDurationSecs` | Whole number ≥ 1 — fills in the **Trial secs** field (still editable), same rules. All bundled presets set `10`. |
 | `questions` | Replaces `CONFIG.QUESTIONS` wholesale for the session (applied at Start). Omit to keep the built-in default (100% `sync`). |
 | `configOverrides` | Arbitrary `key: value` pairs applied directly onto `CONFIG` at Start (after resetting CONFIG to its hardcoded defaults, so a previous session's preset never silently lingers). Any key in [config.js](./modules/ibreath/config.js) can be overridden this way — this is how the iBeat presets carry their peak-envelope timings. The signal pipeline (smoother, peak envelope, async delay buffer) is rebuilt after the overrides are applied, so `PEAK_*` and `DELAY_VALUES_MS` overrides take effect too. |

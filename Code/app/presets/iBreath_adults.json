@@ -3,7 +3,7 @@
   "description": "Same question setup as iBreath_only_sync_question, with a placeholder question added at 20% probability (replace its text/answers before real use). Physiological (breath) input signal. Eye tracking activated.",
   "inputSignalType": "physiological",
   "useEyeTracking": true,
-  "numTrials": 30,
+  "numTrials": 32,
   "trialDurationSecs": 10,
   "questions": [
     { "id": "sync",        "probability": 0.8, "text": "Hat der Fisch genau zu deinem Atem gepasst?",   "answers": ["yes", "no"], "labels": ["ja", "nein"] },

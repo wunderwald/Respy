@@ -40,8 +40,8 @@ export default class Baseline {
   // Experimenter-supplied params (overridden on 'start' action)
   #subjectCode = CONFIG.SUBJECT_CODE;
   #name        = CONFIG.NAMES[0];       // { label, slug }
-  #fullVideo   = true;
-  #customSecs  = CONFIG.DURATION_SECS;
+  #fullVideo   = false;
+  #customSecs  = CONFIG.CUSTOM_DURATION_SECS;
 
   // Resolved at Start: end on the video's 'ended' event, or after #targetSecs.
   #endsWithVideo = false;
@@ -167,7 +167,7 @@ export default class Baseline {
         if (fullVideo !== undefined) this.#fullVideo = !!fullVideo;
         if (durationSecs !== undefined) {
           this.#customSecs = Number.isFinite(durationSecs) && durationSecs > 0
-            ? durationSecs : CONFIG.DURATION_SECS;
+            ? durationSecs : CONFIG.CUSTOM_DURATION_SECS;
         }
         this.#showInstructions();
         break;

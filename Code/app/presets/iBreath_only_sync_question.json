@@ -2,7 +2,7 @@
   "name": "iBreath_only_sync_question",
   "description": "Every trial asks only the sync-detection question. Physiological (breath) input signal. Eye tracking left to the experimenter controls.",
   "inputSignalType": "physiological",
-  "numTrials": 30,
+  "numTrials": 32,
   "trialDurationSecs": 10,
   "questions": [
     { "id": "sync", "probability": 1, "text": "Hat der Fisch genau zu deinem Atem gepasst?", "answers": ["yes", "no"], "labels": ["ja", "nein"] }
