@@ -55,4 +55,6 @@ time,value
 1.204,response
 ```
 
+**Time column** — instead of `time`, the stream CSVs written by `post/process_xdfs` also work. The first column found is used, in this order: `time`, `time_from_task_start`, `time_from_recording_start`, `timestamp`. Any other time column is ignored. In a marker file without a `value` column, the first non-time column holds the marker values. Load EEG and marker files exported together, so they share the same time base.
+
 Multiple marker files can be selected at once; their events are merged. Invalid files trigger a warning popup and are skipped.

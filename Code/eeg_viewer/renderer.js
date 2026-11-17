@@ -45,14 +45,29 @@ function arrMinMax(arr) {
 }
 
 // ── CSV parsers ───────────────────────────────────────────────────────────────
+// Recognised time columns, in order of preference. The relative columns written by
+// post/process_xdfs come before the absolute LSL "timestamp", so EEG and marker files
+// exported together share the same time base.
+const TIME_COLUMNS = ['time', 'time_from_task_start', 'time_from_recording_start', 'timestamp'];
+
+function findTimeIdx(headers) {
+  const lower = headers.map(h => h.toLowerCase());
+  for (const name of TIME_COLUMNS) {
+    const i = lower.indexOf(name);
+    if (i !== -1) return i;
+  }
+  throw new Error(`No time column found (expected one of: ${TIME_COLUMNS.join(', ')}).`);
+}
+
+const isTimeColumn = h => TIME_COLUMNS.includes(h.toLowerCase());
+
 function parseCSV(text) {
   const lines = text.replace(/\r/g, '').trim().split('\n');
   if (lines.length < 2) throw new Error('File has fewer than 2 rows.');
   const headers = lines[0].split(',').map(s => s.trim());
-  const timeIdx = headers.findIndex(h => h.toLowerCase() === 'time');
-  if (timeIdx === -1) throw new Error('No "time" column found.');
+  const timeIdx = findTimeIdx(headers);
   const chanNames = headers.filter((h, i) => {
-    if (i === timeIdx) return false;
+    if (i === timeIdx || isTimeColumn(h)) return false;
     // Drop pandas auto-index columns (empty header or "Unnamed: 0", "Unnamed: 0.1", …)
     if (h === '' || /^unnamed:\s*\d+$/i.test(h)) return false;
     return true;
@@ -80,10 +95,11 @@ function parseMarkerCSV(text) {
   const lines = text.replace(/\r/g, '').trim().split('\n');
   if (lines.length < 2) throw new Error('File has fewer than 2 rows.');
   const headers = lines[0].split(',').map(s => s.trim().toLowerCase());
-  const timeIdx = headers.indexOf('time');
-  const valIdx  = headers.indexOf('value');
-  if (timeIdx === -1 || valIdx === -1)
-    throw new Error('Required columns "time" and "value" not found.');
+  const timeIdx = findTimeIdx(headers);
+  // "value" column, or else the first non-time column (the marker channel of an exported stream)
+  let valIdx = headers.indexOf('value');
+  if (valIdx === -1) valIdx = headers.findIndex(h => h !== '' && !isTimeColumn(h));
+  if (valIdx === -1) throw new Error('No marker value column found.');
 
   const markers = [];
   for (let i = 1; i < lines.length; i++) {
