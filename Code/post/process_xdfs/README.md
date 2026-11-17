@@ -42,7 +42,10 @@ OUTPUT_DIR/<path>/<name>/
   Channel columns are named by the channel labels from the recording, or `ch0`, `ch1`, ... if there are none. A stream
   without samples in a task gets a header-only CSV and a warning in the task's `summary.txt`.
   Data outside of tasks is not exported.
-- Recordings without a marker stream only get `summary.txt`.
+- **Recordings without task marker pairs** (no marker stream, or no matching start/end) get no task folders; instead
+  the full recording of every stream is written to `<stream name>.csv` directly in `OUTPUT_DIR/<path>/<name>/`, with
+  `time_from_recording_start` (from the earliest timestamp of all streams) as second column. This is logged as a
+  warning and noted in `summary.txt`.
 - Output is written to a hidden `.<name>.partial` folder and renamed when complete, so an interrupted run never leaves
   a folder that would be skipped as processed.
 

@@ -3,7 +3,7 @@ import shutil
 
 import pyxdf
 
-from export_streams import safe_name, write_stream_csvs
+from export_streams import recording_start, safe_name, write_stream_csvs
 from stream_summary import slice_stream, summarize_streams, summarize_task
 from task_markers import (is_aborted, marker_streams, pair_task_markers, summarize_task_markers,
                           write_task_markers_csv)
@@ -36,7 +36,8 @@ PROCESSING
 def write_outputs(xdf_path, streams, out_dir):
     """Write the summary, the task markers and one folder per task (summary + stream CSVs) into out_dir.
 
-    Returns (number of tasks, number of unmatched task markers), or None if there is no marker stream.
+    Without any task marker pair, the stream CSVs of the full recording are written into out_dir instead.
+    Returns (number of tasks, number of unmatched task markers, whether there is a marker stream).
     """
     lines = [
         "=" * 70,
@@ -45,16 +46,19 @@ def write_outputs(xdf_path, streams, out_dir):
     lines += summarize_streams(streams)
 
     markers = marker_streams(streams)
-    if not markers:
-        lines += ["-" * 70, "No marker stream: no task markers, no task folders"]
+    pairs, unmatched = pair_task_markers(markers) if markers else ([], [])
+    if markers:
+        lines += summarize_task_markers(pairs, unmatched, TASK_MARKERS_NAME)
+        write_task_markers_csv(pairs, out_dir / TASK_MARKERS_NAME)
+
+    if not pairs:
+        reason = "No task marker pairs" if markers else "No marker stream"
+        lines += ["-" * 70, f"WARNING: {reason}: stream CSVs cover the full recording"]
         write_lines(out_dir / SUMMARY_NAME, lines)
-        return None
+        write_stream_csvs(streams, out_dir, t0=recording_start(streams), time_column="time_from_recording_start")
+        return 0, len(unmatched), bool(markers)
 
-    pairs, unmatched = pair_task_markers(markers)
-    lines += summarize_task_markers(pairs, unmatched, TASK_MARKERS_NAME)
     write_lines(out_dir / SUMMARY_NAME, lines)
-    write_task_markers_csv(pairs, out_dir / TASK_MARKERS_NAME)
-
     for pair in pairs:
         task_dir = out_dir / task_dir_name(pair)
         task_dir.mkdir()
@@ -62,7 +66,7 @@ def write_outputs(xdf_path, streams, out_dir):
         write_lines(task_dir / SUMMARY_NAME, summarize_task(pair, task_streams))
         write_stream_csvs(task_streams, task_dir, t0=pair["start_time"])
 
-    return len(pairs), len(unmatched)
+    return len(pairs), len(unmatched), True
 
 
 def process_recording(xdf_path, out_dir):
@@ -93,9 +97,12 @@ def process_recording(xdf_path, out_dir):
         shutil.rmtree(out_dir)
     tmp_dir.rename(out_dir)
 
-    if result is None:
-        log.info("  %d streams, no marker stream -> %s", len(streams), out_dir)
+    n_tasks, n_unmatched, has_markers = result
+    if not has_markers:
+        log.warning("  %d streams, no marker stream: exported the full recording -> %s", len(streams), out_dir)
+    elif not n_tasks:
+        log.warning("  %d streams, no task marker pairs (%d unmatched task markers): exported the full recording -> %s",
+                    len(streams), n_unmatched, out_dir)
     else:
-        n_tasks, n_unmatched = result
         log.info("  %d streams, %d tasks, %d unmatched task markers -> %s", len(streams), n_tasks, n_unmatched, out_dir)
     return True

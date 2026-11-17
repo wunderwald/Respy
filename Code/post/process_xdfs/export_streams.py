@@ -5,7 +5,7 @@ import numpy as np
 
 from stream_summary import channel_labels, info_value
 
-TIME_COLUMNS = ["timestamp", "time_from_task_start"]
+TIME_COLUMNS = ["timestamp", "time_from_task_start", "time_from_recording_start"]
 
 """
 HELPERS
@@ -27,8 +27,14 @@ def channel_columns(info, n_channels):
 """
 EXPORT
 """
-def write_stream_csv(stream, path, t0):
-    """Write one stream as CSV: timestamp, time_from_task_start (timestamp - t0), then one column per channel.
+def recording_start(streams):
+    """Return the earliest timestamp of all streams (0 if every stream is empty)."""
+    firsts = [s["time_stamps"][0] for s in streams if len(s["time_stamps"])]
+    return float(min(firsts)) if firsts else 0.0
+
+
+def write_stream_csv(stream, path, t0, time_column):
+    """Write one stream as CSV: timestamp, <time_column> (timestamp - t0), then one column per channel.
 
     Streams without samples get a header-only file.
     """
@@ -43,11 +49,11 @@ def write_stream_csv(stream, path, t0):
 
     with open(path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(TIME_COLUMNS + channel_columns(info, n_channels))
+        writer.writerow(["timestamp", time_column] + channel_columns(info, n_channels))
         writer.writerows([ts, round(ts - t0, 6), *sample] for ts, sample in zip(time_stamps, samples))
 
 
-def write_stream_csvs(streams, out_dir, t0):
+def write_stream_csvs(streams, out_dir, t0, time_column="time_from_task_start"):
     """Write every stream to <out_dir>/<stream name>.csv (see write_stream_csv).
 
     Duplicate names (case-insensitive, for macOS/Windows file systems) get a suffix: name_2, name_3, ...
@@ -60,4 +66,4 @@ def write_stream_csvs(streams, out_dir, t0):
             n += 1
             name = f"{base}_{n}"
         used.add(name.lower())
-        write_stream_csv(stream, out_dir / f"{name}.csv", t0)
+        write_stream_csv(stream, out_dir / f"{name}.csv", t0, time_column)
