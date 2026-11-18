@@ -26,6 +26,7 @@ Two windows open:
 | **Cal secs** | Calibration recording duration (default 10 s). |
 | **Trials** | Number of trials in the session (default `MAX_NUM_TRIALS`, 30). Filled in when the loaded preset defines `numTrials`, but stays editable — the value in the field at Start is used (whole number ≥ 1). Locked once calibration begins. A warning appears next to it if the number isn't a multiple of 4: left/right and pufferfish/starfish are balanced in blocks of 4, so other counts aren't exactly balanced (the session still runs). |
 | **Trial secs** | How long each trial shows the fish, in seconds (default `TRIAL_DURATION_SECS`, 10). The response window (up to `RESPONSE_TIMEOUT_SECS`, 5 s) comes on top. Filled in when the loaded preset defines `trialDurationSecs`, but stays editable (whole number ≥ 1). Locked once calibration begins; recorded in `trialData.csv` (`trialDurationSecs`). |
+| **Read out questions** | Reads each question aloud (German, local Piper TTS) when the answer screen appears — see [Question read-out](#question-read-out-tts). On by default when TTS is installed; unticked and disabled, with a warning next to it, when it isn't. Locked once calibration begins; recorded per trial (`questionAudio`). |
 | **Retry calibration** | Appears only if calibration fails (no signal received, or the signal was flat). Restarts the calibration recording. |
 | **Use default calibration** | Appears only if calibration fails. Skips ahead using `CONFIG.DEFAULT_CAL_RANGE` instead of a measured range. |
 | **Data dir** | Folder for CSV output. Default: `iBreathData/` inside the app folder. |
@@ -121,7 +122,18 @@ Configured in [ibreath_sound_config.js](../modules/ibreath/ibreath_sound_config.
 | Stimulus noise | During each trial | Generated **white noise** (`NOISE: 'white'`, a 10 s loop), its volume following the stimulus level: `NOISE_VOLUME_MIN` (0) at level 0 → `NOISE_VOLUME_MAX` (0.015, ≈ −41 dBFS) at level 1. In async trials it follows the delayed signal, like the animation. Set `NOISE` to a file path (e.g. `'sounds/breath.wav'`) to use a sample instead. |
 | Ambience (`sounds/ambience.wav`) | — | **Muted** (`AMBIENCE_VOLUME: 0`, not loaded); set a volume > 0 to bring it back as a steady background loop during trials |
 
-The trial sounds fade in and out over `FADE_SECS` (1 s). Calibration, ITI, the post-trial question and the flash image are silent.
+The trial sounds fade in and out over `FADE_SECS` (1 s). Calibration, ITI and the flash image are silent; the post-trial question is read out when **Read out questions** is on (`VOICE_VOLUME`, 1.0 — see below).
+
+### Question read-out (TTS)
+
+With **Read out questions** on, the question is spoken when the answer screen appears. The voice stops as soon as the child answers, and stops on Pause (it starts again from the beginning on resume, together with the response window).
+
+- **Engine:** [Piper](https://github.com/OHF-Voice/piper1-gpl) (`piper-tts`, local neural TTS) with the German voice `de_DE-kerstin-low`, run by the Electron main process ([modules/tts/ttsMain.js](../modules/tts/ttsMain.js), [render.py](../modules/tts/render.py)). Questions get a **rising end** (question intonation): over the last 0.6 s of voiced speech the pitch rises by up to 6 semitones, via Praat (`praat-parselmouth`) — Piper's voices otherwise fall at the end, like a statement.
+- **Install** (optional, once per machine, same on Windows and macOS): `npm run tts:setup` in `app/`. Needs Python ≥ 3.9 and internet. Creates `app/tts/` (git-ignored, ≈ 270 MB): a Python environment with the pinned packages ([requirements.txt](../modules/tts/requirements.txt)), the voice, and the audio cache. Re-running is safe; delete `app/tts/` to uninstall.
+- **Not installed:** the switch is off and disabled; the experimenter window says why. The task runs normally, silently.
+- **Pre-rendering:** the experimenter window renders the current question set right away — when it opens, on every preset switch and when the switch is turned on — so nothing is rendered at the answer screen. **While that runs, Start is disabled** and the status next to the switch says „⏳ preparing read-out (N questions)… Start is enabled when it's done". Switching presets (or the switch) mid-render is safe: renders run one at a time and only the newest one counts, so Start comes back once the *current* question set is ready. A failed render doesn't block Start (the questions stay silent; the status shows the error). Each text is rendered once (≈ 0.1 s, plus ≈ 0.3 s to load the voice) and cached in `app/tts/cache/` (one WAV per text and voice settings). At Start the scene window loads the session's questions from the cache. A question that can't be rendered stays silent (`questionAudio = unavailable`) and the experimenter window shows a warning.
+- **Settings** (`TTS` in [ttsMain.js](../modules/tts/ttsMain.js)): `VOICE`, `LENGTH_SCALE` (> 1 = slower), `RISE_SEMITONES` (0 = no rise), `RISE_SECS`. Changing them renders new audio (the cache key includes them).
+- **License:** `piper-tts` and `praat-parselmouth` are GPL-3 — fine for in-house use; check before distributing the app with them.
 
 ---
 
@@ -186,6 +198,7 @@ One row per trial, appended after each trial ends (or after the response screen)
 | `aborted` | `true` if the trial ended early — see `abortReason` |
 | `abortReason` | Why an aborted trial ended (empty otherwise): `experimenter` (Abort button / Escape), `gaze_lost` (inattention check), `pause` (Pause during the trial), `eye_calibration` (eye-tracker calibration started during the trial), `session_closed` (window closed mid-trial) |
 | `response` | One of that trial's question's two `answers` labels (e.g. `yes`/`no`, `left`/`right`, `fish0`/`fish1`), `timeout`, or `session_closed` if the window was closed during the trial or its question |
+| `questionAudio` | Question read-out: `spoken` (audio played), `off` (**Read out questions** off), `unavailable` (on, but no audio for this question), empty for aborted trials (no question) |
 | `flashImage` | Flash image name (`fish2`, from `FLASH_IMAGE`) or empty — only when `FLASHING_IMAGE` is on |
 | `flashScheduledTime` | Seconds into trial when flash was scheduled |
 | `flashX`, `flashY` | Flash position (normalised 0–1) |

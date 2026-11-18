@@ -28,6 +28,7 @@ export class RemoteHud {
     eyelinkState:        'offline',   // run_bridge.py status, or 'offline' while its control socket is closed
     eyelinkRecording:    false,
     eyelinkError:        '',
+    ttsWarning:          '',      // read-out (TTS) problem during the session
   };
   #subjectCode = 'TEST';
 
@@ -35,10 +36,10 @@ export class RemoteHud {
                 onRetryCalibration, onUseDefaultCalibration, onSetUseEyeTracking,
                 onEyelinkStartRecording, onEyelinkStopRecording }) {
     window.api.hud.onAction(({ type, subjectCode, value,
-                               debugGaze, inputSignalType, calibrationSecs, numTrials, trialDurationSecs, presetName, questions, configOverrides }) => {
+                               debugGaze, inputSignalType, calibrationSecs, numTrials, trialDurationSecs, readQuestions, presetName, questions, configOverrides }) => {
       if (subjectCode !== undefined) this.#subjectCode = subjectCode;
       switch (type) {
-        case 'start':           onStart({ debugGaze, inputSignalType, calibrationSecs, numTrials, trialDurationSecs, presetName, questions, configOverrides }); break;
+        case 'start':           onStart({ debugGaze, inputSignalType, calibrationSecs, numTrials, trialDurationSecs, readQuestions, presetName, questions, configOverrides }); break;
         case 'next':            onNext(); break;
         case 'abort':           onAbort(); break;
         case 'response':        onResponse?.(value); break;
@@ -73,6 +74,7 @@ export class RemoteHud {
   set eyelinkState(v)    { this.#snap.eyelinkState    = v; this.#push(); }
   set eyelinkRecording(v) { this.#snap.eyelinkRecording = v; this.#push(); }
   set eyelinkError(v)     { this.#snap.eyelinkError     = v; this.#push(); }
+  set ttsWarning(v)       { this.#snap.ttsWarning       = v; this.#push(); }
   set experimentStartedAt(v) { this.#snap.experimentStartedAt = v; this.#push(); }
   set stateTimer(v)          { this.#snap.stateTimer = v;          this.#push(); }
   get subjectCode()          { return this.#subjectCode; }

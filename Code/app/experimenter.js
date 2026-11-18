@@ -156,6 +156,9 @@ if (frontend === 'ibreath') {
     </select>
     <span id="s-preset-status" style="font-size:11px;opacity:0.6"></span>
     <span id="ib-preset-warning" class="preset-warning" style="display:none"></span>
+    <label title="Read each question aloud (German, local Piper TTS) when the answer screen appears">
+      <input type="checkbox" id="s-read-questions" disabled> read out questions</label>
+    <span id="s-tts-status" style="font-size:11px;opacity:0.6">checking TTS…</span>
   `;
 
   const stateEl            = document.getElementById('ib-state-text');   // in #timer-bar
@@ -193,6 +196,14 @@ if (frontend === 'ibreath') {
   const presetSelect      = document.getElementById('s-preset');
   const presetStatusEl    = document.getElementById('s-preset-status');
   const presetWarningEl   = document.getElementById('ib-preset-warning');
+  const readQuestionsBox  = document.getElementById('s-read-questions');
+  const ttsStatusEl       = document.getElementById('s-tts-status');
+  let ibLocked = false;   // settings locked (session started)
+  // Start needs both: the scene's go-ahead (stream / EyeLink ready) and no
+  // read-out rendering in progress (see prerenderQuestions).
+  let hudStartEnabled = false;
+  let ttsBusy = true;     // until the TTS status is known
+  const applyStartEnabled = () => subjectCheck.setStartEnabled(hudStartEnabled && !ttsBusy);
 
   // ── Clocks ──────────────────────────────────────────────────────────────────
 
@@ -238,7 +249,7 @@ if (frontend === 'ibreath') {
   window.api.hud.onState(({ stateText, stateColor, trialText, delayText, trialType,
                              startEnabled, nextVisible, abortVisible, pauseVisible, playVisible, inputsLocked,
                              experimentStartedAt: esa, stateTimer: st, gazeCalibrating: gc, calFailed,
-                             eyelinkState: es, eyelinkRecording: er, eyelinkError: ee }) => {
+                             eyelinkState: es, eyelinkRecording: er, eyelinkError: ee, ttsWarning: tw }) => {
     if (esa !== undefined) experimentStartedAt = esa;
     if (st  !== undefined) stateTimer          = st;
     if (stateText    !== undefined) stateEl.textContent        = stateText;
@@ -249,7 +260,7 @@ if (frontend === 'ibreath') {
       trialTypeEl.textContent  = trialType ? trialType.toUpperCase() : '—';
       trialTypeEl.dataset.type = trialType ?? '';
     }
-    if (startEnabled !== undefined) subjectCheck.setStartEnabled(startEnabled);
+    if (startEnabled !== undefined) { hudStartEnabled = startEnabled; applyStartEnabled(); }
     if (nextVisible  !== undefined) {
       nextBtn.style.display     = nextVisible ? '' : 'none';
       spaceHintEl.style.display = nextVisible ? '' : 'none';
@@ -265,11 +276,13 @@ if (frontend === 'ibreath') {
       eyelinkErrorEl.textContent   = ee ? `⚠ ${ee}` : '';
       eyelinkErrorEl.style.display = ee ? '' : 'none';
     }
+    if (tw) setTtsStatus(`⚠ ${tw}`, true);   // read-out problem during the session
     if (calFailed    !== undefined) {
       calRetryBtn.style.display   = calFailed ? '' : 'none';
       calDefaultBtn.style.display = calFailed ? '' : 'none';
     }
     if (inputsLocked !== undefined) {
+      ibLocked = inputsLocked;
       subjectInput.disabled       = inputsLocked;
       if (inputsLocked) subjectCheck.lock();
       if (inputsLocked) {
@@ -286,6 +299,7 @@ if (frontend === 'ibreath') {
 
   startBtn.addEventListener('click', () => {
     if (!subjectCheck.isValid()) return;   // the hint under the subject field says why
+    if (ttsBusy) return;                   // questions still rendering (status says so)
     const numTrials = parseTrialCount(numTrialsInput.value);
     if (numTrials == null) {   // the warning next to the field says why
       updateTrialsWarning();
@@ -308,6 +322,7 @@ if (frontend === 'ibreath') {
       calibrationSecs: parseInt(document.getElementById('s-cal-secs').value) || CONFIG.CALIBRATION_SECS,
       numTrials,
       trialDurationSecs,
+      readQuestions:   readQuestionsBox.checked,
       questions:       activePreset?.questions ?? null,
       configOverrides: activePreset?.configOverrides ?? null,
     });
@@ -421,7 +436,79 @@ if (frontend === 'ibreath') {
     updateTrialSecsWarning();
 
     updateSyncWarning(preset?.questions);
+    prerenderQuestions();   // this preset's questions, so Start doesn't wait for TTS
   }
+
+  // ── Read-out (TTS) ───────────────────────────────────────────────────────────
+  //
+  // Optional: needs Piper, installed by `npm run tts:setup` (not in git). If
+  // it's missing, the switch stays off and disabled and the status says why.
+  // Otherwise the current question set is rendered right away — on load, on
+  // every preset switch and when the switch is turned on — so the audio is
+  // cached before Start (the scene window loads it from the cache then).
+  // While that runs, Start is disabled. Switching presets (or the switch)
+  // mid-render is safe: the main process renders one request at a time,
+  // each call gets a sequence number, and only the newest one's result
+  // counts — Start comes back once the *current* question set is ready.
+
+  let ttsAvailable = false;
+  let ttsRenderSeq = 0;
+
+  function setTtsStatus(text, warn = false) {
+    ttsStatusEl.textContent = text;
+    ttsStatusEl.className   = warn ? 'preset-warning' : '';
+    ttsStatusEl.style.opacity = warn ? '' : '0.6';
+  }
+
+  function currentQuestions() {
+    return activePreset?.questions?.length ? activePreset.questions : CONFIG.QUESTIONS;
+  }
+
+  function setTtsBusy(busy) {
+    ttsBusy = busy;
+    applyStartEnabled();
+  }
+
+  async function prerenderQuestions() {
+    if (!ttsAvailable) return;
+    const seq = ++ttsRenderSeq;   // a newer call (preset switch, switch toggled) supersedes this one
+    if (!readQuestionsBox.checked) { setTtsStatus('read-out off'); setTtsBusy(false); return; }
+    const texts = currentQuestions().map((q) => q.text);
+    const n = `${texts.length} question${texts.length === 1 ? '' : 's'}`;
+    setTtsBusy(true);
+    setTtsStatus(`⏳ preparing read-out (${n})… Start is enabled when it's done`, true);
+    let res;
+    try {
+      res = await window.api.tts.prerender(texts);
+    } catch (e) {
+      res = { ok: false, errors: [e.message] };
+    }
+    if (seq !== ttsRenderSeq) return;   // superseded — the newer call manages status and Start
+    if (res.ok) setTtsStatus(`read-out ready (${n})`);
+    else setTtsStatus(`⚠ read-out failed: ${res.errors?.[0] ?? 'unknown error'} — questions stay silent`, true);
+    setTtsBusy(false);   // done either way: a failed render doesn't block the session
+  }
+
+  readQuestionsBox.addEventListener('change', prerenderQuestions);
+
+  (async () => {
+    let st;
+    try {
+      st = await window.api.tts.status();
+    } catch (e) {
+      st = { available: false, reason: e.message };
+    }
+    ttsAvailable = st.available;
+    if (!ttsAvailable) {
+      readQuestionsBox.checked = false;
+      setTtsStatus(`⚠ read-out unavailable: ${st.reason}`, true);
+      setTtsBusy(false);
+      return;
+    }
+    if (!ibLocked) readQuestionsBox.disabled = false;
+    readQuestionsBox.checked = true;
+    prerenderQuestions();
+  })();
 
   async function fetchBundledPreset(name) {
     const res = await fetch(`presets/${name}.json`);

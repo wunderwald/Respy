@@ -35,9 +35,18 @@ export class IBreathSound {
   // Display layer
   #jingle = null;          // LoopPlayer
 
+  // Question read-out
+  #voice = null;           // AudioBufferSourceNode
+  #ready = null;           // Promise — init() done
+
   // ── Init ──────────────────────────────────────────────────────────────────
 
-  async init() {
+  init() {
+    this.#ready ??= this.#init();
+    return this.#ready;
+  }
+
+  async #init() {
     await this.#engine.init();
     const [ambience, noise, jingle] = await Promise.all([
       CFG.AMBIENCE_VOLUME > 0 ? this.#engine.loadBuffer(CFG.AMBIENCE) : null,
@@ -115,6 +124,38 @@ export class IBreathSound {
       gain:      CFG.JINGLE_VOLUME,
       loopCount: CFG.JINGLE_LOOPS,
     });
+  }
+
+  // ── Question read-out ─────────────────────────────────────────────────────
+
+  // WAV bytes (Uint8Array) → AudioBuffer, or null if undecodable.
+  async decode(bytes) {
+    await this.init();
+    try {
+      const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      return await this.#engine.ctx.decodeAudioData(ab);
+    } catch (e) {
+      console.warn('[Sound] could not decode read-out audio:', e.message);
+      return null;
+    }
+  }
+
+  playVoice(buffer) {
+    this.stopVoice();
+    if (!buffer || !this.#engine.ctx) return;
+    this.#engine.resume();
+    const src  = this.#engine.ctx.createBufferSource();
+    const gain = this.#engine.createGain(CFG.VOICE_VOLUME);
+    src.buffer = buffer;
+    src.connect(gain).connect(this.#engine.destination);
+    src.onended = () => { gain.disconnect(); if (this.#voice === src) this.#voice = null; };
+    src.start();
+    this.#voice = src;
+  }
+
+  stopVoice() {
+    try { this.#voice?.stop(); } catch { /* already stopped */ }
+    this.#voice = null;
   }
 
   stopDisplay() {

@@ -1,0 +1,5 @@
+# Read-out of iBreath questions (local TTS). Installed into app/tts/venv by
+# `npm run tts:setup` — not needed otherwise. Pinned so every machine renders
+# with the same engine.
+piper-tts==1.8.0
+praat-parselmouth==0.4.7

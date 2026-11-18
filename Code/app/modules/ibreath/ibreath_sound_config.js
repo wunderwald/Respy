@@ -19,6 +19,7 @@ export const SOUND_CONFIG = {
   NOISE_VOLUME_MAX:  0.015, // noise gain at stimulus level 1 (≈ −41 dBFS; was 0.06, and 0.8 for breath.wav)
   WHITE_NOISE_SECS:  10,    // length of the generated noise loop (short loops repeat audibly)
   JINGLE_VOLUME:     0.6,
+  VOICE_VOLUME:      1.0,   // question read-out (TTS)
   JINGLE_LOOPS:      4,     // number of times to play the jingle per display phase
 
   // ── Timing ──────────────────────────────────────────────────────────────

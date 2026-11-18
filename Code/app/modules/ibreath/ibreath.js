@@ -92,6 +92,11 @@ export default class IBreath {
 
   // ── response (SHOW_QUESTIONS) ──────────────────────────────────────────
   #pendingTrial      = null;
+  // Question read-out (TTS): the experimenter's "read out questions" switch,
+  // and the decoded audio per question id (rendered + cached by the main
+  // process — modules/tts/ttsMain.js).
+  #readQuestions     = false;
+  #questionAudio     = new Map();
   #responseStartTime = null;
 
   // ── flash (FLASHING_IMAGE) ─────────────────────────────────────────────
@@ -282,7 +287,7 @@ export default class IBreath {
 
   // ── State machine ──────────────────────────────────────────────────────
 
-  #beginCalibration({ debugGaze, inputSignalType, calibrationSecs, numTrials, trialDurationSecs, presetName, questions, configOverrides } = {}) {
+  #beginCalibration({ debugGaze, inputSignalType, calibrationSecs, numTrials, trialDurationSecs, readQuestions, presetName, questions, configOverrides } = {}) {
     // Reset to the hardcoded defaults first so a previous session's preset
     // (configOverrides) never silently lingers into a session that loads no
     // preset, or a different one that doesn't mention the same keys.
@@ -300,6 +305,13 @@ export default class IBreath {
     // Trial duration from the "trial secs" field (a preset's
     // trialDurationSecs, or the experimenter's own value) — same rules.
     if (Number.isInteger(trialDurationSecs) && trialDurationSecs >= 1) CONFIG.TRIAL_DURATION_SECS = trialDurationSecs;
+
+    // Read-out: load this session's question audio in the background (the
+    // experimenter window has usually rendered it already — then it's only
+    // read from the cache). Ready long before the first answer screen.
+    this.#readQuestions = !!readQuestions && !!window.api?.tts;
+    this.#questionAudio = new Map();
+    if (this.#readQuestions) this.#loadQuestionAudio(CONFIG.QUESTIONS);
 
     this.#subjectCode = this.#hud.subjectCode;
     this.#trials = makeTrialParams(CONFIG.MAX_NUM_TRIALS);
@@ -521,6 +533,7 @@ export default class IBreath {
       this.#hud.stateTimer    = { startedAt: Date.now(), duration: CONFIG.RESPONSE_TIMEOUT_SECS };
       this.#hud.stateText     = 'respond…';
       this.#markers.send(`response_start_t${trial.trialIndex}`);
+      this.#startQuestionAudio(trial);
     } else {
       this.#csv.appendTrialData(trial);
       this.#trialData.push({ ...trial });
@@ -532,6 +545,7 @@ export default class IBreath {
     if (!this.#pendingTrial) return;
     const trial = this.#pendingTrial;
     this.#pendingTrial = null;
+    this.#sound.stopVoice();
 
     let response;
     if (side === 'timeout') {
@@ -610,6 +624,7 @@ export default class IBreath {
     }
 
     if (this.#pausedFromState === STATE.DISPLAY) this.#sound.stopDisplay();
+    this.#sound.stopVoice();   // a question being read out (replayed on resume)
 
     this.#pausedStateText = this.#hud.stateText;
     this.#pausedAt        = performance.now();
@@ -658,9 +673,12 @@ export default class IBreath {
       }
 
       case STATE.RESPONSE:
-        // Restart the response timeout from zero
+        // Restart the response timeout from zero — and the read-out with it
         this.#responseStartTime = performance.now();
         this.#state = STATE.RESPONSE;
+        if (this.#pendingTrial?.questionAudio === 'spoken') {
+          this.#sound.playVoice(this.#questionAudio.get(this.#pendingTrial.questionType));
+        }
         this.#hud.stateTimer   = { startedAt: Date.now(), duration: CONFIG.RESPONSE_TIMEOUT_SECS };
         this.#hud.pauseVisible = true;
         this.#hud.playVisible  = false;
@@ -934,6 +952,38 @@ export default class IBreath {
         }
       }
     }
+  }
+
+  // ── Question read-out (TTS) ────────────────────────────────────────────
+
+  // Renders (or takes from the cache) and decodes the audio for every
+  // question of this session. Questions without audio stay silent; the
+  // experimenter window shows a warning.
+  async #loadQuestionAudio(questions) {
+    try {
+      const res = await window.api.tts.prerender(questions.map((q) => q.text));
+      for (const q of questions) {
+        const file = res.files?.[q.text];
+        const read = file ? await window.api.tts.read(file) : null;
+        const buf  = read?.ok ? await this.#sound.decode(read.data) : null;
+        if (buf) this.#questionAudio.set(q.id, buf);
+      }
+      const missing = questions.filter((q) => !this.#questionAudio.has(q.id)).map((q) => q.id);
+      if (missing.length) {
+        this.#hud.ttsWarning = `read-out: no audio for ${missing.join(', ')}${res.errors?.[0] ? ` (${res.errors[0]})` : ''} — those questions stay silent`;
+      }
+    } catch (e) {
+      this.#hud.ttsWarning = `read-out failed: ${e.message} — questions stay silent`;
+    }
+  }
+
+  // Answer screen: read the question out, and record whether it was
+  // (trialData.csv questionAudio: spoken | off | unavailable).
+  #startQuestionAudio(trial) {
+    if (!this.#readQuestions) { trial.questionAudio = 'off'; return; }
+    const buf = this.#questionAudio.get(trial.questionType);
+    trial.questionAudio = buf ? 'spoken' : 'unavailable';
+    if (buf) this.#sound.playVoice(buf);
   }
 
   // Inattention check: eye tracking on, past the first GAZE_ABORT_MIN_SECS,

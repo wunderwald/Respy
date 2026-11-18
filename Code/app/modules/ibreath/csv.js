@@ -50,7 +50,7 @@ export class IBreathCSV {
     this.#trialHeader =
       'trialIndex,subject,questionType,synchronous,img,lr,stimX0,stimY0,stimX1,stimY1,delayMs,' +
       'rangeMin,rangeMax,breathFilter,trialDurationSecs,signalType,preset,calibration,ITI,startTime,endTime,aborted,abortReason' +
-      (CONFIG.SHOW_QUESTIONS ? ',response' : '') +
+      (CONFIG.SHOW_QUESTIONS ? ',response,questionAudio' : '') +
       (CONFIG.FLASHING_IMAGE ? ',flashImage,flashScheduledTime,flashX,flashY,flashShown' : '') + '\n';
   }
 
@@ -148,7 +148,7 @@ export class IBreathCSV {
       `${trial.endTime ?? ''},` +
       `${trial.aborted},` +
       `${trial.abortReason ?? ''}` +
-      (CONFIG.SHOW_QUESTIONS ? `,${trial.response ?? ''}` : '') +
+      (CONFIG.SHOW_QUESTIONS ? `,${trial.response ?? ''},${trial.questionAudio ?? ''}` : '') +
       (CONFIG.FLASHING_IMAGE
         ? `,${trial.flashImage ?? ''},${trial.flashTime ?? ''},` +
         `${trial.flashX ?? ''},${trial.flashY ?? ''},${trial.flashShown}`

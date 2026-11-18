@@ -9,7 +9,8 @@
     "visualizer":          "electron . --frontend=visualizer",
     "bioGame":             "electron . --frontend=bioGame",
     "baseline":            "electron . --frontend=baseline",
-    "beltTrainingGame":    "electron . --frontend=beltTrainingGame"
+    "beltTrainingGame":    "electron . --frontend=beltTrainingGame",
+    "tts:setup":           "node scripts/tts-setup.mjs"
   },
   "devDependencies": {
     "electron": "^42.4.0"

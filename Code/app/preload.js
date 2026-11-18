@@ -110,6 +110,17 @@ contextBridge.exposeInMainWorld("api", {
    */
   fileExists: (filePath) => ipcRenderer.invoke("file-exists", filePath),
 
+  // Text-to-speech (iBreath question read-out; Piper, optional — see
+  // modules/tts/ttsMain.js).
+  tts: {
+    // → { available, reason, voice }
+    status:    ()      => ipcRenderer.invoke('tts:status'),
+    // Renders what isn't cached yet → { ok, files: { text: wavPath }, errors }
+    prerender: (texts) => ipcRenderer.invoke('tts:prerender', texts),
+    // → { ok, data: Uint8Array } — a cached WAV file
+    read:      (wavPath) => ipcRenderer.invoke('tts:read', wavPath),
+  },
+
   // Scene window self-management
   window: {
     minimize: () => ipcRenderer.send('window:minimize'),

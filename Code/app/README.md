@@ -1,5 +1,7 @@
 # app
 
+> **⚠ License note — optional TTS.** The iBreath question read-out uses [`piper-tts`](https://github.com/OHF-Voice/piper1-gpl) and [`praat-parselmouth`](https://github.com/YannickJadoul/Parselmouth), both **GPL-3.0**, plus the Piper voice `de_DE-kerstin-low` (check its model card for its own terms). They are *not* part of this repository: `npm run tts:setup` downloads them into `app/tts/` (git-ignored) on each machine. Using them in-house for the study is fine. **Before distributing the app together with `app/tts/`** (e.g. sharing a ready-to-run copy, publishing, or giving it to another lab), check the GPL obligations — distributing GPL software requires providing its source and license, and may affect how the bundle as a whole can be licensed. Without `app/tts/`, the app has no GPL dependencies; the read-out is simply unavailable.
+
 Electron app for real-time respiration biofeedback experiments.
 
 Receives a normalized breath signal `[0, 1]` over WebSocket from `lsl_ws_bridge/` and renders one of several experiment frontends.
@@ -11,6 +13,14 @@ The tablet-deployed breath-training games (river crossing, breath runner) have m
 ```bash
 npm install
 ```
+
+Optional — reading out iBreath's questions (local German TTS, ≈ 270 MB, not in git; needs Python ≥ 3.9):
+
+```bash
+npm run tts:setup
+```
+
+See [iBreath › Question read-out](docs/ibreath.md#question-read-out-tts).
 
 ## Run
 

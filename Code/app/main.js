@@ -147,6 +147,20 @@ ipcMain.handle("read-file", (_event, filePath) => {
   }
 });
 
+// ── Text-to-speech (iBreath question read-out) ───────────────────────────────
+// Piper TTS, optional — see modules/tts/ttsMain.js. Rendering runs in a
+// child process, so the windows never wait on it.
+const tts = require("./modules/tts/ttsMain.js");
+ipcMain.handle("tts:status", () => tts.status());
+ipcMain.handle("tts:prerender", (_event, texts) => tts.prerender(texts));
+ipcMain.handle("tts:read", (_event, wavPath) => {
+  try {
+    return { ok: true, data: tts.read(wavPath) };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
 /**
  * file-exists
  * Checks whether a file exists at the given path, without reading its
