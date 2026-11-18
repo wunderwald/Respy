@@ -5,4 +5,5 @@
 Code/eeg_viewer/package-lock.json
 Code/eeg_viewer/package-lock.json
 Code/eyelink_to_lsl/session.edf
-
+# Local TTS for iBreath (npm run tts:setup) — downloaded, ~100 MB
+Code/app/tts/
