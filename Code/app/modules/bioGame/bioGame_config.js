@@ -8,6 +8,7 @@ export const CONFIG = {
   NATURAL_BPM:           18,
   NATURAL_BPM_RANGE:     [16, 20],
   SHOW_CURVE:            false,
+  SHOW_TIMER:            false, // time-left bar (top right) on the participant screen — hidden; true shows it again
   DATA_DIR:              'output_data/bio_game', // do not change
   SEND_MARKERS:          true,
   MARKER_STREAM_URL:     'ws://localhost:9001',

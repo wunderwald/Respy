@@ -35,7 +35,7 @@ Two windows open:
 
 There is only one scene, the ocean: it's always used (`bioGame_scene.js`, shared with beltTrainingGame).
 
-**On screen during a game:** the time-left bar (top right) is shown in both groups; the score counter (top left) only in the slow/target group.
+**On screen during a game:** the score counter (top left), only in the slow/target group. The time-left bar (top right) is hidden (`SHOW_TIMER: false` in `bioGame_config.js`); set it to `true` to show it again, in both groups.
 
 **Keyboard shortcuts** (experimenter window focused):
 - `Space` — advance (explanation screens → calibration / game)

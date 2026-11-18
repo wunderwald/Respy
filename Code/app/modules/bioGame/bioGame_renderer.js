@@ -372,8 +372,9 @@ export class BioGameRenderer {
       : 1;
     this.#drawAvatar(ctx, avatarScreenX, avatarScreenY, baseH * bumpScale, avatarTilt);
 
-    // Time-left bar: every game, both groups. The score counter is slow-group only.
-    this.#drawTimerBar(ctx, w, h, blockTime, now);
+    // Time-left bar: both groups, but only with CONFIG.SHOW_TIMER (hidden by
+    // default). The score counter is slow-group only.
+    if (CONFIG.SHOW_TIMER) this.#drawTimerBar(ctx, w, h, blockTime, now);
     if (group === 'slow') {
       this.#drawScoreDisplay(ctx, 18, 16, score, dt);
     }
