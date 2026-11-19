@@ -22,20 +22,21 @@ Two windows open:
 |---|---|
 | **Subject** | Type the subject code before pressing Start. Locked once calibration begins. Only letters, digits, `-` and `_` (empty = `TEST`); anything else shows a red hint under the field and disables Start. If data for this code already exists, an amber hint warns that Start will overwrite it (Start stays enabled). |
 | **Group** | *Target (slow 10 BPM)* — fish follows a `SLOW_BPM` (10 BPM) breath curve, starfish appear on that curve. *Control (natural)* — curve uses the participant's natural BPM (set the BPM field). |
-| **Natural BPM** | Only visible in the natural condition. Sets the target curve frequency. Filled in automatically from the subject's **Resting** baseline (the average of the methods in `output_data/baseline/<subject>_baseline_resting_estimates.csv` within 4–25 BPM; older recordings without a name: `<subject>_baseline_estimates.csv`), re-checked whenever the subject code changes. Other baselines (Post slow, …) are never used. If that average is outside `NATURAL_BPM_RANGE` (currently **16–20 BPM**), it is not used: the field is set to the default `NATURAL_BPM` (currently **18 BPM**) and an amber ⚠ warning next to it shows the rejected average. Without a Resting baseline, the field also starts at `NATURAL_BPM`; enter the value manually if needed (a typed value is kept when the subject code changes and no baseline is found). |
+| **Natural BPM** | Only visible in the natural condition. Sets the target curve frequency. Filled in automatically from the subject's **Resting** baseline (the average of the methods in `output_data/baseline/<subject>_baseline_resting_estimates.csv` within 4–25 BPM; older recordings without a name: `<subject>_baseline_estimates.csv`), re-checked whenever the subject code changes. Other baselines (Post slow, …) are never used. If that average is outside `NATURAL_BPM_RANGE` (currently **16–20 BPM**), it is not used: the field is set to the default `NATURAL_BPM` (currently **18 BPM**) and an amber ⚠ warning next to it shows the rejected average. **Start waits for the lookup:** after the subject code is typed, Start stays disabled (status: "looking up Resting baseline…") until that subject's baseline has been read, so a quick Start can't send the previous value; once the session has started, the field no longer changes. Without a Resting baseline, the field also starts at `NATURAL_BPM`; enter the value manually if needed (a typed value is kept when the subject code changes and no baseline is found). |
 | **Show target curve** | Overlays the sinusoidal target curve on screen (for debugging / operator monitoring). |
 | **Cal secs** | How many seconds to calibrate the breath signal (default 10 s). Calibration captures the participant's breathing range. |
 | **Retry calibration** | Appears only if calibration fails (no signal received, or the signal was flat). Restarts the calibration recording. |
 | **Use default calibration** | Appears only if calibration fails. Skips to the ready state using `CONFIG.DEFAULT_CAL_RANGE` instead of a measured range. |
 | **Data dir** | Folder where CSV files are saved. Click **…** to pick a different folder. Default: `bioGameData/` inside the app folder. |
 | **Score** | Live count of starfish collected in the current game. |
+| **Time left** | Countdown of the running game (m:ss), from the game's own clock; `—` between games. |
 | **Start** | Begins calibration. Requires a connected resp stream. |
 | **Start game 1** | Appears on the explanation screen after calibration. Starts the game (also triggered by Space). |
 | **Abort game** | Shown throughout the game (both groups). Ends the game and saves its data (`block_abort` event / marker); with one game that ends the task (`task_end_biogame`). Also triggered by Escape. |
 
 There is only one scene, the ocean: it's always used (`bioGame_scene.js`, shared with beltTrainingGame).
 
-**On screen during a game:** the score counter (top left), only in the slow/target group. The time-left bar (top right) is hidden (`SHOW_TIMER: false` in `bioGame_config.js`); set it to `true` to show it again, in both groups.
+**On screen during a game:** the star counter (top left), in both groups. The time-left bar (top right) is hidden (`SHOW_TIMER: false` in `bioGame_config.js`); set it to `true` to show it again, in both groups.
 
 **Keyboard shortcuts** (experimenter window focused):
 - `Space` — advance (explanation screens → calibration / game)

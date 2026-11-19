@@ -627,6 +627,10 @@ if (frontend === 'ibreath') {
       <span class="label">score</span>
       <span id="bg-score">—</span>
     </span>
+    <span title="Time left in the running game">
+      <span class="label">time left</span>
+      <span id="bg-time-left" style="font-variant-numeric:tabular-nums">—</span>
+    </span>
     <span id="ib-controls">
       <button id="bg-start-btn"       disabled>Start</button>
       <button id="bg-next-btn"        style="display:none">Start Game 2</button>
@@ -658,6 +662,16 @@ if (frontend === 'ibreath') {
   const bgNatBpmEl   = document.getElementById('bg-natural-bpm');
   const bgBpmSrcEl   = document.getElementById('bg-bpm-source');
   const bgScoreEl    = document.getElementById('bg-score');
+  const bgTimeLeftEl = document.getElementById('bg-time-left');
+
+  // Game countdown: the scene sends when the running game ends (blockEndsAt,
+  // wall-clock ms; null between games) — counted down here.
+  let bgBlockEndsAt = null;
+  setInterval(() => {
+    bgTimeLeftEl.textContent = bgBlockEndsAt == null
+      ? '—'
+      : fmtTime(Math.ceil(Math.max(0, bgBlockEndsAt - Date.now()) / 1000));
+  }, 250);
   const bgStartBtn      = document.getElementById('bg-start-btn');
   const bgNextBtn       = document.getElementById('bg-next-btn');
   const bgSpaceHintEl   = document.getElementById('bg-space-hint');
@@ -683,9 +697,21 @@ if (frontend === 'ibreath') {
   // Where the BPM came from is sent with Start and recorded in eventData.csv
   // (`natural_bpm_source`: baseline | fallback | manual | default, and
   // `baseline_bpm`: the Resting average, '' if none was found).
+  //
+  // Start waits for the lookup: from typing a subject code until its baseline
+  // has been read, Start is disabled. (Otherwise a quick Start sent the field's
+  // old value — the default — and the lookup filled in the estimate *after*
+  // the game had started.) Results for an outdated code are dropped, and
+  // once the session has started the field never changes again.
   const WARN_COLOR = 'rgba(255,190,60,0.95)';
   let bpmSource   = 'default';
   let baselineBpm = '';
+  let bgHudStartEnabled = false;
+  let bgLocked          = false;
+  let bpmLookupSeq      = 0;
+  let bpmLookupPending  = true;    // the initial lookup below
+  const bgApplyStart = () => bgSubjectCheck.setStartEnabled(bgHudStartEnabled && !bpmLookupPending);
+  const setBpmPending = (v) => { bpmLookupPending = v; bgApplyStart(); };
 
   // No usable baseline: back to the config default, unless the experimenter
   // typed a value (kept, so changing the subject code doesn't wipe it).
@@ -697,7 +723,19 @@ if (frontend === 'ibreath') {
   }
 
   async function tryLoadBaseline(subjectCode) {
-    const res = await loadNaturalBpm(subjectCode, window.api.readFile);
+    const seq = ++bpmLookupSeq;
+    let res;
+    try {
+      res = await loadNaturalBpm(subjectCode, window.api.readFile);
+    } catch {
+      res = { status: 'missing' };
+    }
+    if (seq !== bpmLookupSeq || bgLocked) return;   // outdated code, or the session already started
+    applyBaseline(subjectCode, res);
+    setBpmPending(false);
+  }
+
+  function applyBaseline(subjectCode, res) {
     bgBpmSrcEl.style.opacity = '';
 
     if (res.status === 'missing') {
@@ -745,6 +783,10 @@ if (frontend === 'ibreath') {
   let bpmLoadTimer = null;
   bgSubjectEl.addEventListener('input', () => {
     clearTimeout(bpmLoadTimer);
+    bpmLookupSeq++;          // an in-flight lookup is for the old code now
+    setBpmPending(true);
+    bgBpmSrcEl.textContent = `looking up ${RESTING.label} baseline…`;
+    bgBpmSrcEl.style.color = '';
     bpmLoadTimer = setTimeout(
       () => tryLoadBaseline(bgSubjectEl.value.trim() || 'TEST'),
       400
@@ -755,10 +797,11 @@ if (frontend === 'ibreath') {
   // ── Receive state from scene window ─────────────────────────────────────────
 
   window.api.frontend.onState(({ stateText, score, startEnabled, startText, nextText,
-                                  nextVisible, abortVisible, calFailed, inputsLocked, warning }) => {
+                                  nextVisible, abortVisible, calFailed, inputsLocked, warning, blockEndsAt }) => {
     if (stateText    !== undefined) bgStatusEl.textContent      = stateText;
+    if (blockEndsAt  !== undefined) bgBlockEndsAt               = blockEndsAt;
     if (score        != null)       bgScoreEl.textContent       = score;
-    if (startEnabled !== undefined) bgSubjectCheck.setStartEnabled(startEnabled);
+    if (startEnabled !== undefined) { bgHudStartEnabled = startEnabled; bgApplyStart(); }
     if (startText    !== undefined) bgStartBtn.textContent      = startText;
     if (nextText     !== undefined) bgNextBtn.textContent       = nextText;
     if (warning      !== undefined) {
@@ -775,6 +818,8 @@ if (frontend === 'ibreath') {
       bgCalDefaultBtn.style.display = calFailed ? '' : 'none';
     }
     if (inputsLocked !== undefined && inputsLocked) {
+      bgLocked = true;
+      clearTimeout(bpmLoadTimer);
       bgSubjectEl.disabled = true;
       bgSubjectCheck.lock();
       bgGroupEl.disabled   = true;
@@ -791,6 +836,7 @@ if (frontend === 'ibreath') {
 
   bgStartBtn.addEventListener('click', () => {
     if (!bgSubjectCheck.isValid()) return;   // the hint under the subject field says why
+    if (bpmLookupPending) return;            // baseline lookup for this code still running
     window.api.frontend.sendAction({
       type:            'start',
       subjectCode:     bgSubjectCheck.code(),

@@ -799,6 +799,13 @@ export default class BioGame {
       calFailed:    this.#state === STATE.CALIBRATING && this.#calFailed,
       inputsLocked: this.#inputsLocked,
       warning:      this.#warning,
+      // Wall-clock time (Date.now() ms) the running game ends — the
+      // experimenter's "time left" countdown; null when no game is running.
+      // The game clock follows the wall clock, so this stays accurate; it is
+      // refreshed with every push (score changes, state changes).
+      blockEndsAt:  this.#state === STATE.PLAYING
+        ? Date.now() + (CONFIG.BLOCK_DURATION_SECS - this.#blockTime) * 1000
+        : null,
       ...overrides,
       stateText:    this.#stateText,
     });
