@@ -157,6 +157,13 @@ class LSLPeakRecorder:
         Length of the calibration recording when ``threshold`` is ``None``.
     """
 
+    #: Read by Cardioception >= 0.7.2. Anything but "ppg" skips the pulse
+    #: oximeter screens and finger question in the HRD tutorial, and shows the
+    #: "stay still" text instead of the oximeter one when no beats are found.
+    #: It would also select the ECG beat detector, but run.py replaces
+    #: detect_beats with the rising edges.
+    signal_type = "ecg"
+
     def __init__(
         self,
         info: StreamInfo,
@@ -296,7 +303,7 @@ class LSLPeakRecorder:
     ) -> Tuple[np.ndarray, np.ndarray]:
         """Last ``window_s`` seconds as (signal, peaks) on a ``new_sfreq`` grid.
 
-        This is the shape ``systole.detection.ppg_peaks(..., new_sfreq=1000)``
+        This is the shape Cardioception's ``detect_beats(..., new_sfreq=1000)``
         returns, which the HRD task turns into BPM with
         ``60000 / np.diff(np.where(peaks[-5000:])[0])``. Beats come from the
         rising edges, not from re-detecting them in the signal.
@@ -416,15 +423,16 @@ class LSLPeakRecorder:
         return threshold
 
 
-def make_ppg_peaks(recorder: LSLPeakRecorder) -> Callable:
-    """Replacement for ``ppg_peaks`` inside ``cardioception.HRD.task``.
+def make_detect_beats(recorder: LSLPeakRecorder) -> Callable:
+    """Replacement for ``detect_beats`` inside ``cardioception.HRD.task``.
 
-    The task calls ``ppg_peaks(signal, sfreq=75, new_sfreq=1000, clipping=True)``
+    The task calls ``detect_beats(signal, sfreq, signal_type, new_sfreq=1000)``
     on the last 6 s it read from the recorder. The signal it passes is ignored;
     the beats come from the recorder's rising edges.
     """
 
-    def ppg_peaks(signal=None, sfreq=None, new_sfreq: int = 1000, **_):
+    def detect_beats(signal=None, sfreq=None, signal_type=None,
+                     new_sfreq: int = 1000, **_):
         return recorder.peak_vector(window_s=6.0, new_sfreq=new_sfreq)
 
-    return ppg_peaks
+    return detect_beats

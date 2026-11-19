@@ -18,8 +18,10 @@ source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Cardioception is pinned to a GitHub commit, not the PyPI release: 0.7.1 on PyPI
-freezes the confidence slider on macOS in mouse mode (upstream issue #103).
+Cardioception is pinned to 0.7.2 from PyPI. It is the first release with German
+instructions (HRD and HBC) and fixes the confidence slider freezing on macOS in
+mouse mode (upstream issue #103). An existing venv on 0.7.1 is upgraded by
+running `pip install -r requirements.txt` again.
 
 ## Run
 
@@ -28,6 +30,8 @@ freezes the confidence slider on macOS in mouse mode (upstream issue #103).
 3. In the dialog, pick the task and the **Peak stream**. The first stream with
    "peak" in its name is preselected; choose *Rescan for streams...* if it isn't
    listed yet.
+4. **Language** defaults to German. HRD also offers English, Danish, Danish
+   (children) and French; HBC only German and English.
 
 Results are written to `./data/<participant><session>/` as usual.
 
@@ -56,16 +60,17 @@ raw ECG channel offline.
 systole's `Oximeter` the tasks use (`setup`, `read`, `readInWaiting`, `waitBeat`,
 `save`, `channels["Channel_0"]`).
 
-[`run.py`](run.py) — the dialog, plus three patches:
+[`run.py`](run.py) — the dialog, and the hookup:
 
 | Where | What | Why |
 |---|---|---|
-| `HRD.parameters`, `HBC.parameters`: `serial`, `Oximeter` | Return the LSL recorder, only during `getParameters()` | Keeps `setup="behavioral"`: full screen and the real-data code paths |
-| `HRD.task.ppg_peaks` | Return the last 6 s of pulse-edge beats on a 1 kHz grid | The task estimates each trial's heart rate with `ppg_peaks()` on the signal it read; the BPM line after it is unchanged |
-| `texts["checkOximeter"]` (English) | ECG wording | Shown when no beats are found |
+| `getParameters(recorder=...)` (HRD and HBC) | The LSL recorder, through Cardioception's own argument | Replaces the oximeter without opening a serial port; `setup="behavioral"` still gives full screen and the real-data code paths |
+| `LSLPeakRecorder.signal_type = "ecg"` | Read by Cardioception | The HRD tutorial skips the pulse-oximeter screens and finger question; "stay still" is shown instead of the oximeter text when no beats are found |
+| `HRD.task.detect_beats` (patched) | Return the last 6 s of pulse-edge beats on a 1 kHz grid | The task estimates each trial's heart rate with `detect_beats()` on the signal it read; the BPM line after it is unchanged |
 
-`run.py` checks the patched names still exist and warns if the Cardioception
-version is not 0.7.1. Re-check the patches before changing the pin.
+`run.py` checks that `detect_beats` and the `recorder` argument exist and warns
+if the Cardioception version is not 0.7.2. Re-check the patch before changing
+the pin.
 
 ## Event markers
 
@@ -103,7 +108,5 @@ For this data, use the `peaks` column or the edges instead.
 
 ## Known issues
 
-- The HRD tutorial still shows the pulse-oximeter screens and asks which finger
-  the sensor is on. Answer anything. The tutorial can be switched off in the dialog.
 - Beat detection quality is set by the FRO configuration in LabChart. The only
   checks here are the refractory period and Cardioception's 40–120 BPM cutoff.
