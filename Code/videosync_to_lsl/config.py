@@ -7,7 +7,7 @@ LISTEN_PORT = 40007
 
 # Enter these exactly as "Start Signal" / "Stop Signal" in VideoSync Pro.
 START_SIGNAL = "video_start"
-STOP_SIGNAL = "video_stop"
+STOP_SIGNAL = "video_end"
 
 
 # ── LSL ───────────────────────────────────────────────────────────────────────
