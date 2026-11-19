@@ -37,6 +37,9 @@ function startBridges() {
     const scriptPath = path.join(__dirname, "..", ...script);
     const proc = spawn(venvPython, [scriptPath], {
       stdio: ["ignore", "pipe", "pipe"],
+      // UTF-8 for piped output: on Windows Python otherwise uses cp1252 and
+      // logging fails on non-ASCII characters such as "→".
+      env: { ...process.env, PYTHONUTF8: "1" },
     });
 
     proc.stdout.on("data", (d) =>
