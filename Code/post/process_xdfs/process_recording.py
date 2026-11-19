@@ -7,9 +7,11 @@ from export_streams import recording_start, safe_name, write_stream_csvs
 from stream_summary import slice_stream, summarize_streams, summarize_task
 from task_markers import (is_aborted, marker_streams, pair_task_markers, summarize_task_markers,
                           write_task_markers_csv)
+from video_times import find_videos, is_video_stream, summarize_videos, video_time_rows, write_video_times_csv
 
 SUMMARY_NAME = "summary.txt"
 TASK_MARKERS_NAME = "task_markers.csv"
+VIDEO_TIMES_NAME = "video_times.csv"
 
 """
 LOGGING
@@ -52,6 +54,12 @@ def write_outputs(xdf_path, streams, out_dir, executor=None):
         lines += summarize_task_markers(pairs, unmatched, TASK_MARKERS_NAME)
         write_task_markers_csv(pairs, out_dir / TASK_MARKERS_NAME)
 
+        videos = find_videos(markers)
+        if videos:
+            rows = video_time_rows(markers, videos)
+            lines += summarize_videos(videos, rows, VIDEO_TIMES_NAME)
+            write_video_times_csv(rows, out_dir / VIDEO_TIMES_NAME)
+
     if not pairs:
         reason = "No task marker pairs" if markers else "No marker stream"
         lines += ["-" * 70, f"WARNING: {reason}: stream CSVs cover the full recording"]
@@ -64,7 +72,9 @@ def write_outputs(xdf_path, streams, out_dir, executor=None):
     for pair in pairs:
         task_dir = out_dir / task_dir_name(pair)
         task_dir.mkdir()
-        task_streams = [slice_stream(s, pair["start_time"], pair["end_time"]) for s in streams]
+        # The video start/stop markers lie outside of tasks (see video_times.csv instead)
+        task_streams = [slice_stream(s, pair["start_time"], pair["end_time"])
+                        for s in streams if not is_video_stream(s)]
         write_lines(task_dir / SUMMARY_NAME, summarize_task(pair, task_streams))
         write_stream_csvs(task_streams, task_dir, t0=pair["start_time"], executor=executor)
 

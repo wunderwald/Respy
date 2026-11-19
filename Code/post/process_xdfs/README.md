@@ -34,6 +34,7 @@ For `INPUT_DIR/<path>/<name>.xdf`:
 OUTPUT_DIR/<path>/<name>/
   summary.txt             stream summary (type, format, shape, srate, duration, labels) + task marker pairs
   task_markers.csv        task_name, index, start_marker, end_marker, start_time, end_time; one row per pair
+  video_times.csv         only with VideoSync Pro videos: every marker with its video and time in the video
   <task>_<index>/         one folder per task, e.g. rest_1, breathing_game_2_aborted
     summary.txt           task times + stream summary of the data within the task
     <stream name>.csv     timestamp, time_from_task_start, one column per channel
@@ -46,6 +47,11 @@ OUTPUT_DIR/<path>/<name>/
   Channel columns are named by the channel labels from the recording, or `ch0`, `ch1`, ... if there are none. A stream
   without samples in a task gets a header-only CSV and a warning in the task's `summary.txt`.
   Data outside of tasks is not exported.
+- **Videos** are found from the `video_record_start` / `video_record_stop` markers of the `VideoSyncMarkers` stream
+  (see [videosync_to_lsl](../../videosync_to_lsl/)). `video_times.csv` lists every marker of the other marker
+  streams with `video_index`, `video_time` (seconds from that video's start) and `video_timecode` (`H:MM:SS.mmm`),
+  or empty video columns if no video was recording. The videos are listed in `summary.txt`. The `VideoSyncMarkers`
+  stream is left out of the task folders.
 - **Recordings without task marker pairs** (no marker stream, or no matching start/end) get no task folders; instead
   the full recording of every stream is written to `<stream name>.csv` directly in `OUTPUT_DIR/<path>/<name>/`, with
   `time_from_recording_start` (from the earliest timestamp of all streams) as second column. This is logged as a
@@ -63,3 +69,4 @@ OUTPUT_DIR/<path>/<name>/
 | `stream_summary.py` | stream and task summaries, cutting streams to a time window |
 | `task_markers.py` | finding marker streams, pairing task markers, task marker table/CSV |
 | `export_streams.py` | writing streams to CSV |
+| `video_times.py` | finding VideoSync Pro videos, converting marker times to video times |

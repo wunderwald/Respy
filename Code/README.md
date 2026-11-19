@@ -30,4 +30,4 @@ Multiple machines can stream data to LSL simultaneously. Only the stream selecte
 | [eyelink_to_lsl/](eyelink_to_lsl/) | SR Research EyeLink → LSL bridge |
 | [labchart_to_lsl/](labchart_to_lsl/) | Windows-only LabChart → LSL forwarding module |
 | [raspi/](raspi/) | Raspberry Pi analog-to-LSL script |
-| [lsl_to_videosync/](lsl_to_videosync/) | Forwards LSL markers to Mangold VideoSync Pro (UDP External Marker) |
+| [videosync_to_lsl/](videosync_to_lsl/) | Mangold VideoSync Pro recording start/stop (UDP signal) → LSL markers |
