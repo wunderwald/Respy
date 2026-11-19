@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { enterFullscreen } from './fullscreen.js';
 import { exportRun } from '../recording/runExport.js';
+import { startAutoFlush } from '../recording/dataApi.js';
 import './gamePage.css';
 
 export function TapGamePage({ GameClass }) {
@@ -11,6 +12,9 @@ export function TapGamePage({ GameClass }) {
   const gameRef = useRef(null);
 
   const [state, setState] = useState('idle');
+
+  // Upload any runs still queued on this device (also retries periodically).
+  useEffect(() => { startAutoFlush(); }, []);
 
   useEffect(() => {
     const game = new GameClass({

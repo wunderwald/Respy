@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   micSupport, micSupportMessage, queryMicPermission, requestMicPermission,
 } from '../shared/mic/micPermission.js';
+import { onUploadStatus, flushPending, startAutoFlush } from '../shared/recording/dataApi.js';
 import './launcher.css';
 
 // Direct navigation to each game's own standalone HTML entry — the web
@@ -91,6 +92,48 @@ function MicStatus({ mic, errorMsg, onRequest }) {
   }
 }
 
+// Runs recorded on this device that the data server hasn't confirmed yet.
+// Hidden when nothing is pending.
+function UploadStatus() {
+  const [status, setStatus] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    startAutoFlush();
+    return onUploadStatus(setStatus);
+  }, []);
+
+  if (!status || status.pending === 0) return null;
+  const n = status.pending;
+  const runs = n === 1 ? '1 Durchgang' : `${n} Durchgänge`;
+
+  if (!status.configured) {
+    return (
+      <p className="upload-status">
+        {runs} auf diesem Gerät gespeichert – Server-URL noch nicht eingetragen.
+      </p>
+    );
+  }
+
+  const upload = async () => {
+    setBusy(true);
+    await flushPending();
+    setBusy(false);
+  };
+
+  return (
+    <div className="upload-status">
+      <p>
+        {runs} noch nicht hochgeladen
+        {status.lastError ? ` (Fehler: ${status.lastError})` : ''}.
+      </p>
+      <button className="mic-btn" onClick={upload} disabled={busy}>
+        {busy ? 'Wird hochgeladen…' : 'Jetzt hochladen'}
+      </button>
+    </div>
+  );
+}
+
 export function Launcher() {
   const { mic, errorMsg, request } = useMicPermissionGate();
   const micReady = mic === 'granted';
@@ -109,6 +152,7 @@ export function Launcher() {
             <a key={g.href} className="card" href={g.href}>{g.label}</a>
           )))}
         </main>
+        <UploadStatus />
       </div>
     </div>
   );

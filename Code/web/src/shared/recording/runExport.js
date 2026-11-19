@@ -1,7 +1,8 @@
 // runExport — assembles a finished run's full JSON document (game data +
-// session/device context) and downloads it. For now the browser download is
-// the only sink; uploading to a server later only needs a different sink for
-// the same document.
+// session/device context) and hands it to dataApi, which queues it on the
+// device and uploads it to the data server (→ MySQL).
+
+import { submitRun } from './dataApi.js';
 
 export const SCHEMA_VERSION = 1;
 
@@ -38,28 +39,8 @@ export function deviceInfo() {
   };
 }
 
-function fileStamp(iso) {
-  // local time, filesystem-safe: 2026-11-16_14-03-27
-  const d = new Date(iso);
-  const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-    + `_${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;
-}
-
-export function downloadJson(filename, data) {
-  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
-}
-
 /**
- * Build the export document for a finished run and download it.
+ * Build the document for a finished run and submit it for upload.
  * @param {object} runData  from the game's getRunData() — must contain
  *                          game, variant, time, config, detection, summary,
  *                          events, timeseries
@@ -71,6 +52,7 @@ export function exportRun(runData, context = {}) {
   const { game, variant, time, config, detection, summary, events, timeseries } = runData;
   const doc = {
     schema_version: SCHEMA_VERSION,
+    run_id: newId(),  // unique per run — the server dedupes retried uploads on it
     game,
     variant,
     session_id: SESSION_ID,
@@ -85,5 +67,5 @@ export function exportRun(runData, context = {}) {
     events,
     timeseries,
   };
-  downloadJson(`${game}_${variant}_${fileStamp(time.started_at)}.json`, doc);
+  submitRun(doc);
 }

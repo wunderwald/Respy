@@ -21,6 +21,14 @@ npm run dev:chromeDinoGame       # Breath Runner
 
 The launcher requests microphone permission on load; mic games stay locked until it's granted.
 
+## Run data → MySQL
+
+Each finished River Crossing run (breath and tap) is sent as one JSON document to a data endpoint that stores it in MySQL.
+
+- **Endpoint URL:** set `VITE_DATA_API_URL` in [`.env`](.env), then restart `npm run dev` or rebuild. It's currently a placeholder (`*.invalid`), which counts as "not configured".
+- **Never lost:** runs are queued on the device in IndexedDB and only removed once the server confirms them. The queue is retried on page load, when the device comes back online, every 60 s, and after each run. The launcher shows how many runs are still waiting, with an upload button.
+- **Endpoint contract and table schema:** [`server/README.md`](server/README.md) and [`server/schema.sql`](server/schema.sql).
+
 ## Build
 
 ```bash

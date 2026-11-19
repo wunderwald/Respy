@@ -8,6 +8,7 @@ import { useMicBreathSignal } from '../mic/useMicBreathSignal.js';
 import { MicCalibration } from '../calibration/MicCalibration.jsx';
 import { enterFullscreen } from './fullscreen.js';
 import { exportRun } from '../recording/runExport.js';
+import { startAutoFlush } from '../recording/dataApi.js';
 import './gamePage.css';
 
 export function GamePage({ GameClass }) {
@@ -21,6 +22,9 @@ export function GamePage({ GameClass }) {
 
   const [state, setState] = useState('idle');
   const [calibrating, setCalibrating] = useState(false);
+
+  // Upload any runs still queued on this device (also retries periodically).
+  useEffect(() => { startAutoFlush(); }, []);
 
   useEffect(() => {
     const game = new GameClass({

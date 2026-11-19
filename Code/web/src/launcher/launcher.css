@@ -134,3 +134,15 @@ main {
     padding: 0 16px;
   }
 }
+
+.upload-status {
+  margin: 0;
+  max-width: 440px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #9a6a80;
+}
+
+.upload-status p {
+  margin: 0 0 10px;
+}
