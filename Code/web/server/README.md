@@ -33,11 +33,12 @@ so the endpoint's request size limit must allow at least 5 MB to be safe.
 1. Parse the JSON body and check that `run_id`, `session_id`, `game`,
    `variant` and `time.started_at` are present. If not, respond with
    **400**.
-2. Insert one row into `game_runs`, copying the key fields into their columns
-   and storing the whole body in `data`. Use
-   `INSERT … ON DUPLICATE KEY UPDATE id = id` so that a run uploaded twice is
-   stored once.
-3. Respond with **201** (stored) or **200** (already stored).
+2. Insert one row into `game_runs` with a plain `INSERT`, copying the key
+   fields into their columns and storing the whole body in `data`.
+3. Respond with **201** if the row was stored. If the insert fails with a
+   duplicate-key error (MySQL error 1062, same `run_id`), the run was already
+   stored by an earlier attempt: respond with **200**. This way the database
+   account the endpoint uses only needs the `INSERT` privilege.
 
 How the frontend treats responses:
 
