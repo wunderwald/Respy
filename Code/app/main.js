@@ -3,7 +3,7 @@ const path = require("path");
 const fs = require("fs");
 const { spawn } = require("child_process");
 
-let bridgeProcess  = null;
+let bridgeProcesses = [];
 let mainWindow     = null;
 let controlWindow  = null;
 let launcherWindow = null;
@@ -12,41 +12,55 @@ let launcherWindow = null;
 // picked from the launcher, and ending one returns to it instead of quitting.
 let launcherMode = false;
 
-// ── Python bridge ────────────────────────────────────────────────────────────
+// ── Python bridges ───────────────────────────────────────────────────────────
+//
+// Both run for the app's whole lifetime (across launcher sessions), so their
+// LSL outlets stay open for one continuous LabRecorder recording.
+//   bridge     lsl_ws_bridge/main.py            LSL ⇄ WebSocket, RespFishMarkers outlet
+//   videosync  videosync_to_lsl/videosync_to_lsl.py   VideoSync Pro UDP → VideoSyncMarkers
 
-function startBridge() {
-  // Use the venv Python; fall back to system python3
+const BRIDGES = [
+  { label: "bridge",    script: ["lsl_ws_bridge", "main.py"] },
+  { label: "videosync", script: ["videosync_to_lsl", "videosync_to_lsl.py"] },
+];
+
+function startBridges() {
+  // Shared venv at the repo root
   const venvPython = process.platform === "win32"
   ? path.join(
     __dirname, "..", ".venv", "Scripts", "python.exe"
   ) : path.join(
     __dirname, "..", ".venv", "bin", "python3"
   );
-  const bridgeScript = path.join(__dirname, "..", "lsl_ws_bridge", "main.py");
 
-  bridgeProcess = spawn(venvPython, [bridgeScript], {
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  for (const { label, script } of BRIDGES) {
+    const scriptPath = path.join(__dirname, "..", ...script);
+    const proc = spawn(venvPython, [scriptPath], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
 
-  bridgeProcess.stdout.on("data", (d) =>
-    console.log("[bridge]", d.toString().trimEnd())
-  );
-  bridgeProcess.stderr.on("data", (d) =>
-    console.error("[bridge]", d.toString().trimEnd())
-  );
-  bridgeProcess.on("exit", (code) =>
-    console.log("[bridge] exited with code", code)
-  );
-  bridgeProcess.on("error", (err) =>
-    console.error("[bridge] failed to start:", err.message)
-  );
+    proc.stdout.on("data", (d) =>
+      console.log(`[${label}]`, d.toString().trimEnd())
+    );
+    proc.stderr.on("data", (d) =>
+      console.error(`[${label}]`, d.toString().trimEnd())
+    );
+    proc.on("exit", (code) =>
+      console.log(`[${label}] exited with code`, code)
+    );
+    proc.on("error", (err) =>
+      console.error(`[${label}] failed to start:`, err.message)
+    );
+
+    bridgeProcesses.push(proc);
+  }
 }
 
-function killBridge() {
-  if (bridgeProcess && !bridgeProcess.killed) {
-    bridgeProcess.kill();
-    bridgeProcess = null;
+function killBridges() {
+  for (const proc of bridgeProcesses) {
+    if (!proc.killed) proc.kill();
   }
+  bridgeProcesses = [];
 }
 
 // ── IPC: File I/O ────────────────────────────────────────────────────────────
@@ -431,7 +445,7 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 app.whenReady().then(() => {
   setupPermissions();
-  startBridge();
+  startBridges();
 
   // `--frontend=<name>` (used by the npm scripts — works on every platform),
   // or the FRONTEND env var as a fallback.
@@ -461,8 +475,8 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
-  killBridge();
+  killBridges();
   app.quit();
 });
 
-app.on("before-quit", killBridge);
+app.on("before-quit", killBridges);

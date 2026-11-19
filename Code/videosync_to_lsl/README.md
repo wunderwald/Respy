@@ -18,7 +18,7 @@ Purpose: the video is only used to check what happened in the lab when something
 |---|---|
 | `pylsl` | `pip install -r requirements.txt` |
 
-Python 3.8+. Optionally create a `.venv` in this folder; `start_bridge.bat` uses it if present, otherwise the system `python`.
+Python 3.8+. The Electron app starts the bridge with the repo-root `.venv` (the one `lsl_ws_bridge/` uses, which already has `pylsl`). For running it on its own, optionally create a `.venv` in this folder; `start_bridge.bat` uses it if present, otherwise the system `python`.
 
 ---
 
@@ -53,7 +53,7 @@ Any other datagram is pushed as `videosync_unknown_<text>` with a warning in the
 
 Order matters: the start signal must arrive while LabRecorder is recording.
 
-1. Start the bridge (`start_bridge.bat`, or `python videosync_to_lsl.py`). It creates the `VideoSyncMarkers` stream right away.
+1. Start the bridge. The Electron app (`app/`) starts it automatically and keeps it running until the app quits; its output appears in the app's console prefixed with `[videosync]`. Without the app: `start_bridge.bat`, or `python videosync_to_lsl.py`. Don't do both: only one process can listen on the UDP port. The bridge creates the `VideoSyncMarkers` stream right away.
 2. In LabRecorder, select `VideoSyncMarkers` together with the other streams and start recording.
 3. Start the VideoSync Pro recording. The bridge console logs `video_record_start`.
 4. Run the experiment.
