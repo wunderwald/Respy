@@ -4,6 +4,7 @@
   "inputSignalType": "physiological",
   "numTrials": 32,
   "trialDurationSecs": 10,
+  "responseTimeoutSecs": 5,
   "questions": [
     { "id": "sync",  "probability": 0.8,    "text": "Hat der Fisch genau zu deinem Atem gepasst?",   "answers": ["yes", "no"], "labels": ["ja", "nein"] },
     { "id": "flash", "probability": 0.06,   "text": "Hast du den rosa Fisch blinken sehen?",          "answers": ["yes", "no"], "labels": ["ja", "nein"] },

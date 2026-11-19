@@ -141,8 +141,12 @@ if (frontend === 'ibreath') {
     <span id="s-trials-warning" class="preset-warning" style="display:none"></span>
     <span class="label">trial secs</span>
     <input id="s-trial-secs" type="number" class="settings-num" min="1" step="1"
-           value="${CONFIG.TRIAL_DURATION_SECS}" title="Seconds per trial (the response window, up to ${CONFIG.RESPONSE_TIMEOUT_SECS} s, comes on top) — filled in by a preset that defines trialDurationSecs; editable" />
+           value="${CONFIG.TRIAL_DURATION_SECS}" title="Seconds per trial (the response window, &quot;response secs&quot;, comes on top) — filled in by a preset that defines trialDurationSecs; editable" />
     <span id="s-trial-secs-warning" class="preset-warning" style="display:none"></span>
+    <span class="label">response secs</span>
+    <input id="s-response-secs" type="number" class="settings-num" min="1" step="1"
+           value="${CONFIG.RESPONSE_TIMEOUT_SECS}" title="How long the question (answer screen) stays up at most — an answer moves on right away; no answer by then is recorded as timeout. Filled in by a preset that defines responseTimeoutSecs; editable" />
+    <span id="s-response-secs-warning" class="preset-warning" style="display:none"></span>
     <span class="label">preset</span>
     <select id="s-preset" class="stream-select">
       <option value="">None (sync only)</option>
@@ -193,6 +197,8 @@ if (frontend === 'ibreath') {
   const trialsWarningEl   = document.getElementById('s-trials-warning');
   const trialSecsInput    = document.getElementById('s-trial-secs');
   const trialSecsWarningEl = document.getElementById('s-trial-secs-warning');
+  const responseSecsInput  = document.getElementById('s-response-secs');
+  const responseSecsWarningEl = document.getElementById('s-response-secs-warning');
   const presetSelect      = document.getElementById('s-preset');
   const presetStatusEl    = document.getElementById('s-preset-status');
   const presetWarningEl   = document.getElementById('ib-preset-warning');
@@ -312,6 +318,12 @@ if (frontend === 'ibreath') {
       trialSecsInput.focus();
       return;
     }
+    const responseTimeoutSecs = parseTrialCount(responseSecsInput.value);
+    if (responseTimeoutSecs == null) {
+      updateResponseSecsWarning();
+      responseSecsInput.focus();
+      return;
+    }
     window.api.hud.sendAction({
       type:            'start',
       subjectCode:     subjectCheck.code(),
@@ -322,6 +334,7 @@ if (frontend === 'ibreath') {
       calibrationSecs: parseInt(document.getElementById('s-cal-secs').value) || CONFIG.CALIBRATION_SECS,
       numTrials,
       trialDurationSecs,
+      responseTimeoutSecs,
       readQuestions:   readQuestionsBox.checked,
       questions:       activePreset?.questions ?? null,
       configOverrides: activePreset?.configOverrides ?? null,
@@ -357,7 +370,7 @@ if (frontend === 'ibreath') {
   // A preset is a JSON file (bundled under app/presets/, or any file via
   // "Browse…") that can define: inputSignalType / useEyeTracking (pre-filled
   // and locked in the UI the moment the preset loads — not deferred to
-  // Start), numTrials / trialDurationSecs (pre-filled, but stay editable), a custom `questions` list (replacing the default
+  // Start), numTrials / trialDurationSecs / responseTimeoutSecs (pre-filled, but stay editable), a custom `questions` list (replacing the default
   // sync-only question), and arbitrary `configOverrides` (applied to CONFIG
   // at Start, same as every other setting). See docs/ibreath.md for the file
   // format.
@@ -393,6 +406,13 @@ if (frontend === 'ibreath') {
   }
   trialSecsInput.addEventListener('input', updateTrialSecsWarning);
 
+  function updateResponseSecsWarning() {
+    const msg = parseTrialCount(responseSecsInput.value) == null ? '⚠ response secs must be a whole number ≥ 1' : '';
+    responseSecsWarningEl.textContent   = msg;
+    responseSecsWarningEl.style.display = msg ? '' : 'none';
+  }
+  responseSecsInput.addEventListener('input', updateResponseSecsWarning);
+
   function updateSyncWarning(questions) {
     const list = questions?.length ? questions : CONFIG.QUESTIONS;
     const hasSync = list.some(q => q.id === 'sync');
@@ -422,7 +442,8 @@ if (frontend === 'ibreath') {
     // editable (the value in the field at Start is what's used). A bad
     // preset value leaves the field as it was and says why.
     for (const [key, input, label] of [['numTrials', numTrialsInput, 'trials'],
-                                       ['trialDurationSecs', trialSecsInput, 'trial secs']]) {
+                                       ['trialDurationSecs', trialSecsInput, 'trial secs'],
+                                       ['responseTimeoutSecs', responseSecsInput, 'response secs']]) {
       if (preset?.[key] === undefined) continue;
       const n = parseTrialCount(preset[key]);
       if (n != null) {
@@ -434,6 +455,7 @@ if (frontend === 'ibreath') {
     }
     updateTrialsWarning();
     updateTrialSecsWarning();
+    updateResponseSecsWarning();
 
     updateSyncWarning(preset?.questions);
     prerenderQuestions();   // this preset's questions, so Start doesn't wait for TTS

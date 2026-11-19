@@ -287,7 +287,7 @@ export default class IBreath {
 
   // ── State machine ──────────────────────────────────────────────────────
 
-  #beginCalibration({ debugGaze, inputSignalType, calibrationSecs, numTrials, trialDurationSecs, readQuestions, presetName, questions, configOverrides } = {}) {
+  #beginCalibration({ debugGaze, inputSignalType, calibrationSecs, numTrials, trialDurationSecs, responseTimeoutSecs, readQuestions, presetName, questions, configOverrides } = {}) {
     // Reset to the hardcoded defaults first so a previous session's preset
     // (configOverrides) never silently lingers into a session that loads no
     // preset, or a different one that doesn't mention the same keys.
@@ -305,6 +305,9 @@ export default class IBreath {
     // Trial duration from the "trial secs" field (a preset's
     // trialDurationSecs, or the experimenter's own value) — same rules.
     if (Number.isInteger(trialDurationSecs) && trialDurationSecs >= 1) CONFIG.TRIAL_DURATION_SECS = trialDurationSecs;
+    // Response window (max time on the answer screen) from the "response
+    // secs" field (a preset's responseTimeoutSecs, or the experimenter's).
+    if (Number.isInteger(responseTimeoutSecs) && responseTimeoutSecs >= 1) CONFIG.RESPONSE_TIMEOUT_SECS = responseTimeoutSecs;
 
     // Read-out: load this session's question audio in the background (the
     // experimenter window has usually rendered it already — then it's only
@@ -342,6 +345,7 @@ export default class IBreath {
     this.#csv = new IBreathCSV(this.#subjectCode, this.#useEyeTracking || this.#gazeEnabled,
       { signalType: this.#inputSignalType, preset: presetName ?? '',
         trialDurationSecs: CONFIG.TRIAL_DURATION_SECS,
+        responseTimeoutSecs: CONFIG.RESPONSE_TIMEOUT_SECS,
         // peaksOnly doesn't use the breath filter (peak envelope instead).
         breathFilter: this.#inputSignalType === 'peaksOnly' ? 'none' : this.#smoother.label },
       (msg) => this.#showWarning(`CSV: ${msg}`));

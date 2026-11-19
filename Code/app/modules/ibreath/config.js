@@ -62,7 +62,8 @@ export const CONFIG = {
   // Questions after trials
   SHOW_QUESTIONS: true,      // show a post-trial response question after each trial (fixed — not exposed in experimenter UI)
   // Response window: an arrow key answers and moves on right away; no
-  // answer within RESPONSE_TIMEOUT_SECS → 'timeout'.
+  // answer within RESPONSE_TIMEOUT_SECS → 'timeout'. Default for the
+  // experimenter's "response secs" field (a preset's responseTimeoutSecs fills it).
   RESPONSE_TIMEOUT_SECS: 5,
   RESPONSE_LEFT_COLOR:  '#b07cff',  // purple — left arrow (←)
   RESPONSE_RIGHT_COLOR: '#ff9a3c',  // orange — right arrow (→)

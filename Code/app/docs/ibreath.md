@@ -25,7 +25,8 @@ Two windows open:
 | **Subject** | Subject code written to the CSV filename. Locked once calibration begins. Only letters, digits, `-` and `_` (empty = `TEST`); anything else shows a red hint under the field and disables Start. If data for this code already exists, an amber hint warns that Start will overwrite it (Start stays enabled). |
 | **Cal secs** | Calibration recording duration (default 10 s). |
 | **Trials** | Number of trials in the session (default `MAX_NUM_TRIALS`, 30). Filled in when the loaded preset defines `numTrials`, but stays editable — the value in the field at Start is used (whole number ≥ 1). Locked once calibration begins. A warning appears next to it if the number isn't a multiple of 4: left/right and pufferfish/starfish are balanced in blocks of 4, so other counts aren't exactly balanced (the session still runs). |
-| **Trial secs** | How long each trial shows the fish, in seconds (default `TRIAL_DURATION_SECS`, 10). The response window (up to `RESPONSE_TIMEOUT_SECS`, 5 s) comes on top. Filled in when the loaded preset defines `trialDurationSecs`, but stays editable (whole number ≥ 1). Locked once calibration begins; recorded in `trialData.csv` (`trialDurationSecs`). |
+| **Trial secs** | How long each trial shows the fish, in seconds (default `TRIAL_DURATION_SECS`, 10). The response window (**Response secs**) comes on top. Filled in when the loaded preset defines `trialDurationSecs`, but stays editable (whole number ≥ 1). Locked once calibration begins; recorded in `trialData.csv` (`trialDurationSecs`). |
+| **Response secs** | How long the answer screen stays up **at most**, in seconds (default `RESPONSE_TIMEOUT_SECS`, 5): an answer moves on right away; no answer by then is recorded as `timeout`. Filled in when the loaded preset defines `responseTimeoutSecs`, but stays editable (whole number ≥ 1). Locked once calibration begins; recorded in `trialData.csv` (`responseTimeoutSecs`). |
 | **Read out questions** | Reads each question aloud (German, local Piper TTS) when the answer screen appears — see [Question read-out](#question-read-out-tts). On by default when TTS is installed; unticked and disabled, with a warning next to it, when it isn't. Locked once calibration begins; recorded per trial (`questionAudio`). |
 | **Retry calibration** | Appears only if calibration fails (no signal received, or the signal was flat). Restarts the calibration recording. |
 | **Use default calibration** | Appears only if calibration fails. Skips ahead using `CONFIG.DEFAULT_CAL_RANGE` instead of a measured range. |
@@ -63,7 +64,7 @@ stream ready → [Start] → Explanation: "Let's get ready!"  → [Space / Next]
                                ↓
                       Trial (TRIAL_DURATION_SECS, 10 s)
                                ↓
-                   [RESPONSE — ← or →, max 5 s]  (skipped if trial aborted)
+                   [RESPONSE — ← or →, max Response secs (5 s)]  (skipped if trial aborted)
                                ↓
                       ITI (2–3 s jitter)
                                ↓
@@ -84,7 +85,7 @@ The `[READY]` step between trials is skipped when `AUTO_ADVANCE` is on. The `[DI
 - **Synchronous trials** — cloud animation tracks the filtered breath signal (low-latency [breath filter](signal.md#breath-filter), ≈ 0.13–0.15 s behind the breath), rescaled into `[0, 1]` using the current signal range — taken from calibration, then drift-tracked (see [Signal range](#signal-range) below).
 - **Asynchronous trials** — cloud tracks the participant's own real-time breath signal, delayed by the current adaptive delay (see [Async delay staircase](#async-delay-staircase) below), then rescaled the same way as sync trials.
 - **Flash stimulus** (`FLASHING_IMAGE`) — a lightning image appears on 50 % of trials at a random time between `FLASH_TIME_MIN` and `FLASH_TIME_MAX` seconds into the trial, but always fully inside the trial (10 s trials: between 5 and 9.75 s).
-- **Post-trial question** (`CONFIG.QUESTIONS`) — after each non-aborted trial, a question is shown for up to `RESPONSE_TIMEOUT_SECS` (5) seconds; an arrow key answers and moves on right away. Non-responses are recorded as `timeout`. The arrows are colour-coded: **left purple, right orange** (`RESPONSE_LEFT_COLOR` / `RESPONSE_RIGHT_COLOR`). Which question(s) can appear, in what mix, is defined by `CONFIG.QUESTIONS` — either the built-in default (100% `sync`) or a loaded preset's `questions` list. See [Presets](#presets) for the full mechanism.
+- **Post-trial question** (`CONFIG.QUESTIONS`) — after each non-aborted trial, a question is shown for up to **Response secs** (`RESPONSE_TIMEOUT_SECS`, default 5) seconds; an arrow key answers and moves on right away. Non-responses are recorded as `timeout`. The arrows are colour-coded: **left purple, right orange** (`RESPONSE_LEFT_COLOR` / `RESPONSE_RIGHT_COLOR`). Which question(s) can appear, in what mix, is defined by `CONFIG.QUESTIONS` — either the built-in default (100% `sync`) or a loaded preset's `questions` list. See [Presets](#presets) for the full mechanism.
 - **Inattention check** (eye tracking on only, `GAZE_ABORT`) — the first `GAZE_ABORT_MIN_SECS` (5 s) of a trial are always shown. After that, the trial is ended as soon as there has been **no gaze position on screen for `GAZE_ABORT_LOST_SECS` (2 s) in a row**: blinks / lost tracking (`[-1, -1]`), gaze outside `[0, 1]`, or no gaze samples at all. The run counts from the trial start at the earliest, so a child who already looked away early is stopped right at 5 s. The trial is aborted like an experimenter abort (no question, next trial follows), with `abortReason = gaze_lost` in `trialData.csv` and a `trial_abort_reason_gaze_lost_t<N>` marker; the experimenter's status line says so during the ITI. ⚠ If the gaze stream stops while eye tracking is on, every trial ends at 5 s.
 
 ### Signal range
@@ -155,7 +156,7 @@ Flags in [app/modules/ibreath/config.js](./modules/ibreath/config.js):
 | `GAZE_ABORT` | `true` | Inattention check on/off (only active with eye tracking on) |
 | `GAZE_ABORT_MIN_SECS` | `5` | Seconds of each trial that are always shown |
 | `GAZE_ABORT_LOST_SECS` | `2` | No on-screen gaze for this long (after the first `GAZE_ABORT_MIN_SECS`) ends the trial |
-| `RESPONSE_TIMEOUT_SECS` | `5` | Response window (s): an answer moves on right away; none by then → `timeout` |
+| `RESPONSE_TIMEOUT_SECS` | `5` | Default response window (s) — the **Response secs** field's initial value; overridden per session by that field (a preset's `responseTimeoutSecs`, or the experimenter's own value). An answer moves on right away; none by then → `timeout` |
 | `RESPONSE_LEFT_COLOR` / `RESPONSE_RIGHT_COLOR` | `#b07cff` / `#ff9a3c` | Arrow colours on the answer cards (left purple, right orange) |
 | `CALIBRATION_SECS` | `10` | Duration of the calibration recording |
 | `DELAY_VALUES_MS` | `[200, 500, 800, 1000, 1200, 1600, 2200, 3000]` | The fixed set of values the async delay staircase steps through (see [Async delay staircase](#async-delay-staircase)) |
@@ -188,6 +189,7 @@ One row per trial, appended after each trial ends (or after the response screen)
 | `delayMs` | Async delay applied to this trial (ms), or empty (sync trials) — see [Async delay staircase](#async-delay-staircase) |
 | `rangeMin`, `rangeMax` | Signal range (native units) mapped to stimulus `[0, 1]` for this trial — see [Signal range](#signal-range) |
 | `trialDurationSecs` | Trial duration (s) used in this session — the **Trial secs** field |
+| `responseTimeoutSecs` | Maximum response window (s) used in this session — the **Response secs** field |
 | `breathFilter` | Breath filter used in this session, e.g. `butterworth2_1.5Hz_fs100` — see [breath filter](signal.md#breath-filter); `none` with *Peaks only* |
 | `signalType` | `physiological` (iBreath) or `peaksOnly` (iBeat) |
 | `preset` | Name of the loaded preset (its `name` field, or the file name for a browsed file without one); empty without a preset |
@@ -290,6 +292,7 @@ A preset is a JSON file that bundles a set of iBreath settings — the experimen
   "useEyeTracking": true,
   "numTrials": 32,
   "trialDurationSecs": 10,
+  "responseTimeoutSecs": 5,
   "questions": [
     { "id": "sync",        "probability": 0.8, "text": "Hat der Fisch genau zu deinem Atem gepasst?", "answers": ["yes", "no"], "labels": ["ja", "nein"] },
     { "id": "placeholder", "probability": 0.2, "text": "Placeholder question — replace before use", "answers": ["yes", "no"], "labels": ["ja", "nein"] }
@@ -306,6 +309,7 @@ Every field is optional except `questions`' internal shape (if `questions` is pr
 | `useEyeTracking` | `true` or `false` — pre-fills and locks the **Use eye tracking** checkbox (and applies it immediately, same as checking it by hand). Omit (or `null`) to leave it to the experimenter. |
 | `numTrials` | Whole number ≥ 1 — fills in the **Trials** field (still editable). Omit to leave the field as it is (default 30). An invalid value is ignored and a warning appears next to the preset selector. All bundled presets set `32`. |
 | `trialDurationSecs` | Whole number ≥ 1 — fills in the **Trial secs** field (still editable), same rules. All bundled presets set `10`. |
+| `responseTimeoutSecs` | Whole number ≥ 1 — fills in the **Response secs** field (still editable), same rules. All bundled presets set `5`. |
 | `questions` | Replaces `CONFIG.QUESTIONS` wholesale for the session (applied at Start). Omit to keep the built-in default (100% `sync`). |
 | `configOverrides` | Arbitrary `key: value` pairs applied directly onto `CONFIG` at Start (after resetting CONFIG to its hardcoded defaults, so a previous session's preset never silently lingers). Any key in [config.js](./modules/ibreath/config.js) can be overridden this way — this is how the iBeat presets carry their peak-envelope timings. The signal pipeline (smoother, peak envelope, async delay buffer) is rebuilt after the overrides are applied, so `PEAK_*` and `DELAY_VALUES_MS` overrides take effect too. |
 

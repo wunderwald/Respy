@@ -28,17 +28,19 @@ export class IBreathCSV {
   #trialHeader;
   #breathFilter;
   #trialDurationSecs;
+  #responseTimeoutSecs;
   #signalType;
   #preset;
   #calibration = '';   // 'measured' | 'default' — set once calibration completes
 
-  // session: { signalType, preset, breathFilter, trialDurationSecs } — repeated on every trial row.
+  // session: { signalType, preset, breathFilter, trialDurationSecs, responseTimeoutSecs } — repeated on every trial row.
   constructor(subjectCode, gazeEnabled, session, onWarn) {
     this.#subjectCode = subjectCode;
     this.#gazeEnabled = gazeEnabled;
     this.#onWarn      = onWarn;
     this.#breathFilter = session.breathFilter ?? '';   // filter label, e.g. butterworth2_1.5Hz_fs100
     this.#trialDurationSecs = session.trialDurationSecs ?? '';
+    this.#responseTimeoutSecs = session.responseTimeoutSecs ?? '';
     this.#signalType   = session.signalType;
     this.#preset       = session.preset;
 
@@ -49,7 +51,7 @@ export class IBreathCSV {
 
     this.#trialHeader =
       'trialIndex,subject,questionType,synchronous,img,lr,stimX0,stimY0,stimX1,stimY1,delayMs,' +
-      'rangeMin,rangeMax,breathFilter,trialDurationSecs,signalType,preset,calibration,ITI,startTime,endTime,aborted,abortReason' +
+      'rangeMin,rangeMax,breathFilter,trialDurationSecs,responseTimeoutSecs,signalType,preset,calibration,ITI,startTime,endTime,aborted,abortReason' +
       (CONFIG.SHOW_QUESTIONS ? ',response,questionAudio' : '') +
       (CONFIG.FLASHING_IMAGE ? ',flashImage,flashScheduledTime,flashX,flashY,flashShown' : '') + '\n';
   }
@@ -142,6 +144,7 @@ export class IBreathCSV {
       `${trial.rangeMin ?? ''},${trial.rangeMax ?? ''},` +
       `${this.#breathFilter},` +
       `${this.#trialDurationSecs},` +
+      `${this.#responseTimeoutSecs},` +
       `${this.#signalType},${this.#preset},${this.#calibration},` +
       `${trial.ITI},` +
       `${trial.startTime ?? ''},` +

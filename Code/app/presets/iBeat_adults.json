@@ -5,6 +5,7 @@
   "useEyeTracking": true,
   "numTrials": 32,
   "trialDurationSecs": 10,
+  "responseTimeoutSecs": 5,
   "questions": [
     { "id": "sync",        "probability": 0.8, "text": "Hat der Fisch genau zu deinem Herzschlag gepasst?",   "answers": ["yes", "no"], "labels": ["ja", "nein"] },
     { "id": "placeholder", "probability": 0.2, "text": "Placeholder question — replace before use",   "answers": ["yes", "no"], "labels": ["ja", "nein"] }
