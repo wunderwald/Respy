@@ -58,7 +58,8 @@ export default class BioGame {
   // ── Experiment settings (overridden by experimenter on start) ─────────────
   #subjectCode      = CONFIG.SUBJECT_CODE;
   #group            = CONFIG.GROUP;
-  #naturalBpm       = CONFIG.NATURAL_BPM;
+  #bpmProfile       = CONFIG.NATURAL_BPM_PROFILE;   // 'child' | 'adult' — the experimenter's "BPM range" switch
+  #naturalBpm       = CONFIG.NATURAL_BPM_PROFILES[CONFIG.NATURAL_BPM_PROFILE].defaultBpm;
   #naturalBpmSource = 'default';   // where the natural BPM came from (see experimenter.js)
   #baselineBpm      = '';          // averaged Resting-baseline estimate, '' = none
   #showCurve        = CONFIG.SHOW_CURVE;
@@ -207,7 +208,7 @@ export default class BioGame {
 
   // ── Action handler ────────────────────────────────────────────────────────
 
-  #onAction({ type, subjectCode, group, naturalBpm, naturalBpmSource, baselineBpm, showCurve, calibrationSecs }) {
+  #onAction({ type, subjectCode, group, naturalBpm, naturalBpmSource, baselineBpm, bpmProfile, showCurve, calibrationSecs }) {
     switch (type) {
       case 'start':
         // Settings only count for a session that actually starts now, so the
@@ -217,6 +218,7 @@ export default class BioGame {
         if (group           !== undefined) this.#group           = group;
         if (naturalBpm      !== undefined) this.#naturalBpm      = naturalBpm;
         if (naturalBpmSource !== undefined) this.#naturalBpmSource = naturalBpmSource;
+        if (bpmProfile in CONFIG.NATURAL_BPM_PROFILES) this.#bpmProfile = bpmProfile;
         if (baselineBpm     !== undefined) this.#baselineBpm     = baselineBpm;
         if (showCurve       !== undefined) this.#showCurve       = showCurve;
         if (calibrationSecs !== undefined) this.#calibrationSecs = calibrationSecs;
@@ -266,6 +268,8 @@ export default class BioGame {
         target_bpm:          this.#activeBpm,   // SLOW_BPM (slow) or the entered natural BPM
         natural_bpm_source:  this.#naturalBpmSource,   // baseline | fallback | manual | default
         baseline_bpm:        this.#baselineBpm,        // Resting-baseline average ('' = none found)
+        bpm_profile:         this.#bpmProfile,         // child | adult — valid range for baseline_bpm
+        bpm_profile_range:   CONFIG.NATURAL_BPM_PROFILES[this.#bpmProfile].range.join('-'),   // e.g. 16-20
         show_curve:          this.#showCurve,
         calibration_secs:    this.#calibrationSecs,
         breath_filter:       this.#smoother.label,   // e.g. butterworth2_1.5Hz_fs100

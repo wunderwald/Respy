@@ -620,7 +620,11 @@ if (frontend === 'ibreath') {
     <span id="bg-natural-bpm-wrap">
       <span class="label">natural BPM</span>
       <input id="bg-natural-bpm" type="number" min="4" max="20" step="0.5"
-             value="${BG.NATURAL_BPM}" style="width:46px" />
+             value="${BG.NATURAL_BPM_PROFILES[BG.NATURAL_BPM_PROFILE].defaultBpm}" style="width:46px" />
+      <select id="bg-bpm-profile" class="stream-select" title="Valid range for the baseline estimate, and the default used otherwise">
+        ${Object.entries(BG.NATURAL_BPM_PROFILES).map(([key, p]) =>
+          `<option value="${key}" ${key === BG.NATURAL_BPM_PROFILE ? 'selected' : ''}>${p.label} (${p.range[0]}–${p.range[1]})</option>`).join('')}
+      </select>
       <span id="bg-bpm-source" style="font-size:11px;opacity:0.5">—</span>
     </span>
     <span>
@@ -661,6 +665,7 @@ if (frontend === 'ibreath') {
   const bgNatBpmWrap = document.getElementById('bg-natural-bpm-wrap');
   const bgNatBpmEl   = document.getElementById('bg-natural-bpm');
   const bgBpmSrcEl   = document.getElementById('bg-bpm-source');
+  const bgBpmProfileEl = document.getElementById('bg-bpm-profile');
   const bgScoreEl    = document.getElementById('bg-score');
   const bgTimeLeftEl = document.getElementById('bg-time-left');
 
@@ -690,9 +695,10 @@ if (frontend === 'ibreath') {
 
   // Natural breathing rate = the subject's *Resting* baseline estimates (see
   // modules/baseline/baselineFiles.js — shared with the baseline writer).
-  // An average outside BG.NATURAL_BPM_RANGE is not used: the field gets
-  // the default BG.NATURAL_BPM (same value as with no baseline at all) and an
-  // amber warning says so.
+  // An average outside the selected age profile's range (child / adult —
+  // BG.NATURAL_BPM_PROFILES) is not used: the field gets that profile's
+  // default (same value as with no baseline at all) and an amber warning
+  // says so.
   //
   // Where the BPM came from is sent with Start and recorded in eventData.csv
   // (`natural_bpm_source`: baseline | fallback | manual | default, and
@@ -713,17 +719,26 @@ if (frontend === 'ibreath') {
   const bgApplyStart = () => bgSubjectCheck.setStartEnabled(bgHudStartEnabled && !bpmLookupPending);
   const setBpmPending = (v) => { bpmLookupPending = v; bgApplyStart(); };
 
-  // No usable baseline: back to the config default, unless the experimenter
-  // typed a value (kept, so changing the subject code doesn't wipe it).
+  // Age profile (the "BPM range" switch): which estimates count as valid,
+  // and the default used otherwise — BG.NATURAL_BPM_PROFILES.
+  const bpmProfile = () => BG.NATURAL_BPM_PROFILES[bgBpmProfileEl.value] ?? BG.NATURAL_BPM_PROFILES[BG.NATURAL_BPM_PROFILE];
+  const inProfileRange = (v) => Number.isFinite(v) && v >= bpmProfile().range[0] && v <= bpmProfile().range[1];
+  const rangeText = () => `${bpmProfile().range[0]}–${bpmProfile().range[1]}`;
+
+  // No usable baseline: the profile's default — unless the experimenter typed
+  // a value that's within the range (kept, so changing the subject code or
+  // the profile doesn't wipe it). Returns true if a typed value was kept.
   function noBaseline() {
     baselineBpm = '';
-    if (bpmSource === 'manual') return;
+    if (bpmSource === 'manual' && inProfileRange(parseFloat(bgNatBpmEl.value))) return true;
     bpmSource = 'default';
-    bgNatBpmEl.value = BG.NATURAL_BPM;
+    bgNatBpmEl.value = bpmProfile().defaultBpm;
+    return false;
   }
 
   async function tryLoadBaseline(subjectCode) {
     const seq = ++bpmLookupSeq;
+    setBpmPending(true);
     let res;
     try {
       res = await loadNaturalBpm(subjectCode, window.api.readFile);
@@ -737,46 +752,55 @@ if (frontend === 'ibreath') {
 
   function applyBaseline(subjectCode, res) {
     bgBpmSrcEl.style.opacity = '';
+    const def = bpmProfile().defaultBpm;
 
-    if (res.status === 'missing') {
-      noBaseline();
-      bgBpmSrcEl.textContent = `no ${RESTING.label} baseline for ${subjectCode}${bpmSource === 'manual' ? '' : ` — using default ${BG.NATURAL_BPM} BPM`}`;
-      bgBpmSrcEl.style.color = '';
-      return;
-    }
-    if (res.status === 'invalid') {
-      noBaseline();
-      bgBpmSrcEl.textContent = `no valid BPM in ${RESTING.label} baseline file${bpmSource === 'manual' ? '' : ` — using default ${BG.NATURAL_BPM} BPM`}`;
-      bgBpmSrcEl.style.color = WARN_COLOR;
+    if (res.status === 'missing' || res.status === 'invalid') {
+      const kept = noBaseline();
+      const what = res.status === 'missing'
+        ? `no ${RESTING.label} baseline for ${subjectCode}`
+        : `no valid BPM in ${RESTING.label} baseline file`;
+      bgBpmSrcEl.textContent = kept ? `${what} — keeping the entered value` : `${what} — using default ${def} BPM`;
+      bgBpmSrcEl.style.color = res.status === 'invalid' ? WARN_COLOR : '';
       return;
     }
 
     // Round first, so the value checked is the value shown.
     const bpm = Math.round(res.bpm * 10) / 10;
-    const [lo, hi] = BG.NATURAL_BPM_RANGE;
     baselineBpm = bpm;
-    if (bpm < lo || bpm > hi) {
+    if (!inProfileRange(bpm)) {
       bpmSource = 'fallback';
-      bgNatBpmEl.value       = BG.NATURAL_BPM;
-      bgBpmSrcEl.textContent = `⚠ ${RESTING.label} baseline avg ${bpm.toFixed(1)} BPM is outside ${lo}–${hi} — using default ${BG.NATURAL_BPM} BPM`;
+      bgNatBpmEl.value       = def;
+      bgBpmSrcEl.textContent = `⚠ ${RESTING.label} baseline avg ${bpm.toFixed(1)} BPM is outside ${rangeText()} (${bpmProfile().label.toLowerCase()}) — using default ${def} BPM`;
       bgBpmSrcEl.style.color = WARN_COLOR;
       bgBpmSrcEl.style.opacity = '1';
       return;
     }
     bpmSource = 'baseline';
     bgNatBpmEl.value       = bpm.toFixed(1);
-    bgBpmSrcEl.textContent = `auto from ${RESTING.label} baseline (${res.count} estimates, avg ${bpm.toFixed(1)} BPM)`;
+    bgBpmSrcEl.textContent = `auto from ${RESTING.label} baseline (${res.count} estimate${res.count === 1 ? '' : 's'}, avg ${bpm.toFixed(1)} BPM)`;
     bgBpmSrcEl.style.color = 'rgba(100,220,130,0.9)';
   }
 
-  // Typing a value overrides whatever was loaded.
+  // Typing a value overrides whatever was loaded (a value outside the
+  // profile's range is allowed, but flagged).
   bgNatBpmEl.addEventListener('input', () => {
     bpmSource = 'manual';
-    bgBpmSrcEl.textContent = baselineBpm === ''
+    const v = parseFloat(bgNatBpmEl.value);
+    const base = baselineBpm === ''
       ? 'entered manually'
       : `entered manually (${RESTING.label} baseline avg ${baselineBpm.toFixed(1)} BPM)`;
-    bgBpmSrcEl.style.color   = '';
+    const out = Number.isFinite(v) && !inProfileRange(v);
+    bgBpmSrcEl.textContent   = out ? `⚠ ${base} — outside ${rangeText()}` : base;
+    bgBpmSrcEl.style.color   = out ? WARN_COLOR : '';
     bgBpmSrcEl.style.opacity = '';
+  });
+
+  // Flipping the profile re-checks the current subject's estimates against
+  // the new range (re-reads them; Start waits meanwhile).
+  bgBpmProfileEl.addEventListener('change', () => {
+    if (bgLocked) return;
+    clearTimeout(bpmLoadTimer);
+    tryLoadBaseline(bgSubjectEl.value.trim() || 'TEST');
   });
 
   // Trigger on subject change (debounced) and immediately on init
@@ -824,6 +848,7 @@ if (frontend === 'ibreath') {
       bgSubjectCheck.lock();
       bgGroupEl.disabled   = true;
       bgNatBpmEl.disabled  = true;
+      bgBpmProfileEl.disabled = true;
       // Stream selection stays live even once everything else locks, so the
       // experimenter can recover from a dropped stream mid-session.
       for (const el of settingsBar.querySelectorAll('input, button, select')) {
@@ -841,7 +866,8 @@ if (frontend === 'ibreath') {
       type:            'start',
       subjectCode:     bgSubjectCheck.code(),
       group:           bgGroupEl.value,
-      naturalBpm:      parseFloat(bgNatBpmEl.value) || BG.NATURAL_BPM,
+      naturalBpm:      parseFloat(bgNatBpmEl.value) || bpmProfile().defaultBpm,
+      bpmProfile:      bgBpmProfileEl.value,
       naturalBpmSource: bpmSource,
       baselineBpm,
       showCurve:       document.getElementById('bg-show-curve').checked,

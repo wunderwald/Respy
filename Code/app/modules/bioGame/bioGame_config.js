@@ -2,11 +2,16 @@ export const CONFIG = {
   // ── Experiment ───────────────────────────────────────────────────────────
   SUBJECT_CODE:          'TEST',
   GROUP:                 'slow',   // 'slow' | 'natural'
-  // Natural group: BPM used when there is no usable Resting baseline —
-  // none found, or its estimate outside NATURAL_BPM_RANGE (the experimenter
-  // UI then shows a warning).
-  NATURAL_BPM:           18,
-  NATURAL_BPM_RANGE:     [16, 20],
+  // Natural group: the BPM comes from the subject's Resting baseline if its
+  // estimate lies within the selected age profile's `range`; otherwise
+  // (none found, or out of range — the experimenter UI then warns) the
+  // profile's `defaultBpm`. The experimenter's "BPM range" switch selects the
+  // profile; NATURAL_BPM_PROFILE is its initial setting.
+  NATURAL_BPM_PROFILE:   'child',
+  NATURAL_BPM_PROFILES: {
+    child: { label: 'Child', range: [16, 20], defaultBpm: 18 },
+    adult: { label: 'Adult', range: [10, 20], defaultBpm: 15 },
+  },
   SHOW_CURVE:            false,
   SHOW_TIMER:            false, // time-left bar (top right) on the participant screen — hidden; true shows it again
   DATA_DIR:              'output_data/bio_game', // do not change
