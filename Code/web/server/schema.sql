@@ -33,13 +33,14 @@ CREATE TABLE IF NOT EXISTS game_runs (
 -- One run document is roughly 0.3 MB (tap) to 1 MB (3-min breath run), so
 -- the server's max_allowed_packet (MySQL 8 default: 64 MB) is ample.
 
--- Example insert, as the endpoint should do it (idempotent on run_id):
+-- Example insert, as the endpoint should do it. A duplicate-key error
+-- (1062) on uq_run_id means the run was already stored by an earlier
+-- upload attempt → treat as success. Needs only the INSERT privilege.
 --
 -- INSERT INTO game_runs
 --   (run_id, session_id, run_index, schema_version, game, variant,
 --    started_at, ended_at, duration_s, sheep_delivered, client_ip, data)
--- VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
--- ON DUPLICATE KEY UPDATE id = id;
+-- VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 --
 -- (started_at/ended_at: the ISO strings from doc.time, converted to
 --  'YYYY-MM-DD HH:MM:SS.fff' UTC.)
