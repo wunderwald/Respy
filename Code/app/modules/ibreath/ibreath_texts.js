@@ -7,4 +7,5 @@ export const TEXTS = {
   paused:  'Kurze Pause',
   eyeCal:  'Einen Moment bitte …',         // eye-tracker calibration (scene usually minimized)
   done:    'Geschafft! Super gemacht!',    // end screen
+  storyContinue: 'Weiter mit der Leertaste',  // under a story (stories feature, wait-for-Space mode)
 };

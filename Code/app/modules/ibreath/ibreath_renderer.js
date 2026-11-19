@@ -5,6 +5,7 @@ import { STATE, CONFIG } from './config.js';
 import { drawDisplay } from './animationDisplay.js';
 import { Caustics }    from './caustics.js';
 import { drawInstructions } from '../instructions/instructionScreen.js';
+import { drawStory } from './storyScreen.js';
 import { TEXTS } from './ibreath_texts.js';
 
 export class IBreathRenderer {
@@ -49,6 +50,7 @@ export class IBreathRenderer {
       case STATE.INSTRUCTIONS_TASK: drawInstructions(ctx, w, h, data.instructions); break;
       case STATE.CALIBRATING: this.#drawCalibrating(ctx, w, h, data.calProgress, data.calRemaining); break;
       case STATE.READY:       break;   // between trials (AUTO_ADVANCE off): background only
+      case STATE.STORY:       drawStory(ctx, w, h, data.story?.text, { hint: data.story?.hint }); break;
       case STATE.DISPLAY:     this.#drawDisplayState(ctx, w, h, data.displayElapsed); break;
       case STATE.TRIAL:       this.#drawTrial(ctx, w, h, data.trial, data.stimLevel, data.flashActive); break;
       case STATE.RESPONSE:    this.#drawResponse(ctx, w, h, now, data.responseStartTime, data.questionType); break;

@@ -102,6 +102,13 @@ export const CONFIG = {
 
   // Experiment control
   AUTO_ADVANCE: true,      // skip the READY state — advance to next trial automatically (fixed — not exposed in experimenter UI)
+
+  // Stories (optional — the experimenter's "use stories" switch): a story
+  // from a CSV file (modules/ibreath/stories.js) is shown before each
+  // trial's animation; the chosen group's stories set the number of trials.
+  STORY_AUTO_SECS: 5,     // default delay for "auto after" (the experimenter can change it)
+  STORY_MIN_SECS: 1,      // Space is ignored for this long after a story appears (no accidental skip)
+  STORY_FONT_U: 3.4,      // story text size (1 u = 1 % of screen height) — adult reading size
 };
 
 // Snapshot of the hardcoded defaults above, taken once at module load — used to reset CONFIG
@@ -116,6 +123,7 @@ export const STATE = {
   INSTRUCTIONS_CAL: 'instructions_cal',    // explanation before calibration — waits for Space/Next
   CALIBRATING: 'calibrating',
   INSTRUCTIONS_TASK: 'instructions_task',  // explanation before the first trial — waits for Space/Next
+  STORY: 'story',      // stories feature: a story before the trial's animation — Space or auto-advance
   READY: 'ready',      // between trials — waiting for experimenter
   DISPLAY: 'display',  // 5-second pre-trial animation
   TRIAL: 'trial',

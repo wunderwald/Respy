@@ -8,6 +8,7 @@ import { CONFIG as BTG } from './modules/beltTrainingGame/beltTrainingGame_confi
 import { CONFIG as BL }  from './modules/baseline/baseline_config.js';
 import { loadNaturalBpm, RESTING, baselineFileStem } from './modules/baseline/baselineFiles.js';
 import { attachSubjectCheck } from './modules/subjectCheck.js';
+import { parseStoryFile, DEFAULT_STORY_FILE, ALL_STORIES } from './modules/ibreath/stories.js';
 
 // ── Frontend detection ────────────────────────────────────────────────────────
 
@@ -163,6 +164,8 @@ if (frontend === 'ibreath') {
     <label title="Read each question aloud (German, local Piper TTS) when the answer screen appears">
       <input type="checkbox" id="s-read-questions" disabled> read out questions</label>
     <span id="s-tts-status" style="font-size:11px;opacity:0.6">checking TTS…</span>
+    <label title="Show a story (from a CSV file) before each trial — one trial per story">
+      <input type="checkbox" id="s-use-stories"> use stories</label>
   `;
 
   const stateEl            = document.getElementById('ib-state-text');   // in #timer-bar
@@ -203,6 +206,35 @@ if (frontend === 'ibreath') {
   const presetStatusEl    = document.getElementById('s-preset-status');
   const presetWarningEl   = document.getElementById('ib-preset-warning');
   const readQuestionsBox  = document.getElementById('s-read-questions');
+  const useStoriesBox     = document.getElementById('s-use-stories');
+  // Stories row — appears under the settings bar while "use stories" is on.
+  const storiesBar = document.createElement('div');
+  storiesBar.id = 'stories-bar';
+  storiesBar.style.display = 'none';
+  storiesBar.innerHTML = `
+    <span class="label">stories</span>
+    <span id="s-story-file" class="story-file">—</span>
+    <button id="s-story-load" title="Load a different story file (CSV: story_number, story, optional randomization_group)">Load CSV…</button>
+    <span class="label">group</span>
+    <select id="s-story-group" class="stream-select"></select>
+    <span id="s-story-info" class="story-info"></span>
+    <span class="label">advance</span>
+    <select id="s-story-advance" class="stream-select" title="How the story screen ends: the participant presses Space (or you click Next), or automatically after the set time">
+      <option value="space">wait for Space</option>
+      <option value="auto">auto after</option>
+    </select>
+    <input id="s-story-secs" type="number" class="settings-num" min="0.5" step="0.5" value="${CONFIG.STORY_AUTO_SECS}" disabled />
+    <span class="label">s</span>
+    <span id="s-story-warning" class="preset-warning" style="display:none"></span>
+  `;
+  settingsBar.insertAdjacentElement('afterend', storiesBar);
+  const storyFileEl    = document.getElementById('s-story-file');
+  const storyLoadBtn   = document.getElementById('s-story-load');
+  const storyGroupSel  = document.getElementById('s-story-group');
+  const storyInfoEl    = document.getElementById('s-story-info');
+  const storyAdvSel    = document.getElementById('s-story-advance');
+  const storySecsInput = document.getElementById('s-story-secs');
+  const storyWarnEl    = document.getElementById('s-story-warning');
   const ttsStatusEl       = document.getElementById('s-tts-status');
   let ibLocked = false;   // settings locked (session started)
   // Start needs both: the scene's go-ahead (stream / EyeLink ready) and no
@@ -294,7 +326,8 @@ if (frontend === 'ibreath') {
       if (inputsLocked) {
         // Stream selection stays live even once everything else locks, so the
         // experimenter can recover from a dropped stream mid-session.
-        for (const el of settingsBar.querySelectorAll('input, button, select')) {
+        for (const el of [...settingsBar.querySelectorAll('input, button, select'),
+                          ...storiesBar.querySelectorAll('input, button, select')]) {
           el.disabled = true;
         }
       }
@@ -306,6 +339,15 @@ if (frontend === 'ibreath') {
   startBtn.addEventListener('click', () => {
     if (!subjectCheck.isValid()) return;   // the hint under the subject field says why
     if (ttsBusy) return;                   // questions still rendering (status says so)
+    const storyIssue = storyProblem();
+    if (storyIssue) { setStoryWarning(`⚠ ${storyIssue}`); return; }
+    const stories = useStoriesBox.checked ? {
+      file:     storyData.fileName,
+      group:    storyGroupSel.value === ALL_STORIES ? 'all' : storyGroupSel.value,
+      advance:  storyAdvSel.value,
+      autoSecs: storyAutoSecs() ?? CONFIG.STORY_AUTO_SECS,
+      items:    currentStories().map(({ number, text, group }) => ({ number, text, group })),
+    } : null;
     const numTrials = parseTrialCount(numTrialsInput.value);
     if (numTrials == null) {   // the warning next to the field says why
       updateTrialsWarning();
@@ -336,6 +378,7 @@ if (frontend === 'ibreath') {
       trialDurationSecs,
       responseTimeoutSecs,
       readQuestions:   readQuestionsBox.checked,
+      stories,
       questions:       activePreset?.questions ?? null,
       configOverrides: activePreset?.configOverrides ?? null,
     });
@@ -453,6 +496,12 @@ if (frontend === 'ibreath') {
         presetStatusEl.textContent = presetStatusEl.textContent ? `${presetStatusEl.textContent} · ${warn}` : warn;
       }
     }
+    // Stories on: the story count rules the trials field; the preset's
+    // trial count comes back when stories are switched off.
+    if (useStoriesBox.checked && preset?.numTrials !== undefined && parseTrialCount(preset.numTrials) != null) {
+      trialsBeforeStories = String(parseTrialCount(preset.numTrials));
+    }
+    updateStories();
     updateTrialsWarning();
     updateTrialSecsWarning();
     updateResponseSecsWarning();
@@ -460,6 +509,102 @@ if (frontend === 'ibreath') {
     updateSyncWarning(preset?.questions);
     prerenderQuestions();   // this preset's questions, so Start doesn't wait for TTS
   }
+
+  // ── Stories (optional) ───────────────────────────────────────────────────────
+  //
+  // "use stories" shows the stories row and loads the default story file
+  // (DEFAULT_STORY_FILE); "Load CSV…" replaces it. The chosen randomization
+  // group's stories are sent with Start; the scene shuffles them over the
+  // trials (one each), so their number sets the trial count — the trials
+  // field shows it and is locked meanwhile. See modules/ibreath/stories.js.
+
+  let storyData = null;             // { fileName, parsed } — the loaded story file
+  let trialsBeforeStories = null;   // trials value to restore when stories go off
+
+  function currentStories() {
+    return storyData?.parsed.groups.get(storyGroupSel.value) ?? [];
+  }
+
+  function storyAutoSecs() {
+    const v = Number(storySecsInput.value);
+    return Number.isFinite(v) && v > 0 ? v : null;
+  }
+
+  function setStoryWarning(msg) {
+    storyWarnEl.textContent   = msg;
+    storyWarnEl.style.display = msg ? '' : 'none';
+  }
+
+  // Why Start can't go ahead with stories on, or '' if it can.
+  function storyProblem() {
+    if (!useStoriesBox.checked) return '';
+    if (!storyData) return 'no story file loaded';
+    if (currentStories().length === 0) return 'no stories in the selected group';
+    if (storyAdvSel.value === 'auto' && storyAutoSecs() == null) return 'auto-advance time must be > 0 s';
+    return '';
+  }
+
+  function updateStories() {
+    const on = useStoriesBox.checked;
+    storiesBar.style.display = on ? '' : 'none';
+    if (!on) {
+      if (trialsBeforeStories != null) numTrialsInput.value = trialsBeforeStories;
+      trialsBeforeStories = null;
+      numTrialsInput.disabled = ibLocked;
+      numTrialsInput.title = 'Number of trials — filled in by a preset that defines numTrials; editable';
+      updateTrialsWarning();
+      return;
+    }
+    if (trialsBeforeStories == null) trialsBeforeStories = numTrialsInput.value;
+    const n = currentStories().length;
+    if (n > 0) numTrialsInput.value = n;
+    numTrialsInput.disabled = true;
+    numTrialsInput.title = 'Set by the stories: one trial per story in the selected group';
+    storyInfoEl.textContent = storyData ? `${n} stor${n === 1 ? 'y' : 'ies'} → ${n} trial${n === 1 ? '' : 's'}` : '';
+    storySecsInput.disabled = ibLocked || storyAdvSel.value !== 'auto';
+    const problem = storyProblem();
+    const notes = storyData?.parsed.warnings ?? [];
+    setStoryWarning(problem ? `⚠ ${problem}` : notes.length ? `⚠ ${notes.join(' · ')}` : '');
+    updateTrialsWarning();
+  }
+
+  // Reads and parses a story file; keeps the previous one if it fails.
+  async function loadStoryFile(path) {
+    const fileName = path.split(/[\\/]/).pop();
+    let parsed;
+    try {
+      const res = await window.api.readFile(path);
+      if (!res.ok) throw new Error(res.error);
+      parsed = parseStoryFile(res.content);
+    } catch (e) {
+      parsed = { ok: false, error: e.message };
+    }
+    if (!parsed.ok) {
+      setStoryWarning(`⚠ could not load ${fileName}: ${parsed.error}`);
+      return;
+    }
+    const previous = storyGroupSel.value;
+    storyData = { fileName, parsed };
+    storyFileEl.textContent = fileName;
+    storyFileEl.title = path;
+    storyGroupSel.innerHTML = [...parsed.groups].map(([g, list]) =>
+      `<option value="${g.replace(/"/g, '&quot;')}">${g === ALL_STORIES ? 'all' : g === '' ? '(empty)' : g} (${list.length})</option>`).join('');
+    if (parsed.groups.has(previous)) storyGroupSel.value = previous;
+    storyGroupSel.title = parsed.hasGroupColumn ? 'randomization_group' : 'The file has no randomization_group column: all stories are used';
+    updateStories();
+  }
+
+  useStoriesBox.addEventListener('change', async () => {
+    if (useStoriesBox.checked && !storyData) await loadStoryFile(DEFAULT_STORY_FILE);
+    updateStories();
+  });
+  storyGroupSel.addEventListener('change', updateStories);
+  storyAdvSel.addEventListener('change', updateStories);
+  storySecsInput.addEventListener('input', updateStories);
+  storyLoadBtn.addEventListener('click', async () => {
+    const path = await window.api.pickFile({ title: 'Load story file', extensions: ['csv', 'txt'] });
+    if (path) await loadStoryFile(path);
+  });
 
   // ── Read-out (TTS) ───────────────────────────────────────────────────────────
   //

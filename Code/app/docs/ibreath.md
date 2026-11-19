@@ -27,6 +27,7 @@ Two windows open:
 | **Trials** | Number of trials in the session (default `MAX_NUM_TRIALS`, 30). Filled in when the loaded preset defines `numTrials`, but stays editable — the value in the field at Start is used (whole number ≥ 1). Locked once calibration begins. A warning appears next to it if the number isn't a multiple of 4: left/right and pufferfish/starfish are balanced in blocks of 4, so other counts aren't exactly balanced (the session still runs). |
 | **Trial secs** | How long each trial shows the fish, in seconds (default `TRIAL_DURATION_SECS`, 10). The response window (**Response secs**) comes on top. Filled in when the loaded preset defines `trialDurationSecs`, but stays editable (whole number ≥ 1). Locked once calibration begins; recorded in `trialData.csv` (`trialDurationSecs`). |
 | **Response secs** | How long the answer screen stays up **at most**, in seconds (default `RESPONSE_TIMEOUT_SECS`, 5): an answer moves on right away; no answer by then is recorded as `timeout`. Filled in when the loaded preset defines `responseTimeoutSecs`, but stays editable (whole number ≥ 1). Locked once calibration begins; recorded in `trialData.csv` (`responseTimeoutSecs`). |
+| **Use stories** | Shows a story before each trial (adults) — see [Stories](#stories-optional). Off by default; when ticked, the **stories** row appears under the settings bar and the default story file loads. |
 | **Read out questions** | Reads each question aloud (German, local Piper TTS) when the answer screen appears — see [Question read-out](#question-read-out-tts). On by default when TTS is installed; unticked and disabled, with a warning next to it, when it isn't. Locked once calibration begins; recorded per trial (`questionAudio`). |
 | **Retry calibration** | Appears only if calibration fails (no signal received, or the signal was flat). Restarts the calibration recording. |
 | **Use default calibration** | Appears only if calibration fails. Skips ahead using `CONFIG.DEFAULT_CAL_RANGE` instead of a measured range. |
@@ -138,6 +139,32 @@ With **Read out questions** on, the question is spoken when the answer screen ap
 
 ---
 
+## Stories (optional)
+
+For adult sessions: a short text (a "story") is shown before each trial's animation. Off by default.
+
+**Turning it on:** tick **use stories** in the settings bar. A **stories** row appears with:
+
+| Control | What it does |
+|---|---|
+| file name / **Load CSV…** | The default story file [`ib_stories/story_randomization.csv`](../ib_stories/story_randomization.csv) loads when the switch is ticked; **Load CSV…** replaces it. A file that can't be used (e.g. missing columns) is reported in red and the previous one stays. |
+| **group** | The `randomization_group` to use, with its story count — e.g. `1 (25)`. Without that column: `all`. |
+| **advance** | **wait for Space** (the participant presses Space, or the experimenter clicks **Next**) or **auto after** the set seconds (default `STORY_AUTO_SECS`, 5). |
+
+While stories are on, the **trials** field shows the group's story count and is locked: **one trial per story**. Unticking restores the previous trial count (a preset loaded meanwhile sets that value). Start is refused (red note in the row) while no file is loaded, the group is empty, or the auto time isn't > 0. Everything locks at Start.
+
+**Story file:** CSV with the columns `story_number` and `story` (required) and `randomization_group` (optional). Comma-, semicolon- or tab-separated (German Excel's semicolons work), quoted fields with `""` escapes and line breaks, UTF-8 with or without BOM; column names are matched case-insensitively. Rows without `story_number` or `story` are skipped (noted in the row); duplicate numbers within a group are flagged.
+
+**Matching stories to trials:** at Start the group's stories are shuffled and assigned to the trials, one each — every story is shown exactly once. An aborted trial keeps its story (it isn't repeated later). The trial count follows the story count, so the trial balancing (left/right, fish, sync/async, question mix) is done for that number.
+
+**On screen:** the story appears after the ITI, before the pre-trial animation, as a left-aligned paragraph on a dark panel in adult reading size (`STORY_FONT_U`, 3.4 % of the screen height; long stories shrink to fit). In wait-for-Space mode, „Weiter mit der Leertaste" appears under it once Space works: Space is ignored for the first `STORY_MIN_SECS` (1 s), so a press meant for the previous screen can't skip the story. Pause during a story shows it again from the start on resume (auto timer and Space delay restart). An eye-tracker recalibration during a story shows the same story again afterwards.
+
+**Data:** `trialData.csv` gets `storyFile`, `storyGroup`, `storyAdvance`, `storyNumber` and `storySecs` (time on screen); markers `story_start_s<story>_t<N>` / `story_end_t<N>`. At Start, **`storyAssignment.csv`** (next to `trialData.csv`) records which story each trial shows, with the full text — properly quoted, so it stays a faithful record even if the story file changes later.
+
+Stories aren't part of presets, and the explanation screens don't mention them.
+
+---
+
 ## Configuration flags
 
 Flags in [app/modules/ibreath/config.js](./modules/ibreath/config.js):
@@ -157,6 +184,9 @@ Flags in [app/modules/ibreath/config.js](./modules/ibreath/config.js):
 | `GAZE_ABORT_MIN_SECS` | `5` | Seconds of each trial that are always shown |
 | `GAZE_ABORT_LOST_SECS` | `2` | No on-screen gaze for this long (after the first `GAZE_ABORT_MIN_SECS`) ends the trial |
 | `RESPONSE_TIMEOUT_SECS` | `5` | Default response window (s) — the **Response secs** field's initial value; overridden per session by that field (a preset's `responseTimeoutSecs`, or the experimenter's own value). An answer moves on right away; none by then → `timeout` |
+| `STORY_AUTO_SECS` | `5` | [Stories](#stories-optional): default for **auto after** |
+| `STORY_MIN_SECS` | `1` | Stories: Space is ignored this long after a story appears |
+| `STORY_FONT_U` | `3.4` | Stories: text size (% of screen height) |
 | `RESPONSE_LEFT_COLOR` / `RESPONSE_RIGHT_COLOR` | `#b07cff` / `#ff9a3c` | Arrow colours on the answer cards (left purple, right orange) |
 | `CALIBRATION_SECS` | `10` | Duration of the calibration recording |
 | `DELAY_VALUES_MS` | `[200, 500, 800, 1000, 1200, 1600, 2200, 3000]` | The fixed set of values the async delay staircase steps through (see [Async delay staircase](#async-delay-staircase)) |
@@ -199,6 +229,9 @@ One row per trial, appended after each trial ends (or after the response screen)
 | `endTime` | ISO-8601 trial end time |
 | `aborted` | `true` if the trial ended early — see `abortReason` |
 | `abortReason` | Why an aborted trial ended (empty otherwise): `experimenter` (Abort button / Escape), `gaze_lost` (inattention check), `pause` (Pause during the trial), `eye_calibration` (eye-tracker calibration started during the trial), `session_closed` (window closed mid-trial) |
+| `storyFile`, `storyGroup`, `storyAdvance` | [Stories](#stories-optional): the story file, the randomization group (`all` without that column) and how stories advanced (`space` or `auto_<secs>s`); empty when stories are off |
+| `storyNumber` | The story shown before this trial (`story_number` from the file); empty when stories are off |
+| `storySecs` | How long the story was on screen (s, summed over a pause); empty when stories are off |
 | `response` | One of that trial's question's two `answers` labels (e.g. `yes`/`no`, `left`/`right`, `fish0`/`fish1`), `timeout`, or `session_closed` if the window was closed during the trial or its question |
 | `questionAudio` | Question read-out: `spoken` (audio played), `off` (**Read out questions** off), `unavailable` (on, but no audio for this question), empty for aborted trials (no question) |
 | `flashImage` | Flash image name (`fish2`, from `FLASH_IMAGE`) or empty — only when `FLASHING_IMAGE` is on |
@@ -235,6 +268,7 @@ Sent to `MARKER_STREAM_URL` (default `ws://localhost:9001`).
 | `calibration_failed` | Calibration recorded no samples — experimenter is prompted to retry or use defaults |
 | `calibration_default_used` | Experimenter chose to skip ahead using `CONFIG.DEFAULT_CAL_RANGE` after a failed calibration |
 | `display_start_t<N>` | Pre-trial animation starts for trial N |
+| `story_start_s<story>_t<N>` / `story_end_t<N>` | [Stories](#stories-optional) only: the story (its `story_number`, letters/digits only) appears before trial N / is done (Space or auto) |
 | `trial_start_t<N>` | Trial N begins |
 | `trial_end_t<N>` | Trial N ends normally |
 | `trial_abort_t<N>` | Trial N aborted (any reason) |

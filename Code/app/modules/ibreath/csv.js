@@ -20,6 +20,9 @@
 
 import { CONFIG } from './config.js';
 
+// One CSV cell of free text (file names, story numbers): no commas, quotes or line breaks.
+const cell = (v) => String(v ?? '').replace(/[,\r\n"]+/g, ' ').trim();
+
 export class IBreathCSV {
   #subjectCode;
   #gazeEnabled;
@@ -29,11 +32,14 @@ export class IBreathCSV {
   #breathFilter;
   #trialDurationSecs;
   #responseTimeoutSecs;
+  #storyFile;
+  #storyGroup;
+  #storyAdvance;
   #signalType;
   #preset;
   #calibration = '';   // 'measured' | 'default' — set once calibration completes
 
-  // session: { signalType, preset, breathFilter, trialDurationSecs, responseTimeoutSecs } — repeated on every trial row.
+  // session: { signalType, preset, breathFilter, trialDurationSecs, responseTimeoutSecs, storyFile, storyGroup, storyAdvance } — repeated on every trial row.
   constructor(subjectCode, gazeEnabled, session, onWarn) {
     this.#subjectCode = subjectCode;
     this.#gazeEnabled = gazeEnabled;
@@ -41,6 +47,10 @@ export class IBreathCSV {
     this.#breathFilter = session.breathFilter ?? '';   // filter label, e.g. butterworth2_1.5Hz_fs100
     this.#trialDurationSecs = session.trialDurationSecs ?? '';
     this.#responseTimeoutSecs = session.responseTimeoutSecs ?? '';
+    // Stories (empty when the feature is off). Free text → no commas/line breaks.
+    this.#storyFile    = cell(session.storyFile);
+    this.#storyGroup   = cell(session.storyGroup);
+    this.#storyAdvance = cell(session.storyAdvance);
     this.#signalType   = session.signalType;
     this.#preset       = session.preset;
 
@@ -51,7 +61,7 @@ export class IBreathCSV {
 
     this.#trialHeader =
       'trialIndex,subject,questionType,synchronous,img,lr,stimX0,stimY0,stimX1,stimY1,delayMs,' +
-      'rangeMin,rangeMax,breathFilter,trialDurationSecs,responseTimeoutSecs,signalType,preset,calibration,ITI,startTime,endTime,aborted,abortReason' +
+      'rangeMin,rangeMax,breathFilter,trialDurationSecs,responseTimeoutSecs,signalType,preset,calibration,ITI,startTime,endTime,aborted,abortReason,storyFile,storyGroup,storyAdvance,storyNumber,storySecs' +
       (CONFIG.SHOW_QUESTIONS ? ',response,questionAudio' : '') +
       (CONFIG.FLASHING_IMAGE ? ',flashImage,flashScheduledTime,flashX,flashY,flashShown' : '') + '\n';
   }
@@ -150,13 +160,26 @@ export class IBreathCSV {
       `${trial.startTime ?? ''},` +
       `${trial.endTime ?? ''},` +
       `${trial.aborted},` +
-      `${trial.abortReason ?? ''}` +
+      `${trial.abortReason ?? ''},` +
+      `${this.#storyFile},${this.#storyGroup},${this.#storyAdvance},${cell(trial.storyNumber)},${trial.storySecs ?? ''}` +
       (CONFIG.SHOW_QUESTIONS ? `,${trial.response ?? ''},${trial.questionAudio ?? ''}` : '') +
       (CONFIG.FLASHING_IMAGE
         ? `,${trial.flashImage ?? ''},${trial.flashTime ?? ''},` +
         `${trial.flashX ?? ''},${trial.flashY ?? ''},${trial.flashShown}`
         : '') + '\n'
     );
+  }
+
+  // Stories feature: which story each trial shows, with the full text —
+  // storyAssignment.csv, written once at session start (so the record
+  // survives later edits of the story file). Proper CSV quoting.
+  async writeStoryAssignment(trials) {
+    if (!window.api) return;
+    const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const rows = trials.map((t) => [t.trialIndex, q(t.storyNumber), q(t.storyGroup), q(t.storyText)].join(','));
+    const path = `${CONFIG.DATA_DIR}/${this.#subjectCode}/storyAssignment.csv`;
+    const res = await window.api.writeCSV(path, `trialIndex,story_number,randomization_group,story\n${rows.join('\n')}\n`);
+    if (!res.ok) this.#warn(`Could not write storyAssignment.csv: ${res.error}`);
   }
 
   get #trialPath() {

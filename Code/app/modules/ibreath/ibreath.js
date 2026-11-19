@@ -21,6 +21,8 @@
 
 import { GaussianSmoother, SignalDelayLine, PeakEnvelopeFollower, mapRange } from '../signal/signalUtils.js';
 import { BREATH_FILTER, createBreathFilter, StreamRate } from '../signal/breathFilter.js';
+import { shuffled } from './stories.js';
+import { TEXTS } from './ibreath_texts.js';
 import { RespCalibration, AdaptiveRange } from '../calibration/calibration.js';
 import { IBreathSound } from './ibreath_sound.js';
 import { CONFIG, CONFIG_DEFAULTS, STATE } from './config.js';
@@ -92,6 +94,12 @@ export default class IBreath {
 
   // ── response (SHOW_QUESTIONS) ──────────────────────────────────────────
   #pendingTrial      = null;
+  // Stories (optional — the experimenter's "use stories" switch): a story
+  // before each trial's animation. { file, group, advance: 'space' | 'auto',
+  // autoSecs } for the session, or null when the feature is off.
+  #stories           = null;
+  #storyStartTime    = null;   // performance.now() the story screen was (re)shown
+  #storyShownMs      = 0;      // time on screen before a pause
   // Question read-out (TTS): the experimenter's "read out questions" switch,
   // and the decoded audio per question id (rendered + cached by the main
   // process — modules/tts/ttsMain.js).
@@ -287,7 +295,7 @@ export default class IBreath {
 
   // ── State machine ──────────────────────────────────────────────────────
 
-  #beginCalibration({ debugGaze, inputSignalType, calibrationSecs, numTrials, trialDurationSecs, responseTimeoutSecs, readQuestions, presetName, questions, configOverrides } = {}) {
+  #beginCalibration({ debugGaze, inputSignalType, calibrationSecs, numTrials, trialDurationSecs, responseTimeoutSecs, readQuestions, stories, presetName, questions, configOverrides } = {}) {
     // Reset to the hardcoded defaults first so a previous session's preset
     // (configOverrides) never silently lingers into a session that loads no
     // preset, or a different one that doesn't mention the same keys.
@@ -308,6 +316,10 @@ export default class IBreath {
     // Response window (max time on the answer screen) from the "response
     // secs" field (a preset's responseTimeoutSecs, or the experimenter's).
     if (Number.isInteger(responseTimeoutSecs) && responseTimeoutSecs >= 1) CONFIG.RESPONSE_TIMEOUT_SECS = responseTimeoutSecs;
+    // Stories: the chosen group's stories set the number of trials (one
+    // story per trial, assigned below).
+    const storyItems = Array.isArray(stories?.items) && stories.items.length ? stories.items : null;
+    if (storyItems) CONFIG.MAX_NUM_TRIALS = storyItems.length;
 
     // Read-out: load this session's question audio in the background (the
     // experimenter window has usually rendered it already — then it's only
@@ -318,6 +330,7 @@ export default class IBreath {
 
     this.#subjectCode = this.#hud.subjectCode;
     this.#trials = makeTrialParams(CONFIG.MAX_NUM_TRIALS);
+    this.#assignStories(storyItems, stories);
     this.#trialIndex = 0;
     this.#trialData = [];
     this.#buildSignalPipeline();
@@ -346,10 +359,14 @@ export default class IBreath {
       { signalType: this.#inputSignalType, preset: presetName ?? '',
         trialDurationSecs: CONFIG.TRIAL_DURATION_SECS,
         responseTimeoutSecs: CONFIG.RESPONSE_TIMEOUT_SECS,
+        storyFile:  this.#stories?.file ?? '',
+        storyGroup: this.#stories?.group ?? '',
+        storyAdvance: this.#stories ? (this.#stories.advance === 'auto' ? `auto_${this.#stories.autoSecs}s` : 'space') : '',
         // peaksOnly doesn't use the breath filter (peak envelope instead).
         breathFilter: this.#inputSignalType === 'peaksOnly' ? 'none' : this.#smoother.label },
       (msg) => this.#showWarning(`CSV: ${msg}`));
     this.#csv.init();
+    if (this.#stories) this.#csv.writeStoryAssignment(this.#trials);
     this.#markers.send(`task_start_${this.#taskName}`);
     this.#markers.send('instructions_cal_start');
   }
@@ -382,6 +399,12 @@ export default class IBreath {
       case STATE.INSTRUCTIONS_CAL:  this.#startCalibration(); break;
       case STATE.INSTRUCTIONS_TASK:   // the explanation replaces the first READY screen
       case STATE.READY:             this.#advanceTrial(); break;
+      case STATE.STORY:
+        // Wait-for-Space mode only, and not in the first STORY_MIN_SECS (a
+        // press that ended the previous screen mustn't skip the story).
+        if (this.#stories?.advance === 'space' &&
+            performance.now() - this.#storyStartTime >= CONFIG.STORY_MIN_SECS * 1000) this.#endStory();
+        break;
     }
   }
 
@@ -469,6 +492,17 @@ export default class IBreath {
     this.#hud.abortVisible = false;
     this.#hud.pauseVisible = true;
 
+    if (this.#stories) {
+      this.#beginStory(trial);   // the story first; #endStory then continues below
+      return;
+    }
+    this.#startDisplayOrTrial(trial);
+  }
+
+  // The trial's pre-trial animation (if on), else the trial itself.
+  #startDisplayOrTrial(trial) {
+    this.#hud.nextVisible  = false;
+    this.#hud.pauseVisible = true;
     if (CONFIG.ANIMATION_DISPLAY) {
       this.#displayStartTime = performance.now();
       this.#state = STATE.DISPLAY;
@@ -485,6 +519,52 @@ export default class IBreath {
     this.#hud.trialText = `${this.#trialIndex + 1} / ${this.#trials.length}`;
     this.#hud.trialType = trial.synchronous ? 'sync' : 'async';
     this.#updateDelayHud(trial);
+  }
+
+  // ── Stories ────────────────────────────────────────────────────────────
+
+  // One story per trial: the chosen group's stories, shuffled (each used
+  // once — an aborted trial keeps its story; stories are never repeated).
+  #assignStories(items, settings) {
+    this.#stories = null;
+    if (!items) return;
+    shuffled(items).forEach((s, i) => {
+      const trial = this.#trials[i];
+      trial.storyNumber = String(s.number);
+      trial.storyGroup  = String(s.group ?? '');
+      trial.storyText   = String(s.text);
+    });
+    const secs = Number(settings.autoSecs);
+    this.#stories = {
+      file:     String(settings.file ?? ''),
+      group:    String(settings.group ?? ''),
+      advance:  settings.advance === 'auto' ? 'auto' : 'space',
+      autoSecs: Number.isFinite(secs) && secs > 0 ? secs : CONFIG.STORY_AUTO_SECS,
+    };
+  }
+
+  #beginStory(trial) {
+    const auto = this.#stories.advance === 'auto';
+    this.#state          = STATE.STORY;
+    this.#storyStartTime = performance.now();
+    this.#storyShownMs   = 0;
+    this.#hud.stateTimer  = { startedAt: Date.now(), duration: auto ? this.#stories.autoSecs : null };
+    this.#hud.nextVisible = !auto;   // experimenter's Next = the participant's Space
+    this.#hud.trialText   = `${this.#trialIndex + 1} / ${this.#trials.length}`;
+    this.#hud.trialType   = trial.synchronous ? 'sync' : 'async';
+    this.#hud.stateText   = `story ${trial.storyNumber} — ${auto ? `continues after ${this.#stories.autoSecs} s` : 'waiting for Space (participant) or Next'}`;
+    // Story number in the marker (letters/digits only), trial number last as everywhere.
+    const num = trial.storyNumber.replace(/[^A-Za-z0-9-]/g, '');
+    this.#markers.send(`story_start_s${num}_t${trial.trialIndex}`);
+  }
+
+  #endStory() {
+    if (this.#state !== STATE.STORY) return;
+    const trial = this.#trials[this.#trialIndex];
+    trial.storySecs = +((this.#storyShownMs + performance.now() - this.#storyStartTime) / 1000).toFixed(3);
+    this.#storyStartTime = null;
+    this.#markers.send(`story_end_t${trial.trialIndex}`);
+    this.#startDisplayOrTrial(trial);
   }
 
   #beginTrial() {
@@ -614,8 +694,9 @@ export default class IBreath {
   }
 
   #onPause() {
-    const pauseable = [STATE.DISPLAY, STATE.TRIAL, STATE.RESPONSE, STATE.ITI];
+    const pauseable = [STATE.STORY, STATE.DISPLAY, STATE.TRIAL, STATE.RESPONSE, STATE.ITI];
     if (!pauseable.includes(this.#state)) return;
+    if (this.#state === STATE.STORY) this.#storyShownMs += performance.now() - this.#storyStartTime;
 
     if (this.#state === STATE.TRIAL) {
       // Abort and flush the running trial before pausing
@@ -652,6 +733,18 @@ export default class IBreath {
     this.#markers.send(`task_resume_${this.#taskName}`);
 
     switch (from) {
+      case STATE.STORY:
+        // Show the story again from the start (auto-advance and the
+        // Space delay restart; storySecs keeps counting visible time)
+        this.#storyStartTime = performance.now();
+        this.#state = STATE.STORY;
+        this.#hud.stateTimer   = { startedAt: Date.now(), duration: this.#stories.advance === 'auto' ? this.#stories.autoSecs : null };
+        this.#hud.nextVisible  = this.#stories.advance === 'space';
+        this.#hud.pauseVisible = true;
+        this.#hud.playVisible  = false;
+        this.#hud.stateText    = stateText;
+        break;
+
       case STATE.DISPLAY:
         // Rewind animation to the beginning and restart jingle
         this.#displayStartTime = performance.now();
@@ -902,6 +995,11 @@ export default class IBreath {
       }
     }
 
+    if (this.#state === STATE.STORY && this.#stories?.advance === 'auto' &&
+        now - this.#storyStartTime >= this.#stories.autoSecs * 1000) {
+      this.#endStory();
+    }
+
     if (this.#state === STATE.DISPLAY) {
       if (now - this.#displayStartTime >= CONFIG.DISPLAY_SECS * 1000) {
         this.#beginTrial();
@@ -1037,6 +1135,12 @@ export default class IBreath {
         responseStartTime: this.#responseStartTime,
         questionType:      this.#pendingTrial?.questionType ?? '',
         instructions:      this.#instructions,
+        story:             this.#state === STATE.STORY ? {
+          text: this.#trials[this.#trialIndex]?.storyText ?? '',
+          // Space hint once Space works (wait-for-Space mode)
+          hint: this.#stories?.advance === 'space' && now - this.#storyStartTime >= CONFIG.STORY_MIN_SECS * 1000
+            ? TEXTS.storyContinue : '',
+        } : null,
         gazeX:             this.#gazeX,
         gazeY:             this.#gazeY,
         ...(trialDrawData ?? {}),

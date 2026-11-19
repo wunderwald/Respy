@@ -90,7 +90,8 @@
 }
 
 #stats button,
-#settings-bar button {
+#settings-bar button,
+#stories-bar button {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 99px;
@@ -105,13 +106,15 @@
 }
 
 #stats button:hover:not(:disabled),
-#settings-bar button:hover:not(:disabled) {
+#settings-bar button:hover:not(:disabled),
+#stories-bar button:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.2);
   border-color: rgba(255, 255, 255, 0.48);
 }
 
 #stats button:disabled,
-#settings-bar button:disabled {
+#settings-bar button:disabled,
+#stories-bar button:disabled {
   opacity: 0.3;
   cursor: default;
 }
